@@ -567,6 +567,14 @@ wheels = [
 ]
 
 [[package]]
+name = "flatbuffers"
+version = "25.12.19"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl", hash = "sha256:7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4", size = 26661, upload-time = "2025-12-19T23:16:13.622Z" },
+]
+
+[[package]]
 name = "fonttools"
 version = "4.68.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1510,6 +1518,20 @@ wheels = [
 ]
 
 [[package]]
+name = "onnxruntime"
+version = "1.31.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flatbuffers" },
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "protobuf" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/eb/27/c6a823bac55b2977bea2027c3ec9393a2c1002cb9a09eb40354563e02730/onnxruntime-1.31.1-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:1f3dea47f2f0e5117c2404cea7d21fd253ae7836a3bf167a501cdfbb2600d536", size = 23760988, upload-time = "2026-10-26T19:26:23.153Z" },
+]
+
+[[package]]
 name = "onnxscript"
 version = "0.7.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1578,6 +1600,11 @@ name = "pi-wbc"
 version = "0.0.1"
 source = { editable = "." }
 default-groups = ["dev", "sim"]
+dependencies = [
+    { name = "mujoco" },
+    { name = "numpy" },
+    { name = "onnxruntime" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1592,6 +1619,11 @@ sim = [
 ]
 
 [package.metadata]
+requires-dist = [
+    { name = "mujoco", specifier = "~=3.12.0" },
+    { name = "numpy", specifier = ">=2" },
+    { name = "onnxruntime", specifier = ">=1.20" },
+]
 
 [package.metadata.requires-dev]
 dev = [
