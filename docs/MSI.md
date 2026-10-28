@@ -62,18 +62,25 @@ stage 1's long runs will add it.
 Run on the workstation, in the repository (one login with password and Duo):
 
 ```
-rsync -av --mkpath <user>@agate.msi.umn.edu:pi-wbc/results/ results/
-rsync -av --mkpath --include='*/' --include='exported/***' --include='params/***' --exclude='*' \
-    <user>@agate.msi.umn.edu:pi-wbc/logs/rsl_rl/ logs/msi/rsl_rl/
+rsync -av --mkpath <user>@agate.msi.umn.edu:pi-wbc/logs/results/ results/
+rsync -avm --include='*/' --include='exported/***' --include='params/***' \
+    --include='events.out.tfevents*' --include='*.out' --exclude='*' \
+    <user>@agate.msi.umn.edu:pi-wbc/logs/ logs/
 ```
 
-The first copies small result files (committed on the workstation afterwards); the second
-copies only the exported policies and run settings, not checkpoints, into the ignored `logs/`.
+The first copies small result files into `results/`, to be committed on the workstation. The
+second copies the exported policies, run settings, training curves and job logs, but not the
+checkpoints, into the ignored `logs/`.
 
 ## Working rules
 
 - Commands are run by hand on MSI, one short block at a time, each labelled read-only,
   creates files, overwrites/deletes, or spends GPU time.
 - Each session starts with `set +H`, so a `!` in a pasted line is not a history command.
+- Jobs write only under the ignored `logs/` folder. A job that wrote a tracked file made the
+  next `git pull` fail once that file was committed on the workstation, and the jobs submitted
+  after it ran old code (2026-10-28).
+- A submission block submits only if the clone is at the expected commit, and its output,
+  including the commit line, is checked before the jobs are counted on.
 - Use `squeue --me` and similar, so output never lists other users; cluster output that names
   other users is never committed.

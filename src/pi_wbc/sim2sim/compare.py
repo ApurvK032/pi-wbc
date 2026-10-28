@@ -3,11 +3,11 @@
     uv run pi-wbc-sim2sim-compare results/stage0/reward_pilot/*.json \
         --model menagerie --scenario walk_1.0
 
-Each result file holds one trained policy and carries a label `<variant>-s<seed>`. Files with
-the same variant are grouped: falls are pooled over all their commands, models and episodes
-(with a 95% Wilson interval), and tracking error and gait are averaged per run on one model and
-command, then over runs. With two or three training seeds per variant, differences smaller than
-the spread between seeds are not evidence of anything.
+Each result file holds one trained policy and carries a label `<variant>-s<seed>`; several
+runs may share a label. Files with the same variant are grouped: falls are pooled over all
+their commands, models and episodes (with a 95% Wilson interval), and tracking error and gait
+are averaged per run on one model and command, then over runs. With a few training runs per
+variant, differences smaller than the spread between runs are not evidence of anything.
 """
 
 from __future__ import annotations
@@ -57,11 +57,12 @@ def compare(results: list[dict[str, Any]], model: str, scenario: str) -> list[di
             for k in METRICS
         }
         lo, hi = wilson_interval(falls, episodes)
-        seeds = sorted(s for s in (variant_of(r.get("label") or "")[1] for r in runs) if s)
+        seeds = sorted({s for s in (variant_of(r.get("label") or "")[1] for r in runs) if s})
         lin = [p["lin_err_mean"] for p in picked]
         rows.append(
             {
                 "variant": variant,
+                "runs": len(runs),
                 "seeds": seeds,
                 "falls": falls,
                 "episodes": episodes,
@@ -78,15 +79,18 @@ def compare(results: list[dict[str, Any]], model: str, scenario: str) -> list[di
 def markdown_table(rows: list[dict[str, Any]]) -> str:
     headers = [h for h, *_ in GAIT_COLUMNS]
     out = [
-        "| Variant | Seeds | Falls (all commands) | Speed error | " + " | ".join(headers) + " |",
-        "|---|---|---|---:|" + "---:|" * len(headers),
+        "| Variant | Runs | Seeds | Falls (all commands) | Speed error | "
+        + " | ".join(headers)
+        + " |",
+        "|---|---:|---|---|---:|" + "---:|" * len(headers),
     ]
     for r in rows:
         lo, hi = r["fall_rate_ci95"]
         lin = "—" if r["lin_err_mean"] is None else f"{r['lin_err_mean']:.2f} m/s"
         seeds = ", ".join(str(s) for s in r["seeds"])
         out.append(
-            f"| {r['variant']} | {seeds} | {r['falls']}/{r['episodes']} ({lo:.0%}-{hi:.0%}) "
+            f"| {r['variant']} | {r['runs']} | {seeds} "
+            f"| {r['falls']}/{r['episodes']} ({lo:.0%}-{hi:.0%}) "
             f"| {lin} | " + " | ".join(format_gait(r["gait"])) + " |"
         )
     return "\n".join(out)

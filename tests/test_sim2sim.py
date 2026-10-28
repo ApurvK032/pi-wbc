@@ -304,4 +304,4 @@ def test_compare_groups_seeds_of_a_variant() -> None:
     assert base["lin_err_mean"] == pytest.approx(0.2)
     assert base["gait"]["step_rate_hz"] == pytest.approx(11.5)
     assert air["variant"] == "airtime"
-    assert "| airtime | 2 | 1/10 (" in compare.markdown_table([air])
+    assert "| airtime | 1 | 2 | 1/10 (" in compare.markdown_table([air])
