@@ -267,8 +267,8 @@ Raw data: [`sim2sim_mujoco_g1flat_msi_seed1.json`](sim2sim_mujoco_g1flat_msi_see
 - **The L40S pays off at scale.** It is slightly slower than the 4070 at 512 environments
   (small runs are limited by per-step CPU overhead, and the desktop CPU is faster per core) and
   1.5-1.7× faster at 4096-8192. Cluster runs should use at least 4096 environments.
-- **Queue rule found on the way:** `interactive-gpu` runs one job per user at a time
-  (`AssocMaxJobsLimit`), so parallel seeds need another partition.
+- **Queue rule found on the way:** the interactive GPU partition used here runs one job per
+  user at a time (`AssocMaxJobsLimit`), so parallel seeds need another partition.
 
 ### Limits
 
