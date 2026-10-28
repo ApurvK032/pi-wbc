@@ -127,11 +127,21 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   by name.
 - **Bench policy gait:** with the built-in rewards, PPO learns a fast, low shuffle: about 11
   steps/s of 8 cm, 2-3 cm foot lift, feet sliding at about 0.35 m/s in stance, nearly straight
-  knees, no arm swing (both stage 0 policies, measured in MuJoCo at 1 m/s). Stage 1's rewards
+  knees, no arm swing (measured in MuJoCo at 1 m/s; all 13 runs of the setup do this, see
+  `results/stage0/README.md` part 4). Stage 1's rewards
   must shape the gait: a stepping rhythm of about 1.5-2 steps/s, swing-foot clearance, stronger
   slip and energy penalties, arm swing. Its evaluation reports step rate, step length, foot
   lift and slip.
 - **Cluster queue:** `interactive-gpu` runs one job per user at a time (`AssocMaxJobsLimit`).
+- **Training is not bit-reproducible.** Runs with the same seed, even on the same node, export
+  different policies. Across 13 runs of the stage 0 setup, some measures spread widely: time
+  with both feet down 11-57%, turn-in-place error 0.12-0.80 rad/s.
+- **Newton's exported MJCF differs from Menagerie in contact settings:** every geom has a 1 cm
+  `gap` (MuJoCo then lists force-free contacts up to 2 cm apart), and contacts are stiffer
+  (time constant 1.8 ms requested, raised by MuJoCo to 5 ms, vs Menagerie's default 20 ms).
+- **Cluster jobs must not write tracked files.** The stage 0 benchmark wrote a results file into
+  the cluster clone; once that file was committed on the workstation, `git pull` on the cluster
+  failed and the next 12 jobs ran old code (the planned reward pilot became 12 default runs).
 
 ## D-009: Cluster runs use an Apptainer container and the workstation's lockfile (2026-10-28)
 
@@ -147,6 +157,31 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   baked in.
 - **Cost:** about 8 GB of environment per clone; the image must be rebuilt when the recipe
   changes. Jobs have no checkpoint-and-requeue logic yet (stage 0 runs take under 25 min).
+
+## D-010: Gait measures in the MuJoCo evaluation (2026-10-28)
+
+- **What:** `pi-wbc-sim2sim` reports, after the 2 s settling time and for episodes that did
+  not fall: step rate, step length, swing time, foot lift, foot speed while in stance, time
+  with both feet down and with none, knee range and arm swing (`src/pi_wbc/sim2sim/gait.py`).
+  A foot is down when one of its contacts with the floor carries force; a step is a touchdown
+  after at least 60 ms in the air; swings cut off by the start or end of recording are left
+  out; joint ranges are 5th-95th percentile. Training changes are compared on the Menagerie
+  model at a 1 m/s command.
+- **Why:** stage 0's policies walk without falling but shuffle, and falls and tracking error
+  don't show that. Stage 1's reward design needs a number for "walks like a person". Contact
+  is defined by force so that a model's inactive contacts (Newton's `gap`) don't count.
+- **Cost:** contact is sampled at the 50 Hz policy rate, so very short swings and contacts are
+  approximate. Step length divides speed by step rate, so it is meaningless when standing.
+
+## D-011: Training changes are compared against the run-to-run spread (2026-10-28)
+
+- **What:** every training change is run at least twice, and its results are shown next to the
+  lowest and highest run of the unchanged setup. A change counts as having an effect only if it
+  moves a measure clearly outside that range. Rankings between changes need more runs.
+- **Why:** GPU training is not bit-reproducible, and 13 runs of one setup differ by a factor of
+  5 or more in some measures (see Findings). Single-run comparisons would mostly measure noise.
+- **Cost:** two to three times the cluster time per change. The 13 default runs give the
+  baseline range at no extra cost.
 
 ## Open items
 
