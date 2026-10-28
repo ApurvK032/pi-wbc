@@ -19,7 +19,7 @@ settings. This module adds the conventions that differ between the two simulator
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -290,14 +290,25 @@ class G1MujocoSim:
     def base_height(self) -> float:
         return float(self.data.qpos[self.root_qpos_adr + 2])
 
+    def floor_contacts(self) -> Iterator[Any]:
+        """Contacts with the floor that carry force.
+
+        Newton's exported model gives every geom a 1 cm `gap`: MuJoCo then also lists pairs up
+        to 2 cm apart as inactive contacts (`exclude == 1`) that exert no force. Those are
+        skipped here, so "touching" means the same on every model.
+        """
+        d = self.data
+        for c in d.contact[: d.ncon]:
+            if c.exclude == 0 and (c.geom1 in self.floor_geoms or c.geom2 in self.floor_geoms):
+                yield c
+
     def torso_touches_floor(self) -> bool:
         """Isaac Lab's fall test: the torso link in contact with the ground."""
-        m, d = self.model, self.data
-        for c in d.contact[: d.ncon]:
-            bodies = {int(m.geom_bodyid[c.geom1]), int(m.geom_bodyid[c.geom2])}
-            if self.torso_body in bodies and ({c.geom1, c.geom2} & self.floor_geoms):
-                return True
-        return False
+        m = self.model
+        return any(
+            self.torso_body in (m.geom_bodyid[c.geom1], m.geom_bodyid[c.geom2])
+            for c in self.floor_contacts()
+        )
 
     def velocity_yaw_frame(self) -> tuple[np.ndarray, float]:
         """Planar COM velocity in the heading frame and yaw rate, as the tracking rewards use."""
