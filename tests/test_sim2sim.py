@@ -289,7 +289,9 @@ def test_gait_metrics_ignore_short_lifts_and_cut_swings() -> None:
 def _result(label: str, falls: int, lin: float, steps: float) -> dict:
     gait = dict.fromkeys(METRICS, 0.0) | {"step_rate_hz": steps}
     row = {"model": "menagerie", "scenario": "walk_1.0", "falls": falls, "episodes": 10}
-    return {"label": label, "summary": [row | {"lin_err_mean": lin, "gait": gait}]}
+    policy = f"logs/rsl_rl/x/slurm-{label}/exported/policy.onnx"
+    row |= {"lin_err_mean": lin, "gait": gait}
+    return {"label": label, "policy": policy, "summary": [row]}
 
 
 def test_compare_groups_seeds_of_a_variant() -> None:
@@ -305,3 +307,7 @@ def test_compare_groups_seeds_of_a_variant() -> None:
     assert base["gait"]["step_rate_hz"] == pytest.approx(11.5)
     assert air["variant"] == "airtime"
     assert "| airtime | 1 | 2 | 1/10 (" in compare.markdown_table([air])
+    assert "| 11.5 (11.0-12.0) |" in compare.markdown_table([base])
+    per_run = compare.compare(results, "menagerie", "walk_1.0", per_run=True)
+    assert len(per_run) == 3
+    assert per_run[0]["variant"] == "base-s1 (slurm-base-s1)"
