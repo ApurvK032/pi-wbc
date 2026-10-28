@@ -33,11 +33,11 @@ uv run pi-wbc-bench-table results/stage0/bench_rtx4070_newton_g1flat.json
 
 | Envs | Steps/s | Sim time / iter | Learn time / iter | Peak VRAM | Median power | Status |
 |---:|---:|---:|---:|---:|---:|---|
-| 512 | 42,016 | 0.253 s | 0.039 s | 0.5 GB | 83 W | ok |
-| 1024 | 65,472 | 0.335 s | 0.040 s | 0.6 GB | 102 W | ok |
-| 2048 | 91,147 | 0.493 s | 0.046 s | 0.9 GB | 125 W | ok |
-| 4096 | 110,434 | 0.814 s | 0.077 s | 1.5 GB | 144 W | ok |
-| 8192 | 122,181 | 1.461 s | 0.149 s | 2.6 GB | 158 W | ok |
+| 512 | 42,061 | 0.253 s | 0.039 s | 0.5 GB | 84 W | ok |
+| 1024 | 65,441 | 0.335 s | 0.040 s | 0.6 GB | 103 W | ok |
+| 2048 | 91,429 | 0.492 s | 0.046 s | 0.9 GB | 126 W | ok |
+| 4096 | 110,682 | 0.813 s | 0.075 s | 1.5 GB | 144 W | ok |
+| 8192 | 122,261 | 1.460 s | 0.149 s | 2.6 GB | 159 W | ok |
 
 - **Steps/s** is rsl_rl's figure: environment (policy) steps per second, including learning
   time; median over the 45 timed iterations. Physics steps are 4× higher.
@@ -45,12 +45,13 @@ uv run pi-wbc-bench-table results/stage0/bench_rtx4070_newton_g1flat.json
   used 15 MB before each run. **Median power** covers the timed iterations only; the card's
   limit is 200 W.
 - Raw data: [`bench_rtx4070_newton_g1flat.json`](bench_rtx4070_newton_g1flat.json), with a
-  provenance record (package versions, GPU, driver, time).
+  provenance record: commit `8aadd62` with a clean working tree, package versions, GPU, driver
+  and time.
 
 ## What this shows
 
 - Throughput is still rising at 8192 environments, but slowly: doubling from 4096 to 8192 adds
-  11%. Power reaches 158 of 200 W, so the GPU is close to full use. Simulation takes 87-91% of
+  about 10%. Power reaches 159 of 200 W, so the GPU is close to full use. Simulation takes 87-91% of
   each iteration; PPO updates are the rest.
 - During the 1024-environment run the Isaac Lab process held one CPU core at 100% while the GPU
   drew about 100 W (one spot check), so small runs are probably limited by Python and
@@ -62,11 +63,10 @@ uv run pi-wbc-bench-table results/stage0/bench_rtx4070_newton_g1flat.json
 
 ## Limits
 
-- One run per environment count. Iteration-to-iteration variation is small (coefficient of
-  variation 0.5-1.2%), but run-to-run variation was not measured.
+- Two runs per environment count: this one and an identical earlier run made before the first
+  commit (kept in commit `8aadd62`). Their medians agree within 0.3% at every count, and
+  iteration-to-iteration variation within a run is 0.5-1.2% (coefficient of variation).
 - Throughput only: 50 iterations are far too few to learn to walk, and the mean reward was not
   meant to improve. Training quality is stage 1's job.
 - Flat terrain and the 37-joint built-in G1. Rough terrain (height scanner, terrain mesh) and
   our 29-DoF robot will be slower; re-measure in stage 1.
-- The result file was written before the repository's first commit, so its provenance has no
-  commit hash. Re-run after the first commit to get one.
