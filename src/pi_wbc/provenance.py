@@ -39,17 +39,35 @@ def _run(cmd: list[str], cwd: Path | None = None) -> str | None:
 
 
 def git_info(repo: Path | None = None) -> dict[str, Any]:
-    """Commit hash and whether the working tree has uncommitted changes.
+    """Commit hash, whether the working tree differs from it, and the changed paths.
 
-    Defaults to the repository this file lives in. Outside a git checkout both
-    fields are None.
+    New files under `results/` don't count: they are the outputs of the runs being recorded,
+    and a batch of runs would otherwise mark every run after its first as dirty. Any other
+    change, tracked or new, does. Defaults to the repository this file lives in; outside a git
+    checkout every field is None.
     """
     repo = repo if repo is not None else Path(__file__).resolve().parent
     commit = _run(["git", "rev-parse", "HEAD"], cwd=repo)
     if commit is None:
-        return {"commit": None, "dirty": None}
-    status = _run(["git", "status", "--porcelain"], cwd=repo)
-    return {"commit": commit, "dirty": bool(status)}
+        return {"commit": None, "dirty": None, "changes": None}
+    # -z: NUL-separated entries "XY path", with paths not quoted or stripped.
+    try:
+        out = subprocess.run(
+            ["git", "status", "--porcelain", "-z", "--untracked-files=all"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return {"commit": commit, "dirty": None, "changes": None}
+    changes = [
+        entry[3:]
+        for entry in out.split("\0")
+        if len(entry) > 3 and not (entry.startswith("?? ") and entry[3:].startswith("results/"))
+    ]
+    return {"commit": commit, "dirty": bool(changes), "changes": changes[:20]}
 
 
 def package_versions(names: Iterable[str] = DEFAULT_PACKAGES) -> dict[str, str | None]:
