@@ -1,0 +1,42 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+# Runtime for pi-wbc on the cluster: Ubuntu 24.04 (glibc 2.39, Python 3.12, as on the
+# workstation) plus uv. The cluster's own OS (Rocky Linux 8, glibc 2.28) is too old for some
+# wheels Isaac Lab 3.0 depends on (open3d, usd-exchange, omniverseclient need glibc >= 2.34).
+#
+# The Python environment is NOT baked into the image: `uv sync --frozen` run inside the
+# container builds .venv in the repository from the same uv.lock as the workstation.
+#
+# Build (no admin rights needed):  apptainer build pi-wbc.sif msi/pi-wbc.def
+# Use:                              apptainer exec --nv pi-wbc.sif uv run ...
+
+%labels
+    org.opencontainers.image.title pi-wbc
+    org.opencontainers.image.description Ubuntu 24.04 + Python 3.12 + uv for Isaac Lab 3.0 training
+
+%environment
+    export UV_PYTHON=/usr/bin/python3.12
+    export UV_PYTHON_DOWNLOADS=never
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    # Python, git and certificates; the X11/GL libraries are loaded by some Isaac Lab
+    # dependencies (open3d, pyglet, imgui) even when training headless.
+    apt-get install -y --no-install-recommends \
+        python3.12 git curl ca-certificates \
+        libgl1 libegl1 libglu1-mesa libglib2.0-0 libgomp1 \
+        libx11-6 libxext6 libxrender1 libxi6 libxrandr2 libxinerama1 libxcursor1 \
+        libxkbcommon0 libsm6 libice6
+    rm -rf /var/lib/apt/lists/*
+    # uv, pinned to the workstation's version
+    UV_VERSION=0.13.6
+    curl -LsSf "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-x86_64-unknown-linux-gnu.tar.gz" \
+        | tar -xz -C /usr/local/bin --strip-components=1
+    uv --version
+
+%runscript
+    exec "$@"
