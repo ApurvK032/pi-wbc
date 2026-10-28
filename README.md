@@ -11,9 +11,10 @@
 
 </div>
 
-> **Status: stage 0 (setup).** Isaac Lab 3.0 trains the built-in G1 task on an RTX 4070 at up
-> to 122,000 steps/s ([smoke test](results/stage0/README.md)). Project results come with
-> stage 1.
+> **Status: stage 0 (setup).** Isaac Lab 3.0 trains G1 walking policies on an RTX 4070 (up to
+> 122,000 steps/s), and a policy trained there walks in plain MuJoCo on two different G1 models
+> without falling ([stage 0 results](results/stage0/README.md)). Cluster jobs come next;
+> project results come with stage 1.
 
 ## What this is
 
