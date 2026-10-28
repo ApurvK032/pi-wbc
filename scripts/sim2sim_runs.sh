@@ -5,8 +5,10 @@
 #
 # RUN_DIR is logs/rsl_rl/<experiment>/slurm-<jobid>[-<variant>] with an exported/ bundle. The
 # training seed is read from the job log logs/slurm/piwbc-stage0-<jobid>.out, and each result
-# is labelled <variant>-s<seed> (variant "base" when the folder has none). Each run is checked
-# on Newton's own model and on MuJoCo Menagerie's G1, 10 seeds per command (evaluate.py).
+# is labelled <variant>-s<seed> (variant "base" when the folder has none) and written to
+# OUT_DIR/<label>-<jobid>.json; GPU training is not bit-reproducible, so runs with the same
+# seed still differ. Each run is checked on Newton's own model and on MuJoCo Menagerie's G1,
+# 10 seeds per command (evaluate.py).
 # Set JOBS to change how many run at once (default 6). Run from the repository root.
 set -euo pipefail
 
@@ -30,8 +32,8 @@ evaluate() {
     uv run --frozen pi-wbc-sim2sim --label "${label}" \
         --policy "${run}/exported/policy.onnx" --policy-io "${run}/exported/policy_io.json" \
         --model "newton=${run}/exported/newton_model.xml" --model "menagerie=${MENAGERIE}" \
-        --seeds 10 --out "${OUT}/${label}.json" > "logs/sim2sim/${label}.txt" 2>&1
-    echo "${label}: done"
+        --seeds 10 --out "${OUT}/${label}-${job}.json" > "logs/sim2sim/${label}-${job}.txt" 2>&1
+    echo "${label}-${job}: done"
 }
 
 for run in "$@"; do

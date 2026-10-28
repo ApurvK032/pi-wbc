@@ -6,7 +6,9 @@
 #   mkdir -p logs/slurm
 #   sbatch -A <account> -p <partition> msi/jobs/bench_stage0.sbatch
 #
-# Writes results/stage0/bench_<gpu>_newton_g1flat.json (e.g. bench_l40s_...).
+# Writes logs/results/stage0/bench_<gpu>_newton_g1flat.json (e.g. bench_l40s_...). Jobs write
+# only under the ignored logs/ folder: a job that wrote a tracked file would make the next
+# `git pull` on the cluster fail once that file is committed on the workstation.
 #SBATCH --job-name=piwbc-bench
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -27,6 +29,6 @@ echo "node $(hostname -s), GPU ${GPU}"
 apptainer exec --nv "${SIF}" uv run --frozen pi-wbc-bench \
     --num-envs 512 1024 2048 4096 8192 16384 --warmup-iters 5 \
     --label "stage 0 smoke test on the cluster: built-in Isaac-Velocity-Flat-G1, Newton MJWarp, ${GPU}" \
-    --out "results/stage0/bench_${GPU}_newton_g1flat.json" -- \
+    --out "logs/results/stage0/bench_${GPU}_newton_g1flat.json" -- \
     isaaclab train --rl_library rsl_rl --task Isaac-Velocity-Flat-G1 \
     --num_envs {num_envs} --max_iterations 50 --seed 1 physics=newton_mjwarp
