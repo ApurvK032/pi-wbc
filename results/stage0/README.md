@@ -6,6 +6,8 @@
    still walk in plain MuJoCo?
 3. [The same training on MSI](#3-the-same-training-on-msi): does the same code train the same
    policy on the cluster, and how fast?
+4. [Run-to-run spread](#4-run-to-run-spread-13-runs-of-the-same-setup): how much do 13 runs of
+   the same setup differ?
 
 <p align="center">
   <img src="g1_mujoco_menagerie_walk_turn.gif" alt="G1 walking and turning in MuJoCo" width="400"><br>
@@ -260,8 +262,8 @@ Raw data: [`sim2sim_mujoco_g1flat_msi_seed1.json`](sim2sim_mujoco_g1flat_msi_see
 - **Same code, same behaviour.** Across both policies, 238 of 240 MuJoCo episodes ran 20 s
   without a fall; the only falls were the workstation policy's 2/10 when turning in place on
   Newton's model. Walking speed errors are 0.02-0.13 m/s for both. Both under-turn when asked to
-  turn in place (0.56-0.74 rad/s error), confirming that weakness comes from training, not
-  from one run.
+  turn in place (0.56-0.74 rad/s error). Part 4 shows this varies a lot between runs: across 13
+  runs the error ranges from 0.12 to 0.80 rad/s, though most runs under-turn.
 - **The L40S pays off at scale.** It is slightly slower than the 4070 at 512 environments
   (small runs are limited by per-step CPU overhead, and the desktop CPU is faster per core) and
   1.5-1.7× faster at 4096-8192. Cluster runs should use at least 4096 environments.
@@ -270,7 +272,70 @@ Raw data: [`sim2sim_mujoco_g1flat_msi_seed1.json`](sim2sim_mujoco_g1flat_msi_see
 
 ### Limits
 
-- One seed per machine; a seed sweep (planned) would separate seed-to-seed spread from
-  machine differences.
+- One seed per machine. Part 4 measures the spread over 13 runs.
 - The same caveats as part 2 apply: easy MuJoCo conditions, no Isaac Lab evaluation under the
   same protocol yet, and a bench policy rather than the project's controller.
+
+## 4. Run-to-run spread: 13 runs of the same setup
+
+**In short:** all 13 runs of the default stage 0 setup learn the same fast shuffle, so the
+shuffle comes from the rewards, not from an unlucky run. But the details vary a lot between
+runs (for example, time with both feet down: 11-57%), so comparing reward changes needs
+several runs per change.
+
+### How these runs came about
+
+The overnight cluster batch on 2026-10-28 was meant to test five reward changes against the
+default (two seeds each). A file written by an earlier job blocked `git pull` on the cluster,
+so the jobs ran the previous job script, which ignored the variant arguments. Every run's saved
+configuration (`params/env.yaml`) has the default reward weights, so all 12 trained the default
+setup: six with seed 2 and six with seed 3. With part 3's seed 1 run, that gives 13 runs. The
+cause is fixed (jobs now write only under the ignored `logs/` folder, and submissions check the
+commit first; [MSI guide](../../docs/MSI.md)), and the reward pilot will be re-run.
+
+**Runs with the same seed are not identical.** All 13 exported policies differ, including
+same-seed runs on the same node: GPU training is not bit-for-bit reproducible here. Each run
+is an independent sample of what this setup learns.
+
+### Results
+
+Same protocol as part 2: both MuJoCo models, 6 commands, 10 seeded starts each, 20 s. Gait is
+measured on the Menagerie model at a 1 m/s command, after the first 2 s. Mean over runs, with
+the lowest and highest run in brackets:
+
+| Runs | Falls (all commands) | Speed error | Steps/s | Step length | Foot lift | Foot speed in stance | Both feet down | Knee range | Arm swing |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 13 | 15/1560 (1%-2%) | 0.11 m/s | 10.7 (9.3-11.5) | 8 cm (8-10) | 2.8 cm (2.2-3.5) | 0.31 m/s (0.21-0.38) | 40% (11-57) | 18° (15-22) | 3° (2-4) |
+
+Raw data: one file per run in [`base_runs/`](base_runs/) (evaluated at commit `055aedf`, clean
+tree), the summary in [`base_runs_compare.json`](base_runs_compare.json), and the training-side
+numbers of the 12 overnight runs in [`base_runs_training.json`](base_runs_training.json). The
+per-run table: `uv run pi-wbc-sim2sim-compare results/stage0/base_runs/*.json --per-run`.
+
+### What this shows
+
+- **The shuffle is what this setup learns.** All 13 runs take 9-12 steps per second of
+  8-10 cm, with 2-4 cm of foot lift. A gait fix should move these numbers far outside these
+  ranges (towards about 2 steps/s, 30+ cm steps and 5-10 cm of lift), so two runs per reward
+  change are enough to see whether it works, but not to rank changes with smaller effects.
+- **Some measures vary widely between runs.** Time with both feet down ranges from 11% to 57%,
+  and the turn-rate error when turning in place from 0.12 to 0.80 rad/s (4 of 13 runs track it
+  within 0.25 rad/s). A difference of this size between two single runs says nothing.
+- **Training and MuJoCo agree on which runs differ.** The runs that collected the most
+  foot-air-time reward in training are the ones that step slowest in MuJoCo (Spearman ρ = -0.76
+  over the 12 runs with training logs).
+- **Falls are rare and nearly all happen while turning in place.** 15 of 1560 episodes (1.0%,
+  95% CI 0.6%-1.6%) fell, 14 of them turning in place. 10 of these come from one run, which falls
+  every time it turns in place on Newton's model and never on Menagerie's.
+
+### Two measurement fixes found on the way
+
+- **Inactive contacts.** Newton's exported model gives every collision shape a 1 cm `gap`, so
+  MuJoCo also lists shapes up to 2 cm apart as contacts that carry no force. The evaluation
+  now counts only contacts that carry force, both for foot contact and for the torso-on-floor
+  fall check. Re-running parts 2 and 3 with the fix changed none of their numbers; the two
+  falls in part 2 happened at the same moments.
+- **Contact stiffness differs between the two models.** Newton's model asks for a contact time
+  constant of 1.8 ms, which MuJoCo raises to its minimum of two steps (5 ms). Menagerie uses
+  MuJoCo's default of 20 ms, so its feet sink further into the floor (median 3 mm while
+  walking). This adds to the model-description differences listed in part 2.
