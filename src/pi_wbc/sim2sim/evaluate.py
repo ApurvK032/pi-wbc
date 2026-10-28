@@ -42,13 +42,29 @@ FALL_HEIGHT = 0.35  # m, pelvis height
 SETTLE_S = 2.0
 
 
+def single_thread_options() -> Any:
+    """onnxruntime options for small policies: one thread, no CPU pinning.
+
+    By default onnxruntime pins a thread to every core of the machine; inside a Slurm job that
+    owns only some of the cores, that fails noisily. A small MLP runs fastest on one thread.
+    """
+    import onnxruntime as ort
+
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = 1
+    options.inter_op_num_threads = 1
+    return options
+
+
 class OnnxPolicy:
     """An exported rsl_rl actor: observation (1, n) float32 in, action (1, m) out."""
 
     def __init__(self, path: str | Path) -> None:
         import onnxruntime as ort
 
-        self.session = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+        self.session = ort.InferenceSession(
+            str(path), sess_options=single_thread_options(), providers=["CPUExecutionProvider"]
+        )
         self.input_name = self.session.get_inputs()[0].name
         self.input_dim = self.session.get_inputs()[0].shape[-1]
 

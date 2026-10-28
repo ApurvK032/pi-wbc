@@ -125,6 +125,28 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   support area.
 - Joint limits agree to 1e-5 rad. Joint order differs only within the hands; joints are matched
   by name.
+- **Bench policy gait:** with the built-in rewards, PPO learns a fast, low shuffle: about 11
+  steps/s of 8 cm, 2-3 cm foot lift, feet sliding at about 0.35 m/s in stance, nearly straight
+  knees, no arm swing (both stage 0 policies, measured in MuJoCo at 1 m/s). Stage 1's rewards
+  must shape the gait: a stepping rhythm of about 1.5-2 steps/s, swing-foot clearance, stronger
+  slip and energy penalties, arm swing. Its evaluation reports step rate, step length, foot
+  lift and slip.
+- **Cluster queue:** `interactive-gpu` runs one job per user at a time (`AssocMaxJobsLimit`).
+
+## D-009: Cluster runs use an Apptainer container and the workstation's lockfile (2026-10-28)
+
+- **What:** jobs on MSI run in an Apptainer image built from `msi/pi-wbc.def` (Ubuntu 24.04,
+  Python 3.12, uv). The Python environment is created in the clone by `uv sync --frozen` inside
+  the container, from the same `uv.lock` as the workstation. Code arrives by `git pull`; Slurm
+  account and partition are given at submission, never stored in the repository; results come
+  home by `rsync`. Commands are run by hand from short labelled blocks (docs/MSI.md).
+- **Why:** MSI's Rocky Linux 8 has glibc 2.28, too old for several Isaac Lab 3.0 wheels (open3d,
+  usd-exchange, omniverseclient need 2.34-2.35). The container fixes the OS; the shared lockfile
+  fixes the packages, so the same commit trains the same way on both machines (stage 0 part 3).
+  The image builds without admin rights and is small (151 MB) because the environment is not
+  baked in.
+- **Cost:** about 8 GB of environment per clone; the image must be rebuilt when the recipe
+  changes. Jobs have no checkpoint-and-requeue logic yet (stage 0 runs take under 25 min).
 
 ## Open items
 
