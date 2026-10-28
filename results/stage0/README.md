@@ -4,6 +4,8 @@
    the workstation, and how fast?
 2. [MuJoCo sim-to-sim bench](#2-mujoco-sim-to-sim-bench): does a policy trained in Isaac Lab
    still walk in plain MuJoCo?
+3. [The same training on MSI](#3-the-same-training-on-msi): does the same code train the same
+   policy on the cluster, and how fast?
 
 <p align="center">
   <img src="g1_mujoco_menagerie_walk_turn.gif" alt="G1 walking and turning in MuJoCo" width="400"><br>
@@ -164,12 +166,111 @@ deterministic: three runs of this evaluation gave identical numbers.
 
 ### Limits
 
+- **The gait is not natural.** Measured in MuJoCo (Menagerie model) at a 1 m/s command, both
+  policies (this one and part 3's) take about 11 steps per second of about 8 cm each, lift
+  their feet only 2-3 cm, let the feet slide at about 0.35 m/s while on the ground, keep the
+  knees almost straight (-5° to 19°) and barely swing the arms (2-3°). A person, or a good G1
+  controller, takes about 2 steps per second of 0.4-0.5 m. The built-in rewards ask only for
+  speed tracking and a few penalties, so PPO found a fast, low shuffle that is stable and
+  scores well. Stage 1 adds gait-shaping rewards and reports these gait measures next to falls.
 - **Small samples.** One training seed and 10 episodes per cell: 0/10 falls only bounds the true
   rate below 28%. The data cannot rank the two models against each other; the 2/10 versus 0/10
-  difference on turning is within noise.
+  difference on turning is within noise. (Part 3 adds a second policy: the same seed trained
+  on a different GPU.)
 - **No Isaac Lab baseline under the same protocol yet.** The end-of-training numbers above come
   from random commands with noise, pushes and randomization, so they are not directly
   comparable. Stage 1 adds an Isaac Lab evaluation with these exact commands and seeds.
 - **Easy conditions.** No sensor noise, delay, pushes or friction changes in MuJoCo, and MuJoCo
   has no joint velocity limits. Stage 1's ablation adds these.
 - **A bench policy.** Built-in rewards and settings, not the project's controller (stage 1).
+
+## 3. The same training on MSI
+
+**Question:** does the same code train the same policy on the Minnesota Supercomputing
+Institute (MSI) cluster, and how fast?
+
+**Answer:** yes. On an MSI NVIDIA L40S the stage 0 policy trained in 17 min 41 s (27 min 12 s
+on the RTX 4070), finished with the same tracking error, exported to a byte-identical policy
+description, and walked in MuJoCo without a single fall in 120 episodes.
+
+### Setup
+
+Runs use an Apptainer container (Ubuntu 24.04, Python 3.12) and the workstation's `uv.lock`;
+see [docs/MSI.md](../../docs/MSI.md) and [D-009](../../docs/DECISIONS.md). Training ran from
+commit `15e86b4` with a clean tree (job 4913225, `msi/jobs/train_stage0.sbatch`, seed 1). The
+training code, task registration and lockfile are identical to `9b03ad7`, the commit the
+workstation policy was trained from (`git diff` between them is empty for those files). GPU:
+L40S 46 GB, driver 580.178.04.
+
+### Training: workstation vs cluster
+
+| | RTX 4070 (workstation) | L40S (MSI) |
+|---|---:|---:|
+| Training time, 1500 iterations | 27 min 12 s | 17 min 41 s |
+| Steps per second at the end | about 90,000 | 145,228 |
+| End-of-training reward / episode length | 22.42 / 996 | 22.16 / 1000 |
+| End-of-training speed / turn-rate error | 0.137 m/s / 0.401 rad/s | 0.137 m/s / 0.418 rad/s |
+| ONNX vs PyTorch, largest action difference | 1.7e-6 | 2.1e-6 |
+| `policy_io.json` and Newton's MuJoCo model | | byte-identical to the workstation's |
+
+The two policies are not bit-identical (GPU arithmetic and parallel reductions differ between
+cards), but they behave alike.
+
+### Throughput: same sweep on the L40S
+
+| Envs | RTX 4070 steps/s | L40S steps/s | L40S / 4070 | L40S peak VRAM | L40S median power |
+|---:|---:|---:|---:|---:|---:|
+| 512 | 42,061 | 37,576 | 0.89 | 0.8 GB | 138 W |
+| 1024 | 65,441 | 65,119 | 1.00 | 0.9 GB | 160 W |
+| 2048 | 91,429 | 109,808 | 1.20 | 1.2 GB | 196 W |
+| 4096 | 110,682 | 164,311 | 1.48 | 1.8 GB | 242 W |
+| 8192 | 122,261 | 202,375 | 1.66 | 3.0 GB | 287 W |
+| 16384 | not run | 217,959 | | 5.2 GB | 326 W |
+
+Raw data: [`bench_l40s_newton_g1flat.json`](bench_l40s_newton_g1flat.json) (commit `15e86b4`,
+clean tree, job 4913226).
+
+### MuJoCo: the cluster-trained policy
+
+Same protocol, commands and seeds as part 2.
+
+| Model | Command (vx, vy, yaw rate) | Falls | Fall rate (95% CI) | Speed error | Turn-rate error |
+|---|---|---:|---|---:|---:|
+| newton | stand (0, 0, 0) | 0/10 | 0% (0%-28%) | 0.01 m/s | 0.03 rad/s |
+| newton | walk (0.5, 0, 0) | 0/10 | 0% (0%-28%) | 0.04 m/s | 0.12 rad/s |
+| newton | walk (1.0, 0, 0) | 0/10 | 0% (0%-28%) | 0.11 m/s | 0.14 rad/s |
+| newton | side-step (0, 0.3, 0) | 0/10 | 0% (0%-28%) | 0.11 m/s | 0.12 rad/s |
+| newton | turn in place (0, 0, 0.8) | 0/10 | 0% (0%-28%) | 0.10 m/s | 0.74 rad/s |
+| newton | walk and turn (0.6, 0, 0.5) | 0/10 | 0% (0%-28%) | 0.08 m/s | 0.16 rad/s |
+| menagerie | stand (0, 0, 0) | 0/10 | 0% (0%-28%) | 0.03 m/s | 0.05 rad/s |
+| menagerie | walk (0.5, 0, 0) | 0/10 | 0% (0%-28%) | 0.02 m/s | 0.10 rad/s |
+| menagerie | walk (1.0, 0, 0) | 0/10 | 0% (0%-28%) | 0.09 m/s | 0.10 rad/s |
+| menagerie | side-step (0, 0.3, 0) | 0/10 | 0% (0%-28%) | 0.12 m/s | 0.20 rad/s |
+| menagerie | turn in place (0, 0, 0.8) | 0/10 | 0% (0%-28%) | 0.04 m/s | 0.72 rad/s |
+| menagerie | walk and turn (0.6, 0, 0.5) | 0/10 | 0% (0%-28%) | 0.07 m/s | 0.15 rad/s |
+
+Raw data: [`sim2sim_mujoco_g1flat_msi_seed1.json`](sim2sim_mujoco_g1flat_msi_seed1.json)
+(evaluated on the workstation, commit `b8068d3`, clean tree).
+
+### What this shows
+
+- **The cluster pipeline works end to end.** The container builds without admin rights, the
+  environment comes from the same lockfile, every job prints its commit, and results come home
+  with provenance.
+- **Same code, same behaviour.** Across both policies, 238 of 240 MuJoCo episodes ran 20 s
+  without a fall; the only falls were the workstation policy's 2/10 when turning in place on
+  Newton's model. Walking speed errors are 0.02-0.13 m/s for both. Both under-turn when asked to
+  turn in place (0.56-0.74 rad/s error), confirming that weakness comes from training, not
+  from one run.
+- **The L40S pays off at scale.** It is slightly slower than the 4070 at 512 environments
+  (small runs are limited by per-step CPU overhead, and the desktop CPU is faster per core) and
+  1.5-1.7× faster at 4096-8192. Cluster runs should use at least 4096 environments.
+- **Queue rule found on the way:** `interactive-gpu` runs one job per user at a time
+  (`AssocMaxJobsLimit`), so parallel seeds need another partition.
+
+### Limits
+
+- One seed per machine; a seed sweep (planned) would separate seed-to-seed spread from
+  machine differences.
+- The same caveats as part 2 apply: easy MuJoCo conditions, no Isaac Lab evaluation under the
+  same protocol yet, and a bench policy rather than the project's controller.

@@ -11,10 +11,10 @@
 
 </div>
 
-> **Status: stage 0 (setup).** Isaac Lab 3.0 trains G1 walking policies on an RTX 4070 (up to
-> 122,000 steps/s), and a policy trained there walks in plain MuJoCo on two different G1 models
-> without falling ([stage 0 results](results/stage0/README.md)). Cluster jobs come next;
-> project results come with stage 1.
+> **Status: stage 0 (setup) done.** The same code trains a G1 walking policy on an RTX 4070 and
+> on an MSI L40S (up to 218,000 steps/s), and both policies walk in plain MuJoCo on two different
+> G1 models without falling ([stage 0 results](results/stage0/README.md)). Their gait is still
+> a fast shuffle; stage 1 builds the project's own controller.
 
 ## What this is
 
@@ -38,7 +38,7 @@ the same VLA, through the same command interface.
 
 | Stage | What | Status |
 |---|---|---|
-| 0 | Setup: Isaac Lab training, MuJoCo sim-to-sim bench, cluster jobs | in progress |
+| 0 | Setup: Isaac Lab training, MuJoCo sim-to-sim bench, cluster jobs | done |
 | 1 | Whole-body controller: PPO, rewards, curriculum, domain randomization, teacher-student | planned |
 | 2 | Human motion imitation (retargeted motion capture) | planned |
 | 3 | Pick-and-place task, scripted expert, rendered demonstrations | planned |

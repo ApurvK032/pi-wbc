@@ -45,6 +45,7 @@ def main(argv: list[str] | None = None) -> None:
 
     import pi_wbc.tasks  # noqa: F401  (registers our tasks)
     from pi_wbc import provenance
+    from pi_wbc.sim2sim.evaluate import single_thread_options
     from pi_wbc.tasks.policy_io import collect
 
     checkpoint = args.checkpoint.resolve()
@@ -69,7 +70,9 @@ def main(argv: list[str] | None = None) -> None:
             runner.export_policy_to_onnx(path=str(out_dir), filename="policy.onnx")
 
             session = ort.InferenceSession(
-                str(out_dir / "policy.onnx"), providers=["CPUExecutionProvider"]
+                str(out_dir / "policy.onnx"),
+                sess_options=single_thread_options(),
+                providers=["CPUExecutionProvider"],
             )
             input_name = session.get_inputs()[0].name
             obs = venv.get_observations()
