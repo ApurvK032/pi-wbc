@@ -122,7 +122,6 @@ def collect(env: Any) -> dict[str, Any]:
             "pos": list(robot.cfg.init_state.pos),
             "rot_xyzw": list(robot.cfg.init_state.rot),
         },
-        "body_mass": _first_env(robot.data.body_mass),
     }
 
 
