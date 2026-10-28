@@ -10,7 +10,8 @@ import mujoco
 import numpy as np
 import pytest
 
-from pi_wbc.sim2sim import evaluate
+from pi_wbc.sim2sim import compare, evaluate
+from pi_wbc.sim2sim.gait import METRICS, GaitRecorder, gait_metrics
 from pi_wbc.sim2sim.mujoco_g1 import (
     G1MujocoSim,
     PolicyIO,
@@ -188,11 +189,39 @@ def test_action_sets_joint_targets_around_the_default_pose(sim: G1MujocoSim) -> 
 
 @needs_model
 def test_episode_runs_with_a_zero_policy(sim: G1MujocoSim) -> None:
-    fell, t_fall, _, _ = evaluate.run_episode(
+    fell, t_fall, _, _, gait = evaluate.run_episode(
         sim, lambda obs: np.zeros(29), (0.0, 0.0, 0.0), seed=0, duration_s=1.0
     )
     assert isinstance(fell, bool)
     assert t_fall is None or 0 < t_fall <= 1.0
+    assert gait is None or set(gait) == set(METRICS)
+
+
+@needs_model
+def test_inactive_gap_contacts_do_not_count_as_touching(io: PolicyIO) -> None:
+    model = build_model(SCENE, io)
+    model.geom_gap[:] = 0.01  # as in Newton's exported model
+    sim = G1MujocoSim(model, io)
+    sim.reset()
+    a = sim.root_qpos_adr
+    sim.data.qpos[a + 2] = 0.8  # lift the robot so the feet hover about 1 cm up
+    mujoco.mj_forward(sim.model, sim.data)
+    recorder = GaitRecorder(sim)
+    listed = [c for c in sim.data.contact[: sim.data.ncon] if c.exclude == 1]
+    assert listed  # MuJoCo lists the near-miss pairs ...
+    assert recorder._foot_down() == [False, False]  # ... but they are not contact
+
+
+@needs_model
+def test_gait_recorder_sees_both_feet_down_when_standing(sim: G1MujocoSim) -> None:
+    recorder = GaitRecorder(sim)
+    for k in range(20):  # the robot spawns a little above the floor; sample after it lands
+        sim.step(np.zeros(29))
+        if k >= 15:
+            recorder.sample()
+    assert all(all(d) for d in recorder.down)
+    g = recorder.metrics()
+    assert g["step_rate_hz"] == 0 and g["double_support"] == 1.0
 
 
 def test_summarize_and_table() -> None:
@@ -214,3 +243,65 @@ def test_summarize_and_table() -> None:
     assert row["lin_err_mean"] == pytest.approx(0.2)  # fallen episodes are left out
     table = evaluate.markdown_table([row])
     assert "| m | stand | 1/4 | 25% (" in table
+    assert row["gait"]["step_rate_hz"] is None  # no gait recorded in these episodes
+    assert "| m | stand | — |" in evaluate.gait_table([row])
+
+
+def _walk(n: int = 200, period: int = 25, swing: int = 10, dt: float = 0.02):
+    """Synthetic gait: each foot swings for `swing` of every `period` samples, out of phase."""
+    t = np.arange(n)
+    phase = np.stack([t % period, (t + period // 2) % period], axis=1)
+    down = phase >= swing
+    foot_z = np.where(down, 0.03, 0.03 + 0.08 * np.sin(np.pi * phase / swing))
+    foot_speed = np.where(down, 0.05, 1.5)
+    base_speed = np.full(n, 0.6)
+    knee = np.stack([0.3 + 0.5 * np.sin(2 * np.pi * t / period)] * 2, axis=1)
+    shoulder = np.zeros((n, 2))
+    return down, foot_z, foot_speed, base_speed, knee, shoulder, dt
+
+
+def test_gait_metrics_on_a_synthetic_walk() -> None:
+    g = gait_metrics(*_walk())
+    # 200 samples of 20 ms = 4 s. The left foot's first swing starts at sample 0, so it is cut
+    # and left out: 7 left + 8 right whole swings.
+    assert g["step_rate_hz"] == pytest.approx(15 / 4.0)
+    assert g["step_length_m"] == pytest.approx(0.6 / 3.75)
+    assert g["swing_s"] == pytest.approx(0.2)
+    assert g["foot_lift_m"] == pytest.approx(0.08 * np.sin(np.pi * 5 / 10))
+    assert g["stance_foot_speed_mps"] == pytest.approx(0.05)
+    assert g["double_support"] + g["flight"] < 1
+    assert 50 < g["knee_range_deg"] < 2 * np.degrees(0.5)
+    assert g["arm_swing_deg"] == 0
+
+
+def test_gait_metrics_ignore_short_lifts_and_cut_swings() -> None:
+    down = np.ones((100, 2), dtype=bool)
+    down[10:12, 0] = False  # 40 ms: contact flicker, not a step
+    down[30:40, 0] = False  # a real step
+    down[:20, 1] = False  # under way when recording starts
+    down[90:, 1] = False  # not finished when recording stops
+    zeros = np.zeros((100, 2))
+    g = gait_metrics(down, zeros, zeros, np.zeros(100), zeros, zeros, dt=0.02)
+    assert g["step_rate_hz"] == pytest.approx(1 / 2.0)
+    assert g["swing_s"] == pytest.approx(0.2)
+
+
+def _result(label: str, falls: int, lin: float, steps: float) -> dict:
+    gait = dict.fromkeys(METRICS, 0.0) | {"step_rate_hz": steps}
+    row = {"model": "menagerie", "scenario": "walk_1.0", "falls": falls, "episodes": 10}
+    return {"label": label, "summary": [row | {"lin_err_mean": lin, "gait": gait}]}
+
+
+def test_compare_groups_seeds_of_a_variant() -> None:
+    results = [
+        _result("base-s1", 0, 0.1, 11.0),
+        _result("airtime-s2", 1, 0.2, 2.0),
+        _result("base-s2", 2, 0.3, 12.0),
+    ]
+    base, air = compare.compare(results, "menagerie", "walk_1.0")
+    assert (base["variant"], base["seeds"]) == ("base", [1, 2])
+    assert (base["falls"], base["episodes"]) == (2, 20)
+    assert base["lin_err_mean"] == pytest.approx(0.2)
+    assert base["gait"]["step_rate_hz"] == pytest.approx(11.5)
+    assert air["variant"] == "airtime"
+    assert "| airtime | 2 | 1/10 (" in compare.markdown_table([air])
