@@ -7,11 +7,22 @@ license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Apurv Kushwaha" }]
 requires-python = ">=3.12,<3.13"
-dependencies = []
+# The MuJoCo bench needs only these, so it also runs without Isaac Lab (`--no-group sim`).
+# MuJoCo stays on the minor version Isaac Lab 3.0 pins.
+dependencies = [
+    "mujoco~=3.12.0",
+    "numpy>=2",
+    "onnxruntime>=1.20",
+]
 
 [project.scripts]
 pi-wbc-bench = "pi_wbc.bench:main"
 pi-wbc-bench-table = "pi_wbc.bench:table_main"
+pi-wbc-policy-io = "pi_wbc.tasks.policy_io:main"
+
+# Lets `isaaclab train/play` find our tasks.
+[project.entry-points."isaaclab.tasks"]
+pi_wbc = "pi_wbc.tasks"
 
 [dependency-groups]
 dev = [
