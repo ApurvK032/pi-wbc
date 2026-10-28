@@ -1,0 +1,76 @@
+[project]
+name = "pi-wbc"
+version = "0.0.1"
+description = "PPO whole-body control for the Unitree G1, trained in Isaac Lab, with a VLA on top."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Apurv Kushwaha" }]
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[project.scripts]
+pi-wbc-bench = "pi_wbc.bench:main"
+pi-wbc-bench-table = "pi_wbc.bench:table_main"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.0",
+    "pytest>=8.3",
+    "ruff>=0.8",
+]
+# Isaac Lab 3.0 with the Newton backend (no Isaac Sim). Torch pins match Isaac Lab's own.
+# Skip it where only lint and unit tests run: `uv sync --no-group sim`.
+sim = [
+    "isaaclab==3.0.0",
+    "torch==2.11.0",
+    "torchvision==0.26.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv]
+default-groups = ["dev", "sim"]
+# The workstation and the cluster are both Linux x86_64.
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
+
+# Explicit indexes serve only the packages pinned to them below; everything else comes from PyPI.
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+isaaclab = { index = "nvidia" }
+torch = { index = "pytorch-cu130" }
+torchvision = { index = "pytorch-cu130" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # import sorting
+    "UP",  # pyupgrade
+    "B",   # bugbear
+    "SIM", # simplify
+    "NPY", # numpy
+    "RUF", # ruff-specific
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Dash (pulled in by open3d via Isaac Lab) registers a pytest plugin we don't use.
+addopts = "-ra -p no:dash"
