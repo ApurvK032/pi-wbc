@@ -132,7 +132,8 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   must shape the gait: a stepping rhythm of about 1.5-2 steps/s, swing-foot clearance, stronger
   slip and energy penalties, arm swing. Its evaluation reports step rate, step length, foot
   lift and slip.
-- **Cluster queue:** `interactive-gpu` runs one job per user at a time (`AssocMaxJobsLimit`).
+- **Cluster queue:** the interactive GPU partition used so far runs one job per user at a time
+  (`AssocMaxJobsLimit`).
 - **Training is not bit-reproducible.** Runs with the same seed, even on the same node, export
   different policies. Across 13 runs of the stage 0 setup, some measures spread widely: time
   with both feet down 11-57%, turn-in-place error 0.12-0.80 rad/s.
