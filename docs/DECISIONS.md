@@ -140,6 +140,12 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 - **Newton's exported MJCF differs from Menagerie in contact settings:** every geom has a 1 cm
   `gap` (MuJoCo then lists force-free contacts up to 2 cm apart), and contacts are stiffer
   (time constant 1.8 ms requested, raised by MuJoCo to 5 ms, vs Menagerie's default 20 ms).
+- **Isaac Lab holds undriven joints at 0.** Joints that no action term drives keep a PD
+  target of 0 unless the task sets one, not the default pose. Stage 0's hands and the first
+  stage 1 gait policies' arms were held at 0 in training but at the default pose in the
+  MuJoCo bench; the bench now uses the targets the export records, and the stage 1 task holds
+  arms and hands at the default pose with a reset event. Stage 0's numbers were re-run (small
+  changes, same conclusions).
 - **Cluster jobs must not write tracked files.** The stage 0 benchmark wrote a results file into
   the cluster clone; once that file was committed on the workstation, `git pull` on the cluster
   failed and the next 12 jobs ran old code (the planned reward pilot became 12 default runs).

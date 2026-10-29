@@ -96,8 +96,16 @@ independent model of the same robot?
 **Answer:** yes, for walking. In the 100 MuJoCo episodes (20 s each, both models) that stand,
 walk at 0.5 and 1.0 m/s, side-step or walk while turning, the robot never fell, and walking
 speed errors were 0.09-0.13 m/s. The one weak spot is turning in place at 0.8 rad/s: the robot
-turns far too slowly on both models (error about 0.6 rad/s) and fell in 2 of 10 episodes on
-Newton's model. That is a training gap, not a transfer gap (see below).
+turns far too slowly on both models (error about 0.6 rad/s) and fell in 1 of 10 episodes on
+each model. That is a training gap, not a transfer gap (see below).
+
+> **Corrected 2026-10-29.** The first version of parts 2-4 held the hand joints, which the
+> policy does not drive, at the default pose in MuJoCo. In training Isaac Lab held them at 0
+> (it leaves the targets of joints no action drives at 0). The bench now holds every such
+> joint where training did, and parts 2-4 were re-run: walking numbers moved by at most
+> 0.02 m/s and the shuffle findings are unchanged; turning in place now shows one fall on
+> each model instead of two on Newton's. The same check found a much larger mismatch in the
+> first stage 1 gait policies, whose arms are not driven either.
 
 ### Policy
 
@@ -139,18 +147,19 @@ MUJOCO_GL=egl uv run pi-wbc-sim2sim --policy <run>/exported/policy.onnx \
 | newton | stand (0, 0, 0) | 0/10 | 0% (0%-28%) | 0.00 m/s | 0.00 rad/s |
 | newton | walk (0.5, 0, 0) | 0/10 | 0% (0%-28%) | 0.10 m/s | 0.07 rad/s |
 | newton | walk (1.0, 0, 0) | 0/10 | 0% (0%-28%) | 0.13 m/s | 0.12 rad/s |
-| newton | side-step (0, 0.3, 0) | 0/10 | 0% (0%-28%) | 0.10 m/s | 0.16 rad/s |
-| newton | turn in place (0, 0, 0.8) | 2/10 | 20% (6%-51%) | 0.12 m/s | 0.61 rad/s |
+| newton | side-step (0, 0.3, 0) | 0/10 | 0% (0%-28%) | 0.10 m/s | 0.15 rad/s |
+| newton | turn in place (0, 0, 0.8) | 1/10 | 10% (2%-40%) | 0.10 m/s | 0.62 rad/s |
 | newton | walk and turn (0.6, 0, 0.5) | 0/10 | 0% (0%-28%) | 0.09 m/s | 0.09 rad/s |
 | menagerie | stand (0, 0, 0) | 0/10 | 0% (0%-28%) | 0.00 m/s | 0.00 rad/s |
-| menagerie | walk (0.5, 0, 0) | 0/10 | 0% (0%-28%) | 0.10 m/s | 0.06 rad/s |
-| menagerie | walk (1.0, 0, 0) | 0/10 | 0% (0%-28%) | 0.13 m/s | 0.08 rad/s |
-| menagerie | side-step (0, 0.3, 0) | 0/10 | 0% (0%-28%) | 0.09 m/s | 0.19 rad/s |
-| menagerie | turn in place (0, 0, 0.8) | 0/10 | 0% (0%-28%) | 0.14 m/s | 0.56 rad/s |
-| menagerie | walk and turn (0.6, 0, 0.5) | 0/10 | 0% (0%-28%) | 0.10 m/s | 0.06 rad/s |
+| menagerie | walk (0.5, 0, 0) | 0/10 | 0% (0%-28%) | 0.09 m/s | 0.14 rad/s |
+| menagerie | walk (1.0, 0, 0) | 0/10 | 0% (0%-28%) | 0.12 m/s | 0.21 rad/s |
+| menagerie | side-step (0, 0.3, 0) | 0/10 | 0% (0%-28%) | 0.09 m/s | 0.22 rad/s |
+| menagerie | turn in place (0, 0, 0.8) | 1/10 | 10% (2%-40%) | 0.15 m/s | 0.56 rad/s |
+| menagerie | walk and turn (0.6, 0, 0.5) | 0/10 | 0% (0%-28%) | 0.09 m/s | 0.10 rad/s |
 
 Raw data, including every episode: [`sim2sim_mujoco_g1flat_seed1.json`](sim2sim_mujoco_g1flat_seed1.json)
-(commit `26fb817`, clean tree). The two falls happened at 10.1 s and 13.5 s. MuJoCo is
+(commit `f456e84`, clean tree). The two falls happened at 16.2 s (Newton's model) and 9.4 s
+(Menagerie's). MuJoCo is
 deterministic: three runs of this evaluation gave identical numbers.
 
 ### What this shows
@@ -170,14 +179,14 @@ deterministic: three runs of this evaluation gave identical numbers.
 
 - **The gait is not natural.** Measured in MuJoCo (Menagerie model) at a 1 m/s command, both
   policies (this one and part 3's) take about 11 steps per second of about 8 cm each, lift
-  their feet only 2-3 cm, let the feet slide at about 0.35 m/s while on the ground, keep the
+  their feet only 2-3 cm, let the feet slide at about 0.3 m/s while on the ground, keep the
   knees almost straight (-5° to 19°) and barely swing the arms (2-3°). A person, or a good G1
   controller, takes about 2 steps per second of 0.4-0.5 m. The built-in rewards ask only for
   speed tracking and a few penalties, so PPO found a fast, low shuffle that is stable and
   scores well. Stage 1 adds gait-shaping rewards and reports these gait measures next to falls.
 - **Small samples.** One training seed and 10 episodes per cell: 0/10 falls only bounds the true
-  rate below 28%. The data cannot rank the two models against each other; the 2/10 versus 0/10
-  difference on turning is within noise. (Part 3 adds a second policy: the same seed trained
+  rate below 28%. The data cannot rank the two models against each other; one fall in 10 on
+  each model when turning is within noise. (Part 3 adds a second policy: the same seed trained
   on a different GPU.)
 - **No Isaac Lab baseline under the same protocol yet.** The end-of-training numbers above come
   from random commands with noise, pushes and randomization, so they are not directly
@@ -240,30 +249,31 @@ Same protocol, commands and seeds as part 2.
 |---|---|---:|---|---:|---:|
 | newton | stand (0, 0, 0) | 0/10 | 0% (0%-28%) | 0.01 m/s | 0.03 rad/s |
 | newton | walk (0.5, 0, 0) | 0/10 | 0% (0%-28%) | 0.04 m/s | 0.12 rad/s |
-| newton | walk (1.0, 0, 0) | 0/10 | 0% (0%-28%) | 0.11 m/s | 0.14 rad/s |
+| newton | walk (1.0, 0, 0) | 0/10 | 0% (0%-28%) | 0.11 m/s | 0.15 rad/s |
 | newton | side-step (0, 0.3, 0) | 0/10 | 0% (0%-28%) | 0.11 m/s | 0.12 rad/s |
-| newton | turn in place (0, 0, 0.8) | 0/10 | 0% (0%-28%) | 0.10 m/s | 0.74 rad/s |
+| newton | turn in place (0, 0, 0.8) | 1/10 | 10% (2%-40%) | 0.06 m/s | 0.66 rad/s |
 | newton | walk and turn (0.6, 0, 0.5) | 0/10 | 0% (0%-28%) | 0.08 m/s | 0.16 rad/s |
-| menagerie | stand (0, 0, 0) | 0/10 | 0% (0%-28%) | 0.03 m/s | 0.05 rad/s |
-| menagerie | walk (0.5, 0, 0) | 0/10 | 0% (0%-28%) | 0.02 m/s | 0.10 rad/s |
-| menagerie | walk (1.0, 0, 0) | 0/10 | 0% (0%-28%) | 0.09 m/s | 0.10 rad/s |
-| menagerie | side-step (0, 0.3, 0) | 0/10 | 0% (0%-28%) | 0.12 m/s | 0.20 rad/s |
+| menagerie | stand (0, 0, 0) | 0/10 | 0% (0%-28%) | 0.06 m/s | 0.11 rad/s |
+| menagerie | walk (0.5, 0, 0) | 0/10 | 0% (0%-28%) | 0.03 m/s | 0.18 rad/s |
+| menagerie | walk (1.0, 0, 0) | 0/10 | 0% (0%-28%) | 0.10 m/s | 0.16 rad/s |
+| menagerie | side-step (0, 0.3, 0) | 0/10 | 0% (0%-28%) | 0.13 m/s | 0.23 rad/s |
 | menagerie | turn in place (0, 0, 0.8) | 0/10 | 0% (0%-28%) | 0.04 m/s | 0.72 rad/s |
-| menagerie | walk and turn (0.6, 0, 0.5) | 0/10 | 0% (0%-28%) | 0.07 m/s | 0.15 rad/s |
+| menagerie | walk and turn (0.6, 0, 0.5) | 0/10 | 0% (0%-28%) | 0.06 m/s | 0.21 rad/s |
 
 Raw data: [`sim2sim_mujoco_g1flat_msi_seed1.json`](sim2sim_mujoco_g1flat_msi_seed1.json)
-(evaluated on the workstation, commit `b8068d3`, clean tree).
+(evaluated on the workstation, commit `f456e84`, clean tree).
 
 ### What this shows
 
 - **The cluster pipeline works end to end.** The container builds without admin rights, the
   environment comes from the same lockfile, every job prints its commit, and results come home
   with provenance.
-- **Same code, same behaviour.** Across both policies, 238 of 240 MuJoCo episodes ran 20 s
-  without a fall; the only falls were the workstation policy's 2/10 when turning in place on
-  Newton's model. Walking speed errors are 0.02-0.13 m/s for both. Both under-turn when asked to
-  turn in place (0.56-0.74 rad/s error). Part 4 shows this varies a lot between runs: across 13
-  runs the error ranges from 0.12 to 0.80 rad/s, though most runs under-turn.
+- **Same code, same behaviour.** Across both policies, 237 of 240 MuJoCo episodes ran 20 s
+  without a fall; all three falls happened while turning in place (the workstation policy once
+  on each model, the cluster policy once on Newton's). Walking speed errors are 0.03-0.13 m/s
+  for both. Both under-turn when asked to turn in place (0.56-0.72 rad/s error). Part 4 shows
+  this varies a lot between runs: across 13 runs the error ranges from 0.11 to 0.80 rad/s,
+  though most runs under-turn.
 - **The L40S pays off at scale.** It is slightly slower than the 4070 at 512 environments
   (small runs are limited by per-step CPU overhead, and the desktop CPU is faster per core) and
   1.5-1.7× faster at 4096-8192. Cluster runs should use at least 4096 environments.
@@ -280,7 +290,7 @@ Raw data: [`sim2sim_mujoco_g1flat_msi_seed1.json`](sim2sim_mujoco_g1flat_msi_see
 
 **In short:** all 13 runs of the default stage 0 setup learn the same fast shuffle, so the
 shuffle comes from the rewards, not from an unlucky run. But the details vary a lot between
-runs (for example, time with both feet down: 11-57%), so comparing reward changes needs
+runs (for example, time with both feet down: 9-59%), so comparing reward changes needs
 several runs per change.
 
 ### How these runs came about
@@ -305,36 +315,40 @@ the lowest and highest run in brackets:
 
 | Runs | Falls (all commands) | Speed error | Steps/s | Step length | Foot lift | Foot speed in stance | Both feet down | Knee range | Arm swing |
 |---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 13 | 15/1560 (1%-2%) | 0.11 m/s | 10.7 (9.3-11.5) | 8 cm (8-10) | 2.8 cm (2.2-3.5) | 0.31 m/s (0.21-0.38) | 40% (11-57) | 18° (15-22) | 3° (2-4) |
+| 13 | 17/1560 (1%-2%) | 0.12 m/s | 10.2 (9.1-11.4) | 9 cm (8-11) | 3.0 cm (2.3-3.9) | 0.31 m/s (0.20-0.42) | 40% (9-59) | 18° (14-23) | 3° (2-4) |
 
-Raw data: one file per run in [`base_runs/`](base_runs/) (evaluated at commit `055aedf`, clean
+Raw data: one file per run in [`base_runs/`](base_runs/) (evaluated at commit `f456e84`, clean
 tree), the summary in [`base_runs_compare.json`](base_runs_compare.json), and the training-side
 numbers of the 12 overnight runs in [`base_runs_training.json`](base_runs_training.json). The
 per-run table: `uv run pi-wbc-sim2sim-compare results/stage0/base_runs/*.json --per-run`.
 
 ### What this shows
 
-- **The shuffle is what this setup learns.** All 13 runs take 9-12 steps per second of
-  8-10 cm, with 2-4 cm of foot lift. A gait fix should move these numbers far outside these
+- **The shuffle is what this setup learns.** All 13 runs take 9-11 steps per second of
+  8-11 cm, with 2-4 cm of foot lift. A gait fix should move these numbers far outside these
   ranges (towards about 2 steps/s, 30+ cm steps and 5-10 cm of lift), so two runs per reward
   change are enough to see whether it works, but not to rank changes with smaller effects.
-- **Some measures vary widely between runs.** Time with both feet down ranges from 11% to 57%,
-  and the turn-rate error when turning in place from 0.12 to 0.80 rad/s (4 of 13 runs track it
+- **Some measures vary widely between runs.** Time with both feet down ranges from 9% to 59%,
+  and the turn-rate error when turning in place from 0.11 to 0.80 rad/s (3 of 13 runs track it
   within 0.25 rad/s). A difference of this size between two single runs says nothing.
 - **Training and MuJoCo agree on which runs differ.** The runs that collected the most
-  foot-air-time reward in training are the ones that step slowest in MuJoCo (Spearman ρ = -0.76
+  foot-air-time reward in training are the ones that step slowest in MuJoCo (Spearman ρ = -0.70
   over the 12 runs with training logs).
-- **Falls are rare and nearly all happen while turning in place.** 15 of 1560 episodes (1.0%,
-  95% CI 0.6%-1.6%) fell, 14 of them turning in place. 10 of these come from one run, which falls
+- **Falls are rare and nearly all happen while turning in place.** 17 of 1560 episodes (1.1%,
+  95% CI 0.7%-1.7%) fell, 15 of them turning in place. 10 of these come from one run, which falls
   every time it turns in place on Newton's model and never on Menagerie's.
 
-### Two measurement fixes found on the way
+### Three measurement fixes found on the way
 
 - **Inactive contacts.** Newton's exported model gives every collision shape a 1 cm `gap`, so
   MuJoCo also lists shapes up to 2 cm apart as contacts that carry no force. The evaluation
   now counts only contacts that carry force, both for foot contact and for the torso-on-floor
   fall check. Re-running parts 2 and 3 with the fix changed none of their numbers; the two
   falls in part 2 happened at the same moments.
+- **Joints the policy does not drive.** Isaac Lab leaves their PD targets at 0 unless the
+  task sets them; the bench had held them at the default pose. It now holds them at the
+  targets the export records (0 for these runs), and every number above uses that (see the
+  correction note in part 2).
 - **Contact stiffness differs between the two models.** Newton's model asks for a contact time
   constant of 1.8 ms, which MuJoCo raises to its minimum of two steps (5 ms). Menagerie uses
   MuJoCo's default of 20 ms, so its feet sink further into the floor (median 3 mm while
