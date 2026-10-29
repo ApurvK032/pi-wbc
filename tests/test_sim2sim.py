@@ -183,7 +183,9 @@ def test_action_sets_joint_targets_around_the_default_pose(sim: G1MujocoSim) -> 
     targets = dict(zip(sim.io.joint_names, sim.data.ctrl[sim.actuator_ids], strict=True))
     assert targets["left_knee_joint"] == pytest.approx(sim.io.default_pos["left_knee_joint"] + 0.2)
     assert targets["right_knee_joint"] == pytest.approx(sim.io.default_pos["right_knee_joint"])
-    assert targets["left_hand_thumb_1_joint"] == pytest.approx(1.0)  # hands stay at default
+    # Joints no action drives keep the target Isaac Lab held them at in training. The stage 0
+    # export records none, and Isaac Lab leaves such targets at 0 (not the default pose, 1.0).
+    assert targets["left_hand_thumb_1_joint"] == pytest.approx(0.0)
     assert np.allclose(sim.last_action, action)
     assert sim.data.time == pytest.approx(0.02)  # one policy step = 8 MuJoCo steps of 2.5 ms
 

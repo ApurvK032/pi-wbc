@@ -159,6 +159,24 @@ def joint_deviation_l2(env: ManagerBasedRLEnv, asset_cfg) -> torch.Tensor:
     return torch.square(offset).sum(dim=-1)
 
 
+# -- events --------------------------------------------------------------------------------------
+
+
+def hold_joints_at_default(env: ManagerBasedRLEnv, env_ids: torch.Tensor | None, asset_cfg) -> None:
+    """Set the PD targets of joints no action drives to the default pose (reset event).
+
+    Isaac Lab otherwise leaves their targets at 0: the first gait runs trained with the arms
+    hanging straight down instead of in the default pose.
+    """
+    asset = env.scene[asset_cfg.name]
+    ids = asset_cfg.joint_ids
+    if isinstance(ids, slice):
+        ids = list(range(asset.num_joints))
+    rows = slice(None) if env_ids is None else env_ids
+    default = asset.data.default_joint_pos.torch[rows][:, ids]
+    asset.set_joint_position_target_index(target=default, joint_ids=ids, env_ids=env_ids)
+
+
 # -- commands ------------------------------------------------------------------------------------
 
 
