@@ -8,6 +8,8 @@
    policy on the cluster, and how fast?
 4. [Run-to-run spread](#4-run-to-run-spread-13-runs-of-the-same-setup): how much do 13 runs of
    the same setup differ?
+5. [Reward pilot](#5-reward-pilot-four-reward-changes-two-runs-each): which reward change turns
+   the shuffle into a walk?
 
 <p align="center">
   <img src="g1_mujoco_menagerie_walk_turn.gif" alt="G1 walking and turning in MuJoCo" width="400"><br>
@@ -301,7 +303,7 @@ so the jobs ran the previous job script, which ignored the variant arguments. Ev
 configuration (`params/env.yaml`) has the default reward weights, so all 12 trained the default
 setup: six with seed 2 and six with seed 3. With part 3's seed 1 run, that gives 13 runs. The
 cause is fixed (jobs now write only under the ignored `logs/` folder, and submissions check the
-commit first; [MSI guide](../../docs/MSI.md)), and the reward pilot will be re-run.
+commit first; [MSI guide](../../docs/MSI.md)); the reward pilot was re-run (part 5).
 
 **Runs with the same seed are not identical.** All 13 exported policies differ, including
 same-seed runs on the same node: GPU training is not bit-for-bit reproducible here. Each run
@@ -353,3 +355,106 @@ per-run table: `uv run pi-wbc-sim2sim-compare results/stage0/base_runs/*.json --
   constant of 1.8 ms, which MuJoCo raises to its minimum of two steps (5 ms). Menagerie uses
   MuJoCo's default of 20 ms, so its feet sink further into the floor (median 3 mm while
   walking). This adds to the model-description differences listed in part 2.
+
+## 5. Reward pilot: four reward changes, two runs each
+
+**In short:** a stronger foot-air-time reward with a longer target air time is enough to turn
+the shuffle into a walk: both runs take about 3 steps per second of 32 cm, far outside all 13
+default runs. Stronger slip and smoothness penalties only halve the step rate, and a stronger
+torque penalty changes nothing. All four changes together walk at 2.5 steps per second of
+38 cm with the least slip, but one of the two runs sways from side to side with its arms
+thrown out. No change improves turning, and the slower walks track commands worse in training.
+
+### Setup
+
+The default stage 0 setup of parts 2-4 with one change per variant, passed as config overrides
+to `msi/jobs/train_stage0.sbatch`:
+
+| Variant | Change from the default |
+|---|---|
+| airtime | foot-air-time reward 0.75 → 2.0, target air time per step 0.4 → 0.5 s |
+| slide | foot-slide penalty −0.1 → −0.5 |
+| smooth | action-rate penalty −0.005 → −0.02 |
+| energy | joint-torque penalty −2e-6 → −2e-5 |
+| all | all four together |
+
+Training seeds 2 and 3, 1500 iterations, one A40 GPU per run, commit `065f4d5` (cluster jobs
+5048189-5048199, 2026-10-29). This time each job log shows the expected commit, variant and
+overrides, and each run's saved configuration (`params/env.yaml`) has the intended weights.
+MuJoCo protocol as in part 2.
+
+### Results
+
+Menagerie model, 1 m/s command. Mean over runs, with the lower and higher run in brackets; the
+default row is part 4's 13 runs:
+
+| Variant | Runs | Falls (all commands) | Speed error | Steps/s | Step length | Foot lift | Foot speed in stance | Both feet down | Knee range | Arm swing |
+|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| default | 13 | 17/1560 (1%-2%) | 0.12 m/s | 10.2 (9.1-11.4) | 9 cm (8-11) | 3.0 cm (2.3-3.9) | 0.31 m/s (0.20-0.42) | 40% (9-59) | 18° (14-23) | 3° (2-4) |
+| airtime | 2 | 0/240 (0%-2%) | 0.10 m/s | 3.0 (2.9-3.1) | 32 cm (32-32) | 6.8 cm (6.6-6.9) | 0.24 m/s (0.23-0.24) | 1% (0-1) | 18° (16-21) | 9° (8-11) |
+| slide | 2 | 0/240 (0%-2%) | 0.07 m/s | 5.7 (5.2-6.2) | 18 cm (16-19) | 3.7 cm (3.6-3.8) | 0.20 m/s (0.17-0.23) | 4% (3-5) | 23° (23-23) | 5° (4-6) |
+| smooth | 2 | 3/240 (0%-4%) | 0.07 m/s | 6.9 (6.6-7.1) | 15 cm (15-16) | 5.5 cm (4.8-6.2) | 0.30 m/s (0.27-0.34) | 46% (36-56) | 29° (28-29) | 4° (4-5) |
+| energy | 2 | 15/240 (4%-10%) | 0.10 m/s | 9.2 (8.3-10.2) | 10 cm (8-12) | 4.0 cm (3.7-4.3) | 0.38 m/s (0.34-0.43) | 33% (14-51) | 20° (18-22) | 3° (2-3) |
+| all | 2 | 0/240 (0%-2%) | 0.09 m/s | 2.5 (2.4-2.5) | 38 cm (37-39) | 8.1 cm (6.4-9.9) | 0.16 m/s (0.14-0.17) | 1% (0-2) | 41° (19-63) | 16° (10-22) |
+
+Turning in MuJoCo (Menagerie model, 0.8 rad/s in place) and Isaac Lab's training statistics
+(mean of the last 50 iterations, over the random training commands), per run, seed 2 then
+seed 3:
+
+| Variant | Turn-rate error, turning in place | Training: speed error | Training: turn-rate error | Training: falls (share of episode ends) |
+|---|---|---|---|---|
+| default | 0.11-0.80 rad/s (13 runs) | 0.13-0.15 m/s (12 runs) | 0.38-0.44 rad/s | 0.9-1.8% |
+| airtime | 0.20, 0.44 rad/s | 0.20, 0.20 m/s | 0.73, 0.64 rad/s | 3.2%, 1.3% |
+| slide | 0.15, 0.35 rad/s | 0.15, 0.16 m/s | 0.41, 0.48 rad/s | 2.0%, 2.7% |
+| smooth | 0.28, 0.21 rad/s | 0.14, 0.14 m/s | 0.41, 0.40 rad/s | 2.1%, 2.1% |
+| energy | 0.38, 0.19 rad/s | 0.14, 0.13 m/s | 0.36, 0.38 rad/s | 1.5%, 1.1% |
+| all | 0.28, 0.23 rad/s | 0.19, 0.20 m/s | 0.62, 0.57 rad/s | 5.3%, 3.3% |
+
+<p align="center">
+  <img src="pilot_airtime_s2_walk_1.0.gif" alt="airtime, seed 2, walking at 1 m/s" width="260">
+  <img src="pilot_all_s2_walk_1.0.gif" alt="all four changes, seed 2, walking at 1 m/s" width="260">
+  <img src="pilot_all_s3_walk_1.0.gif" alt="all four changes, seed 3, walking at 1 m/s" width="260"><br>
+  <em>1 m/s in MuJoCo (Menagerie model). Left: airtime, seed 2, which drifts off its heading
+  by about 0.2 rad/s. Middle: all four changes, seed 2, swaying with high knees and arms thrown
+  out. Right: all four changes, seed 3, upright.</em>
+</p>
+
+Raw data: one file per run in [`pilot_runs/`](pilot_runs/) (evaluated at commit `3ea445b`,
+clean tree), the summary with the default runs in
+[`pilot_runs_compare.json`](pilot_runs_compare.json), and the training-side numbers in
+[`pilot_runs_training.json`](pilot_runs_training.json). The per-run table:
+`uv run pi-wbc-sim2sim-compare results/stage0/pilot_runs/*.json --per-run`.
+
+### What this shows
+
+- **Air time is the lever.** Both airtime runs step at 2.9-3.1 steps per second, take 32 cm
+  steps and lift their feet 6.6-6.9 cm, outside every default run on all three. This matches
+  part 4: the default runs that collected the most air-time reward stepped slowest.
+- **The penalties on their own slow the shuffle but don't make it a walk.** slide and smooth
+  take 5-7 steps per second of 15-19 cm (smooth also lifts its feet higher, 4.8-6.2 cm).
+  energy stays inside the default range on every gait measure.
+- **All four together give the longest steps and the least slip** (0.14-0.17 m/s, below every
+  default run), but the two runs walk differently: seed 2 sways, lifts its knees high (63° of
+  knee range) and swings its arms 22°; seed 3 walks upright (19°, 10°).
+- **Slower walking costs tracking in training.** Over Isaac Lab's random training commands,
+  airtime and all have speed errors of 0.19-0.20 m/s (default 0.13-0.15), turn-rate errors of
+  0.57-0.73 rad/s (default 0.38-0.44), and fall more often. The MuJoCo test commands don't show
+  this: at 1 m/s their speed errors are 0.08-0.12 m/s.
+- **No change fixes turning.** Every variant's turn-in-place error (0.15-0.44 rad/s) is inside
+  the default range, as is its heading drift while walking at 1 m/s (0.01-0.19 rad/s).
+- **Falls give no signal.** All 18 falls happened while turning in place, as with the default
+  rewards. 15 come from one energy run (seed 2), but a default run once fell 10 times, so this
+  is no evidence that the torque penalty causes falls.
+
+Stage 1 does not tune these weights. Its gait task describes the walk instead, with a gait
+clock and Unitree's G1 rewards, and adds a heading reward ([stage 1 results](../stage1/README.md)).
+Its three runs walk like "all" (2.5 steps per second, 39 cm), stay upright, and also turn and
+hold their heading (turn-in-place error 0.06-0.08 rad/s). That is not a controlled comparison:
+stage 1 also changes the actions, gains and commands.
+
+### Limits
+
+- Two runs per variant: enough to see effects far outside the default range (D-011), not to
+  rank variants with smaller differences, such as slide against smooth.
+- One weight per change, not a sweep.
+- The caveats of part 2 apply: easy MuJoCo conditions and a bench policy.
