@@ -92,6 +92,7 @@ def collect(env: Any) -> dict[str, Any]:
 
     command_cfg = env.cfg.commands.base_velocity
     friction = env.cfg.events.physics_material.params
+    gait = getattr(env.cfg, "gait", None)
     return {
         "task_cfg": type(env.cfg).__name__,
         "physics_dt": env.physics_dt,
@@ -109,6 +110,7 @@ def collect(env: Any) -> dict[str, Any]:
             "clip": action_term.cfg.clip,
         },
         "observation": {"dim": start, "terms": obs_layout, "joint_names": obs_joint_names},
+        "gait": None if gait is None else gait.to_dict(),
         "commands": {
             "lin_vel_x": list(command_cfg.ranges.lin_vel_x),
             "lin_vel_y": list(command_cfg.ranges.lin_vel_y),
@@ -154,11 +156,12 @@ def main(argv: list[str] | None = None) -> None:
             data = collect(env.unwrapped)
         finally:
             env.close()
-    # The MuJoCo runner assumes joint observations use the action's joints in the action's order.
+    # Joint observations must name their joints so the MuJoCo runner can order them.
+    terms = [t["name"] for t in data["observation"]["terms"]]
+    for name in ("joint_pos", "joint_vel"):
+        if name in terms and name not in data["observation"]["joint_names"]:
+            raise SystemExit(f"[policy_io] {name} has no joint list")
     action_joints = data["action"]["joint_names"]
-    for name, obs_joints in data["observation"]["joint_names"].items():
-        if obs_joints != action_joints:
-            raise SystemExit(f"[policy_io] {name} joint order differs from the action's")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(data, indent=2) + "\n")
     print(
