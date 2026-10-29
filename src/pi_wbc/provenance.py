@@ -41,10 +41,10 @@ def _run(cmd: list[str], cwd: Path | None = None) -> str | None:
 def git_info(repo: Path | None = None) -> dict[str, Any]:
     """Commit hash, whether the working tree differs from it, and the changed paths.
 
-    New files under `results/` don't count: they are the outputs of the runs being recorded,
-    and a batch of runs would otherwise mark every run after its first as dirty. Any other
-    change, tracked or new, does. Defaults to the repository this file lives in; outside a git
-    checkout every field is None.
+    Changes under `results/` (new or rewritten files) don't count: they are the outputs of the
+    runs being recorded, never inputs to the code, and a batch of runs would otherwise mark
+    every run after its first as dirty. Any other change, tracked or new, does. Defaults to
+    the repository this file lives in; outside a git checkout every field is None.
     """
     repo = repo if repo is not None else Path(__file__).resolve().parent
     commit = _run(["git", "rev-parse", "HEAD"], cwd=repo)
@@ -65,7 +65,7 @@ def git_info(repo: Path | None = None) -> dict[str, Any]:
     changes = [
         entry[3:]
         for entry in out.split("\0")
-        if len(entry) > 3 and not (entry.startswith("?? ") and entry[3:].startswith("results/"))
+        if len(entry) > 3 and not entry[3:].startswith("results/")
     ]
     return {"commit": commit, "dirty": bool(changes), "changes": changes[:20]}
 
