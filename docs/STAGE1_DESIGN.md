@@ -132,7 +132,9 @@ produce a normal gait on this robot:
   cycle and in the air in the rest. The policy sees the phase (as sin and cos), and a reward
   pays each foot for matching the schedule. When the command is near zero, the clock switches
   to standing: both feet down.
-- **Foot lift.** A penalty on the swing foot's height away from a target of about 8 cm.
+- **Foot lift.** A penalty on the swing foot's height away from a target: the ankle at 8 cm,
+  which is about 4.5 cm of clearance under the sole (Unitree's value; raised if the measured
+  lift falls short of the section 1 target).
 - **No slipping.** A penalty on foot speed while the foot is on the ground.
 - **Posture.** Penalties on hip yaw and roll away from neutral (no splayed or crossed legs), on
   body tilt, and on pelvis height away from the target height.
@@ -150,7 +152,7 @@ explained.
 | Task | pelvis height to the commanded height | -10 | Unitree tracks a fixed 0.78 m; here it tracks the height command |
 | Task | torso orientation to the command | 0.5 (exp) | new: the torso command of section 3 |
 | Gait | contact matches the gait clock | 0.18 | Unitree; clock period 0.8 s (2.5 steps/s), right foot half a period behind, stance in the first 55% |
-| Gait | swing-foot height, (height - 0.08 m)² | -20 | Unitree |
+| Gait | swing-foot height, (ankle height - 0.08 m)² | -20 | Unitree; the ankle sits about 3.6 cm above the sole |
 | Gait | foot speed while in contact | -0.2 | Unitree (`contact_no_vel`) |
 | Gait | hip roll and yaw away from zero | -1.0 | Unitree (`hip_pos`) |
 | Gait | feet air time | 0 | dropped: the clock replaces it |
