@@ -311,3 +311,31 @@ def test_compare_groups_seeds_of_a_variant() -> None:
     per_run = compare.compare(results, "menagerie", "walk_1.0", per_run=True)
     assert len(per_run) == 3
     assert per_run[0]["variant"] == "base-s1 (slurm-base-s1)"
+
+
+# -- stage 1 gait task: 15 driven joints, 29 observed, gait clock ------------------------------
+
+GAIT_IO_PATH = ROOT / "tests" / "data" / "policy_io_g1_gait.json"
+
+
+@needs_model
+def test_gait_task_observation_layout_and_clock() -> None:
+    io = PolicyIO.load(GAIT_IO_PATH)
+    assert len(io.action_joint_names) == 15 and len(io.obs_joint_names["joint_pos"]) == 29
+    sim = G1MujocoSim(build_model(SCENE, io), io)
+    sim.reset()
+    obs = sim.observation((0.5, 0.0, 0.0))
+    assert obs.shape == (io.obs_dim,) == (87,)
+    assert _obs_term(sim, obs, "joint_pos").shape == (29,)
+    assert _obs_term(sim, obs, "actions").shape == (15,)
+    assert _obs_term(sim, obs, "gait_clock") == pytest.approx([0.0, 1.0])
+
+    # Only the 15 driven joints move their targets; arms keep the default pose.
+    action = np.ones(15)
+    for _ in range(10):  # 10 steps of 20 ms = a quarter of the 0.8 s period
+        sim.step(action)
+    obs = sim.observation((0.5, 0.0, 0.0))
+    assert _obs_term(sim, obs, "gait_clock") == pytest.approx([1.0, 0.0], abs=1e-9)
+    targets = dict(zip(io.joint_names, sim.data.ctrl[sim.actuator_ids], strict=True))
+    assert targets["left_knee_joint"] == pytest.approx(io.default_pos["left_knee_joint"] + 0.25)
+    assert targets["left_elbow_joint"] == pytest.approx(io.default_pos["left_elbow_joint"])

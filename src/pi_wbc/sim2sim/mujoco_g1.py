@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +36,7 @@ SUPPORTED_OBS_TERMS = {
     "joint_pos",
     "joint_vel",
     "actions",
+    "gait_clock",
 }
 
 
@@ -69,7 +70,7 @@ class PolicyIO:
     """The parts of policy_io.json the MuJoCo side uses."""
 
     joint_names: list[str]  # every joint, in Isaac Lab's order
-    action_joint_names: list[str]  # joints the policy drives; also the joint-observation order
+    action_joint_names: list[str]  # joints the policy drives, in action order
     default_pos: dict[str, float]
     stiffness: dict[str, float]
     damping: dict[str, float]
@@ -85,6 +86,9 @@ class PolicyIO:
     root_pos: tuple[float, float, float]
     root_quat_wxyz: tuple[float, float, float, float]
     command_ranges: dict[str, tuple[float, float]]
+    # joints of each joint observation, in observation order (stage 0: the action's joints)
+    obs_joint_names: dict[str, list[str]] = field(default_factory=dict)
+    gait: dict[str, float] | None = None  # gait clock settings (stage 1 tasks)
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> PolicyIO:
@@ -123,6 +127,10 @@ class PolicyIO:
             root_pos=tuple(raw["root_init"]["pos"]),
             root_quat_wxyz=tuple(xyzw_to_wxyz(raw["root_init"]["rot_xyzw"])),
             command_ranges={k: tuple(v) for k, v in raw["commands"].items()},
+            obs_joint_names={
+                k: list(v) for k, v in raw["observation"].get("joint_names", {}).items()
+            },
+            gait=raw.get("gait"),
         )
 
     @classmethod
@@ -193,6 +201,14 @@ class G1MujocoSim:
         self.actuator_ids = np.array([actuator_names.index(f"pd_{n}") for n in io.joint_names])
         self.policy_ids = np.array([io.joint_names.index(n) for n in io.action_joint_names])
         self.default_pos = np.array([io.default_pos[n] for n in io.joint_names])
+        self.obs_ids = {
+            term: np.array([io.joint_names.index(n) for n in io.obs_joint_names.get(term, [])])
+            if io.obs_joint_names.get(term)
+            else self.policy_ids
+            for term in ("joint_pos", "joint_vel")
+        }
+        if any(t == "gait_clock" for t, _ in io.obs_terms) and not io.gait:
+            raise ValueError("the policy observes a gait clock but policy_io has no gait settings")
 
         free = [j for j in range(m.njnt) if m.jnt_type[j] == mujoco.mjtJoint.mjJNT_FREE]
         if len(free) != 1:
@@ -209,6 +225,8 @@ class G1MujocoSim:
             raise ValueError("the model has no floor plane")
 
         self.steps_per_action = io.decimation * io.num_substeps
+        self.policy_dt = io.physics_dt * io.decimation
+        self.steps = 0  # policy steps since reset, as Isaac Lab's episode_length_buf
         self.last_action = np.zeros(len(self.policy_ids))
         self._vel6 = np.zeros(6)
 
@@ -237,6 +255,7 @@ class G1MujocoSim:
         d.qvel[self.root_qvel_adr : self.root_qvel_adr + 3] = root_lin_vel
         d.ctrl[self.actuator_ids] = self.default_pos
         self.last_action = np.zeros(len(self.policy_ids))
+        self.steps = 0
         mujoco.mj_forward(m, d)
 
     def base_rotation(self) -> np.ndarray:
@@ -263,10 +282,12 @@ class G1MujocoSim:
             "base_ang_vel": rot.T @ ang_w,
             "projected_gravity": rot.T @ GRAVITY_DIR,
             "velocity_commands": np.asarray(command, dtype=float),
-            "joint_pos": (q - self.default_pos)[self.policy_ids],
-            "joint_vel": qd[self.policy_ids],
+            "joint_pos": (q - self.default_pos)[self.obs_ids["joint_pos"]],
+            "joint_vel": qd[self.obs_ids["joint_vel"]],
             "actions": self.last_action,
         }
+        if self.io.gait:
+            terms["gait_clock"] = self.gait_clock()
         parts = []
         for name, size in self.io.obs_terms:
             value = np.asarray(terms[name], dtype=float).ravel()
@@ -284,6 +305,13 @@ class G1MujocoSim:
         for _ in range(self.steps_per_action):
             mujoco.mj_step(self.model, self.data)
         self.last_action = action.copy()
+        self.steps += 1
+
+    def gait_clock(self) -> np.ndarray:
+        """sin and cos of the left leg's gait phase, as `pi_wbc.tasks.mdp.gait_clock`."""
+        period = float(self.io.gait["period"])
+        phase = (self.steps * self.policy_dt % period) / period
+        return np.array([np.sin(2 * np.pi * phase), np.cos(2 * np.pi * phase)])
 
     # -- measurements ------------------------------------------------------------------------
 
