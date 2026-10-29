@@ -4,6 +4,7 @@ The fixture is a policy_io.json written by Isaac Lab for the stage 0 task. Tests
 G1 model skip when MuJoCo Menagerie has not been fetched (scripts/fetch_menagerie.sh).
 """
 
+import dataclasses
 from pathlib import Path
 
 import mujoco
@@ -189,12 +190,13 @@ def test_action_sets_joint_targets_around_the_default_pose(sim: G1MujocoSim) -> 
 
 @needs_model
 def test_episode_runs_with_a_zero_policy(sim: G1MujocoSim) -> None:
-    fell, t_fall, _, _, gait = evaluate.run_episode(
+    fell, t_fall, _, _, gait, drift = evaluate.run_episode(
         sim, lambda obs: np.zeros(29), (0.0, 0.0, 0.0), seed=0, duration_s=1.0
     )
     assert isinstance(fell, bool)
     assert t_fall is None or 0 < t_fall <= 1.0
     assert gait is None or set(gait) == set(METRICS)
+    assert drift is None  # 1 s ends before the 2 s settling time, or it fell
 
 
 @needs_model
@@ -243,6 +245,7 @@ def test_summarize_and_table() -> None:
     assert row["lin_err_mean"] == pytest.approx(0.2)  # fallen episodes are left out
     table = evaluate.markdown_table([row])
     assert "| m | stand | 1/4 | 25% (" in table
+    assert table.splitlines()[-1].endswith("| — |")  # no heading drift recorded
     assert row["gait"]["step_rate_hz"] is None  # no gait recorded in these episodes
     assert "| m | stand | — |" in evaluate.gait_table([row])
 
@@ -339,3 +342,14 @@ def test_gait_task_observation_layout_and_clock() -> None:
     targets = dict(zip(io.joint_names, sim.data.ctrl[sim.actuator_ids], strict=True))
     assert targets["left_knee_joint"] == pytest.approx(io.default_pos["left_knee_joint"] + 0.25)
     assert targets["left_elbow_joint"] == pytest.approx(io.default_pos["left_elbow_joint"])
+
+
+@needs_model
+def test_gait_clock_reads_zero_when_told_to_stand() -> None:
+    io = PolicyIO.load(GAIT_IO_PATH)
+    io = dataclasses.replace(io, gait=io.gait | {"clock_off_when_standing": True})
+    sim = G1MujocoSim(build_model(SCENE, io), io)
+    sim.reset()
+    assert _obs_term(sim, sim.observation((0.0, 0.0, 0.0)), "gait_clock") == pytest.approx([0, 0])
+    assert _obs_term(sim, sim.observation((0.0, 0.0, 0.8)), "gait_clock") == pytest.approx([0, 1])
+    assert _obs_term(sim, sim.observation((0.5, 0.0, 0.0)), "gait_clock") == pytest.approx([0, 1])

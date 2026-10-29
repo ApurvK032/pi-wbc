@@ -125,6 +125,8 @@ class GaitCfg:
     3.6 cm above the sole, so this is about 4.5 cm of clearance (Unitree's value)."""
     base_height: float = 0.78
     """Target pelvis height (m), Unitree's value; a height command replaces it in step 2."""
+    clock_off_when_standing: bool = True
+    """The clock observation reads (0, 0) while the command says "stand"."""
 
 
 @configclass
@@ -139,6 +141,13 @@ class GaitRewardsCfg:
     )
     track_ang_vel_z_exp = RewTerm(
         func=mdp.track_ang_vel_z_world_exp,
+        weight=1.0,
+        params={"command_name": "base_velocity", "std": 0.5},
+    )
+    # new (design change 2026-10-29): the first gait policy drifted 0.2-0.5 rad/s off its
+    # commanded turn rate and walked in circles; this penalizes the accumulated drift
+    heading_tracking = RewTerm(
+        func=pi_mdp.heading_tracking_exp,
         weight=1.0,
         params={"command_name": "base_velocity", "std": 0.5},
     )
@@ -177,6 +186,16 @@ class GaitRewardsCfg:
         func=pi_mdp.joint_deviation_l2,
         weight=-1.0,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_hip_(roll|yaw)_joint"])},
+    )
+    # new (design change 2026-10-29): the first gait policy kept stepping when told to stand
+    stand_still = RewTerm(
+        func=pi_mdp.stand_still,
+        weight=-1.0,
+        params={
+            "command_name": "base_velocity",
+            "stand_threshold": 0.1,
+            "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
+        },
     )
     waist_deviation = RewTerm(
         func=pi_mdp.joint_deviation_l2,
@@ -231,7 +250,7 @@ class G1GaitEnvCfg(G1FlatStage0EnvCfg):
         self.commands.base_velocity = pi_mdp.GaitVelocityCommandCfg(
             asset_name="robot",
             resampling_time_range=(10.0, 10.0),
-            rel_standing_envs=0.1,
+            rel_standing_envs=0.2,
             rel_turning_envs=0.1,
             deadband=gait.stand_threshold,
             heading_command=False,
@@ -241,9 +260,10 @@ class G1GaitEnvCfg(G1FlatStage0EnvCfg):
             ),
         )
 
-        self.observations.policy.gait_clock = ObsTerm(
-            func=pi_mdp.gait_clock, params={"period": gait.period}
-        )
+        clock_params = {"period": gait.period}
+        if gait.clock_off_when_standing:
+            clock_params.update(command_name="base_velocity", stand_threshold=gait.stand_threshold)
+        self.observations.policy.gait_clock = ObsTerm(func=pi_mdp.gait_clock, params=clock_params)
 
         self.rewards = GaitRewardsCfg()
         clock = self.rewards.gait_contact.params
@@ -253,6 +273,7 @@ class G1GaitEnvCfg(G1FlatStage0EnvCfg):
             stance_fraction=gait.stance_fraction,
             stand_threshold=gait.stand_threshold,
         )
+        self.rewards.stand_still.params["stand_threshold"] = gait.stand_threshold
         self.rewards.feet_swing_height.params["target_height"] = gait.swing_height
         self.rewards.base_height.params["target_height"] = gait.base_height
 

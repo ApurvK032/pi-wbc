@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 import torch
 from isaaclab.envs.mdp.commands import UniformVelocityCommand, UniformVelocityCommandCfg
 from isaaclab.utils import configclass
+from isaaclab.utils.math import wrap_to_pi
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
@@ -69,10 +70,23 @@ def _phase(env: ManagerBasedRLEnv, period: float) -> torch.Tensor:
 # -- observations --------------------------------------------------------------------------------
 
 
-def gait_clock(env: ManagerBasedRLEnv, period: float) -> torch.Tensor:
-    """sin and cos of the left leg's phase, as Unitree's G1 policy sees it."""
+def gait_clock(
+    env: ManagerBasedRLEnv,
+    period: float,
+    command_name: str | None = None,
+    stand_threshold: float = 0.1,
+) -> torch.Tensor:
+    """sin and cos of the left leg's phase, as Unitree's G1 policy sees it.
+
+    With `command_name`, the clock reads (0, 0) while the command says "stand": an explicit
+    stand signal, since a running clock invites stepping in place.
+    """
     angle = 2.0 * torch.pi * _phase(env, period)
-    return torch.stack([torch.sin(angle), torch.cos(angle)], dim=-1)
+    clock = torch.stack([torch.sin(angle), torch.cos(angle)], dim=-1)
+    if command_name is not None:
+        standing = is_standing(env.command_manager.get_command(command_name), stand_threshold)
+        clock = clock * (~standing).unsqueeze(-1)
+    return clock
 
 
 # -- rewards -------------------------------------------------------------------------------------
@@ -111,6 +125,32 @@ def feet_contact_velocity(env: ManagerBasedRLEnv, sensor_cfg, asset_cfg) -> torc
     return (torch.square(velocity).sum(dim=-1) * in_contact).sum(dim=-1)
 
 
+def heading_tracking_exp(env: ManagerBasedRLEnv, command_name: str, std: float) -> torch.Tensor:
+    """exp(-heading error² / std²), against the heading the commanded yaw rates add up to.
+
+    Rewarding the instantaneous yaw rate alone lets a steady drift through: a bias of
+    0.3 rad/s costs little next to the rocking of each step, and the robot walks in circles.
+    The integrated target penalizes drift directly.
+    """
+    term = env.command_manager.get_term(command_name)
+    heading = env.scene[term.cfg.asset_name].data.heading_w.torch
+    error = wrap_to_pi(term.target_heading - heading)
+    return torch.exp(-torch.square(error) / std**2)
+
+
+def stand_still(env: ManagerBasedRLEnv, command_name: str, stand_threshold: float, asset_cfg):
+    """L1 joint offset from the default pose while the command says "stand".
+
+    Like Isaac Lab's stand_still_joint_deviation_l1, but "stand" also needs a small yaw rate,
+    so turning in place is not penalized.
+    """
+    asset = env.scene[asset_cfg.name]
+    ids = asset_cfg.joint_ids
+    offset = asset.data.joint_pos.torch[:, ids] - asset.data.default_joint_pos.torch[:, ids]
+    standing = is_standing(env.command_manager.get_command(command_name), stand_threshold)
+    return offset.abs().sum(dim=-1) * standing
+
+
 def joint_deviation_l2(env: ManagerBasedRLEnv, asset_cfg) -> torch.Tensor:
     """Sum of squared joint offsets from the default pose (Unitree's hip_pos uses squares)."""
     asset = env.scene[asset_cfg.name]
@@ -128,6 +168,9 @@ class GaitVelocityCommand(UniformVelocityCommand):
     Yaw rate is sampled directly (no heading controller). Turning envs get zero linear velocity
     and a yaw rate from the usual range. Linear commands slower than `deadband` are set to
     zero, so "walk very slowly" and "stand" are not confused.
+
+    `target_heading` is where the robot should face if it had followed every yaw-rate command
+    exactly since the command was sampled (used by `heading_tracking_exp`).
     """
 
     cfg: GaitVelocityCommandCfg
@@ -135,9 +178,22 @@ class GaitVelocityCommand(UniformVelocityCommand):
     def __init__(self, cfg: GaitVelocityCommandCfg, env):
         super().__init__(cfg, env)
         self.is_turning_env = torch.zeros_like(self.is_standing_env)
+        self.target_heading = torch.zeros(self.num_envs, device=self.device)
+
+    def _update_command(self):
+        super()._update_command()  # zeroes the command of standing envs
+        heading = self.robot.data.heading_w.torch
+        # re-anchor just after an episode reset, once the reset pose has reached the data
+        fresh = self._env.episode_length_buf <= 1
+        self.target_heading = torch.where(
+            fresh,
+            heading,
+            wrap_to_pi(self.target_heading + self.vel_command_b[:, 2] * self._env.step_dt),
+        )
 
     def _resample_command(self, env_ids: Sequence[int]):
         super()._resample_command(env_ids)
+        self.target_heading[env_ids] = self.robot.data.heading_w.torch[env_ids]
         cmd = self.vel_command_b[env_ids]
         turning = torch.rand(cmd.shape[0], device=self.device) < self.cfg.rel_turning_envs
         self.is_turning_env[env_ids] = turning
