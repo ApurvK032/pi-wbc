@@ -86,6 +86,9 @@ class Episode:
     lin_err: float | None  # mean |command_xy - velocity_xy| after settling, m/s
     ang_err: float | None  # mean |command_yaw_rate - yaw_rate| after settling, rad/s
     gait: dict[str, float | None] | None = None  # gait.METRICS after settling; None if it fell
+    # mean yaw rate over the run after settling, minus the command (rad/s): steady turning
+    # that the per-step error hides under the rocking of each step
+    yaw_drift: float | None = None
 
 
 def run_episode(
@@ -94,8 +97,10 @@ def run_episode(
     command: tuple[float, float, float],
     seed: int,
     duration_s: float,
-) -> tuple[bool, float | None, float | None, float | None, dict[str, float | None] | None]:
-    """One episode: (fell, fall time, mean linear error, mean yaw-rate error, gait metrics)."""
+) -> tuple[
+    bool, float | None, float | None, float | None, dict[str, float | None] | None, float | None
+]:
+    """One episode: (fell, fall time, linear error, yaw-rate error, gait metrics, yaw drift)."""
     rng = np.random.default_rng(seed)
     n = len(sim.policy_ids)
     sim.reset(
@@ -106,17 +111,25 @@ def run_episode(
     gait = GaitRecorder(sim)
     dt = sim.io.physics_dt * sim.io.decimation
     lin_errs, ang_errs = [], []
+    yaw_prev, yaw_turned, settled_steps = None, 0.0, 0
     for k in range(round(duration_s / dt)):
         sim.step(policy(sim.observation(command)))
         t = (k + 1) * dt
         if sim.torso_touches_floor() or sim.base_height() < FALL_HEIGHT:
-            return True, t, _mean(lin_errs), _mean(ang_errs), None
+            return True, t, _mean(lin_errs), _mean(ang_errs), None, None
         if t >= SETTLE_S:
             v_xy, yaw_rate = sim.velocity_yaw_frame()
             lin_errs.append(float(np.linalg.norm(np.asarray(command[:2]) - v_xy)))
             ang_errs.append(abs(command[2] - yaw_rate))
             gait.sample()
-    return False, None, _mean(lin_errs), _mean(ang_errs), gait.metrics()
+            rot = sim.base_rotation()
+            yaw = float(np.arctan2(rot[1, 0], rot[0, 0]))
+            if yaw_prev is not None:
+                yaw_turned += (yaw - yaw_prev + np.pi) % (2 * np.pi) - np.pi
+                settled_steps += 1
+            yaw_prev = yaw
+    drift = yaw_turned / (settled_steps * dt) - command[2] if settled_steps else None
+    return False, None, _mean(lin_errs), _mean(ang_errs), gait.metrics(), drift
 
 
 def _mean(values: list[float]) -> float | None:
@@ -138,6 +151,7 @@ def summarize(episodes: list[Episode]) -> list[dict[str, Any]]:
         lo, hi = wilson_interval(falls, len(group))
         lin = [e.lin_err for e in group if e.lin_err is not None and not e.fell]
         ang = [e.ang_err for e in group if e.ang_err is not None and not e.fell]
+        drift = [abs(e.yaw_drift) for e in group if e.yaw_drift is not None and not e.fell]
         gaits = [e.gait for e in group if e.gait is not None and not e.fell]
         gait = {k: _mean([g[k] for g in gaits if g.get(k) is not None]) for k in METRICS}
         rows.append(
@@ -151,6 +165,7 @@ def summarize(episodes: list[Episode]) -> list[dict[str, Any]]:
                 "fall_rate_ci95": [lo, hi],
                 "lin_err_mean": _mean(lin),
                 "ang_err_mean": _mean(ang),
+                "yaw_drift_abs_mean": _mean(drift),
                 "gait": gait,
             }
         )
@@ -159,16 +174,19 @@ def summarize(episodes: list[Episode]) -> list[dict[str, Any]]:
 
 def markdown_table(rows: list[dict[str, Any]]) -> str:
     out = [
-        "| Model | Command | Falls | Fall rate (95% CI) | Speed error | Turn-rate error |",
-        "|---|---|---:|---|---:|---:|",
+        "| Model | Command | Falls | Fall rate (95% CI) | Speed error | Turn-rate error "
+        "| Heading drift |",
+        "|---|---|---:|---|---:|---:|---:|",
     ]
     for r in rows:
         lo, hi = r["fall_rate_ci95"]
         lin = "—" if r["lin_err_mean"] is None else f"{r['lin_err_mean']:.2f} m/s"
         ang = "—" if r["ang_err_mean"] is None else f"{r['ang_err_mean']:.2f} rad/s"
+        d = r.get("yaw_drift_abs_mean")
+        drift = "—" if d is None else f"{d:.2f} rad/s"
         out.append(
             f"| {r['model']} | {r['scenario']} | {r['falls']}/{r['episodes']} "
-            f"| {r['fall_rate']:.0%} ({lo:.0%}-{hi:.0%}) | {lin} | {ang} |"
+            f"| {r['fall_rate']:.0%} ({lo:.0%}-{hi:.0%}) | {lin} | {ang} | {drift} |"
         )
     return "\n".join(out)
 
@@ -254,11 +272,13 @@ def main(argv: list[str] | None = None) -> None:
         start = time.monotonic()
         for scenario in scenarios:
             for seed in range(args.seeds):
-                fell, t_fall, lin, ang, gait = run_episode(
+                fell, t_fall, lin, ang, gait, drift = run_episode(
                     sim, policy, SCENARIOS[scenario], seed, args.duration_s
                 )
                 episodes.append(
-                    Episode(name, scenario, seed, fell, t_fall, args.duration_s, lin, ang, gait)
+                    Episode(
+                        name, scenario, seed, fell, t_fall, args.duration_s, lin, ang, gait, drift
+                    )
                 )
         model_info[name] = {
             "path": path,

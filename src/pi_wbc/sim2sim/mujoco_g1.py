@@ -287,7 +287,7 @@ class G1MujocoSim:
             "actions": self.last_action,
         }
         if self.io.gait:
-            terms["gait_clock"] = self.gait_clock()
+            terms["gait_clock"] = self.gait_clock(command)
         parts = []
         for name, size in self.io.obs_terms:
             value = np.asarray(terms[name], dtype=float).ravel()
@@ -307,9 +307,18 @@ class G1MujocoSim:
         self.last_action = action.copy()
         self.steps += 1
 
-    def gait_clock(self) -> np.ndarray:
-        """sin and cos of the left leg's gait phase, as `pi_wbc.tasks.mdp.gait_clock`."""
-        period = float(self.io.gait["period"])
+    def gait_clock(self, command: Sequence[float] = (0.0, 0.0, 0.0)) -> np.ndarray:
+        """sin and cos of the left leg's gait phase, as `pi_wbc.tasks.mdp.gait_clock`.
+
+        Policies trained with `clock_off_when_standing` see (0, 0) while the command says
+        "stand" (speed and yaw rate both below the threshold).
+        """
+        gait = self.io.gait
+        period = float(gait["period"])
+        if gait.get("clock_off_when_standing"):
+            threshold = float(gait["stand_threshold"])
+            if np.hypot(command[0], command[1]) < threshold and abs(command[2]) < threshold:
+                return np.zeros(2)
         phase = (self.steps * self.policy_dt % period) / period
         return np.array([np.sin(2 * np.pi * phase), np.cos(2 * np.pi * phase)])
 
