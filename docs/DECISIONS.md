@@ -126,7 +126,8 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 - Joint limits agree to 1e-5 rad. Joint order differs only within the hands; joints are matched
   by name.
 - **Bench policy gait:** with the built-in rewards, PPO learns a fast, low shuffle: about 11
-  steps/s of 8 cm, 2-3 cm foot lift, feet sliding at about 0.35 m/s in stance, nearly straight
+  steps/s of 8 cm, 2-3 cm foot lift, ankles moving at about 0.3 m/s in stance (0.14 m/s of
+  slip at the sole, D-016), nearly straight
   knees, no arm swing (measured in MuJoCo at 1 m/s; all 13 runs of the setup do this, see
   `results/stage0/README.md` part 4). Stage 1's rewards
   must shape the gait: a stepping rhythm of about 1.5-2 steps/s, swing-foot clearance, stronger
@@ -167,13 +168,13 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 
 ## D-010: Gait measures in the MuJoCo evaluation (2026-10-28)
 
-- **What:** `pi-wbc-sim2sim` reports, after the 2 s settling time and for episodes that did
-  not fall: step rate, step length, swing time, foot lift, foot speed while in stance, time
-  with both feet down and with none, knee range and arm swing (`src/pi_wbc/sim2sim/gait.py`).
-  A foot is down when one of its contacts with the floor carries force; a step is a touchdown
-  after at least 60 ms in the air; swings cut off by the start or end of recording are left
-  out; joint ranges are 5th-95th percentile. Training changes are compared on the Menagerie
-  model at a 1 m/s command.
+- **What:** `pi-wbc-sim2sim` reports, after the 2 s settling time and for episodes that did not
+  fall: step rate, step length, swing time, foot lift, foot speed while in stance (for slip,
+  see D-016), time with both feet down and with none, knee range and arm swing
+  (`src/pi_wbc/sim2sim/gait.py`). A foot is down when one of its contacts with the floor
+  carries force; a step is a touchdown after at least 60 ms in the air; swings cut off by the
+  start or end of recording are left out; joint ranges are 5th-95th percentile. Training
+  changes are compared on the Menagerie model at a 1 m/s command.
 - **Why:** stage 0's policies walk without falling but shuffle, and falls and tracking error
   don't show that. Stage 1's reward design needs a number for "walks like a person". Contact
   is defined by force so that a model's inactive contacts (Newton's `gap`) don't count.
@@ -229,6 +230,25 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 - **Why:** the stage 3 task is indoors on a flat floor, and Newton's rough-terrain support is
   newer. The ablation is the largest compute item of the project so far.
 - **Cost:** no rough-terrain robustness claims from stage 1.
+
+## D-016: Slip is measured at the sole's floor contacts (2026-10-29)
+
+- **What:** the MuJoCo evaluation's slip measure (`sole_slip_mps`, "sole slip") is the planar
+  speed of the foot itself at each of its floor contacts that carry force, averaged over that
+  foot's contacts with their normal forces as weights, over the samples where the foot is
+  down. The stage 1 slip target (at most 0.1 m/s) applies to it. D-010's measure, the planar
+  speed of the ankle-roll link's origin while the foot is down (`stance_foot_speed_mps`,
+  "stance foot speed"), is still reported for comparison with earlier results.
+- **Why:** the ankle sits 3.5 cm above the sole, so it moves whenever the foot rolls from heel
+  to toe or pivots, without any sliding. With the robot pivoting on its toe at 2 rad/s, the
+  ankle measure reads 0.07 m/s and the sole measure 0.0002 m/s (a unit test). On the stage 1
+  gait at 1 m/s (Menagerie model), the ankle measure gives 0.15-0.21 m/s and the sole measure
+  0.04-0.10 m/s: more than half of what had been read as slip was rolling. Re-running all 26
+  evaluated policies with the new measure changed no other number.
+- **Cost:** the stage 1 target is now easier to meet than it was as first measured, so both
+  numbers are reported side by side. The training penalty `feet_contact_velocity` also uses
+  the ankle's velocity (including its vertical part), so it discourages rolling as well as
+  sliding; whether that shapes the gait badly is open for the later reward work.
 
 ## Open items
 

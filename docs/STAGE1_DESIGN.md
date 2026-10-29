@@ -27,7 +27,7 @@ fall rates and at least 3 training runs per configuration (D-011):
 | Step rate at 1 m/s | 1.5-3 steps/s | 10.7 |
 | Step length at 1 m/s | at least 0.3 m | 0.08 m |
 | Foot lift | at least 5 cm | 2.8 cm |
-| Foot speed in stance (slip) | at most 0.1 m/s | 0.31 m/s |
+| Slip: sole speed at its floor contacts (D-016) | at most 0.1 m/s | 0.14 m/s (ankle speed: 0.31 m/s) |
 | Push recovery | report the largest push survived 95% of the time | not tested |
 | Arm tracking while walking | report joint error | not applicable |
 
