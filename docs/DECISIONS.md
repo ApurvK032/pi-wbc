@@ -184,20 +184,52 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 - **Cost:** two to three times the cluster time per change. The 13 default runs give the
   baseline range at no extra cost.
 
+## D-012: Stage 1 controller interface follows NVIDIA's Decoupled WBC (2026-10-29)
+
+- **What:** the controller takes NVIDIA's Decoupled WBC commands: navigate (forward and
+  sideways speed, yaw rate), pelvis height, torso roll, pitch and yaw, and 7 + 7 arm and
+  7 + 7 hand joint targets. The RL policy drives the 12 leg and 3 waist joints; arm and hand
+  targets go straight to their PD controllers. The simulated robot uses NVIDIA's PD gains and
+  default leg pose. Details: [STAGE1_DESIGN.md](STAGE1_DESIGN.md), sections 3-4.
+- **Why:** this is the interface GR00T N1.6 uses with NVIDIA's controller on the G1, so either
+  controller can sit under the same VLA, and swapping them changes only the lower body. HOMIE,
+  AMO and NVIDIA's WBC-AGILE split the robot the same way. Arm accuracy does not depend on RL.
+- **Cost:** the RL policy never moves the arms, so "whole-body" here means legs and waist
+  balancing against whatever the arms do, not learned arm motion (FALCON's approach was
+  considered and not chosen). The stage 0 gains are replaced.
+
+## D-013: Hands are Dex3 (2026-10-29)
+
+- **What:** the G1 keeps Unitree's Dex3 three-finger hands (7 joints each) for all stages.
+  Settles the open item from D-001.
+- **Why:** NVIDIA's Decoupled WBC and IsaacLab-Arena's G1 both use three-finger hands with
+  Dex3's joint layout, and the GR00T N1.6 G1 action space has 7 values per hand.
+- **Cost:** no five-finger dexterity; grasps stay simple.
+
+## D-014: GR00T N1.6 for stage 4 (2026-10-29)
+
+- **What:** the VLA is GR00T N1.6 (Isaac-GR00T's `n1.6.1-release`), not N1.7. Settles the open
+  item on the GR00T version.
+- **Why:** N1.7's G1 path drives NVIDIA's SONIC controller with latent motion tokens, which
+  has no command interface to swap another controller under. N1.6 sends the D-012 commands.
+- **Cost:** not the newest model. Since NVIDIA's pretrained G1 data comes from its own
+  controller, fine-tuning uses the `NEW_EMBODIMENT` tag on our own demonstrations.
+
+## D-015: Stage 1 scope and compute (2026-10-29)
+
+- **What:** stage 1 trains on flat ground only. Before the ablation (about 45 GPU-hours), the
+  cluster's partition limits are checked with read-only commands to decide between queueing
+  on the current partition, a partition with parallel jobs, or longer workstation runs.
+- **Why:** the stage 3 task is indoors on a flat floor, and Newton's rough-terrain support is
+  newer. The ablation is the largest compute item of the project so far.
+- **Cost:** no rough-terrain robustness claims from stage 1.
+
 ## Open items
 
-- The stage 1 design is a draft under review: [STAGE1_DESIGN.md](STAGE1_DESIGN.md). Its
-  section 15 lists seven decisions; the two items below are among them.
-- Hands: Dex3 (default, recommended) or a five-finger hand such as Inspire. NVIDIA's controller
-  ships G1 29-DoF + Dex3 scenes; Isaac Lab 3.0 has fixed-base G1 configs for both Dex3 and
-  Inspire, but neither is set up for walking. NVIDIA's Decoupled WBC and IsaacLab-Arena both
-  use three-finger hands with Dex3's joint layout (checked 2026-10-29). Decide before stage 3.
+- The stage 1 design ([STAGE1_DESIGN.md](STAGE1_DESIGN.md)) was accepted on 2026-10-29
+  (D-012 to D-015).
 - The built-in G1 velocity tasks use an older 37-joint G1 (`torso_joint`, two elbow joints,
   seven hand joints per side), not the 29-DoF robot. Stage 0's bench already uses
   `G1_29DOF_CFG` (D-007); stage 1 keeps it.
-- GR00T N1.7 is now the main Isaac-GR00T release (N1.6 is on branch `n1d6`). N1.7 inference
-  is listed at 16 GB+, above the RTX 4070. N1.7's G1 path uses the SONIC controller, which takes
-  latent motion tokens rather than velocity commands, so it can't be swapped under our command
-  interface (checked 2026-10-29). Choose the version before stage 4.
 - Motion data: the LAFAN1 retargeting mirror used by BeyondMimic is CC BY-NC-ND 4.0 (no
   derivatives), which limits what processed clips can be released. Check before stage 2.

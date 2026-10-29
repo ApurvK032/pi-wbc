@@ -1,7 +1,8 @@
 # Stage 1 design: the π-WBC whole-body controller
 
-**Status: draft for review (2026-10-29).** Nothing here is built yet. The choices that need
-Apurv's answer are listed in section 15; everything else is a proposal that can still change.
+**Status: accepted (2026-10-29).** Apurv accepted all seven recommendations of section 15;
+they are recorded as D-012 to D-015 in [DECISIONS.md](DECISIONS.md). Details below may still
+change as the work shows what is needed; changes are logged there.
 
 Stage 0 left us with a working pipeline (Isaac Lab training on the workstation and on MSI, a
 MuJoCo sim-to-sim bench, gait measurements) and a bench policy that walks without falling but
@@ -295,9 +296,9 @@ Rough terrain; a realistic motor model (torque-speed limits); a Unitree SDK depl
 a third simulator (PhysX); natural arm swing. These are hardware-readiness and polish items
 to revisit after stage 1.
 
-## 15. Decisions needed
+## 15. Decisions (all accepted 2026-10-29)
 
-Each has a recommendation; the design above assumes the recommended answer.
+Each was accepted as recommended.
 
 1. **Who moves the arms.** Recommended: arm and hand targets go straight to PD controllers and
    the policy moves legs and waist (what NVIDIA, HOMIE, AMO and AGILE do). Alternative: the
