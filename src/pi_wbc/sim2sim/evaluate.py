@@ -196,6 +196,7 @@ GAIT_COLUMNS = (  # header, metric, scale, format
     ("Step length", "step_length_m", 100, "{:.0f} cm"),
     ("Foot lift", "foot_lift_m", 100, "{:.1f} cm"),
     ("Stance foot speed", "stance_foot_speed_mps", 1, "{:.2f} m/s"),
+    ("Sole slip", "sole_slip_mps", 1, "{:.2f} m/s"),
     ("Double support", "double_support", 100, "{:.0f}%"),
     ("Knee range", "knee_range_deg", 1, "{:.0f}°"),
     ("Arm swing", "arm_swing_deg", 1, "{:.0f}°"),
