@@ -9,9 +9,10 @@ its section 12 are done.
 per second of 9 cm) into a walk. Three training runs of 3000 iterations each take 2.5 steps per
 second of 39 cm at 1 m/s and lift their feet 6.5 cm. Their speed error at 1 m/s is 0.06 m/s,
 their turn-rate error when turning in place at most 0.08 rad/s, and none fell in 360 MuJoCo
-episodes. Six of the seven gait targets of the
-design are met. Slip is not: the foot moves at 0.15-0.21 m/s while it is down (target at most
-0.1 m/s), and part of that may be how it is measured (see below).
+episodes. All seven gait targets of the design are met on average over the three runs; one
+run's slip is just over its target (0.102 against at most 0.1 m/s). Slip is measured where the
+sole touches the floor (D-016); the first measure, at the ankle, also counted the foot rolling
+from heel to toe and read 0.15-0.21 m/s.
 
 <p align="center">
   <img src="gait_v3_s1_walk_1.0.gif" alt="G1 walking at 1 m/s in MuJoCo" width="400"><br>
@@ -42,7 +43,8 @@ brackets:
 | Step rate at 1 m/s | 1.5-3 steps/s | 10.2 | 2.5 (2.4-2.5) | yes |
 | Step length at 1 m/s | at least 0.3 m | 9 cm | 39 cm (38-39) | yes |
 | Foot lift | at least 5 cm | 3.0 cm | 6.5 cm (6.1-6.9) | yes |
-| Foot speed in stance (slip) | at most 0.1 m/s | 0.31 m/s | 0.17 m/s (0.15-0.21) | no |
+| Slip: sole speed at its floor contacts (D-016) | at most 0.1 m/s | 0.14 m/s (0.03-0.27) | 0.07 m/s (0.04-0.10) | on average; seed 3 at 0.102 |
+| Ankle speed in stance (first slip measure, for comparison) | — | 0.31 m/s | 0.17 m/s (0.15-0.21) | — |
 | Push recovery, arm tracking | report | — | — | later steps |
 
 Other measures at 1 m/s: both feet down 6% of the time (4-10%), knee range 23° (14-30°), heading
@@ -51,7 +53,9 @@ training commands): speed error 0.14 m/s, turn-rate error 0.34-0.36 rad/s, 1.0-1
 ending in a fall. Stage 1's training commands differ from stage 0's, so these don't compare
 directly with stage 0's.
 
-Raw data: one file per run in [`gait_step1/`](gait_step1/) (commit `3ea445b`, clean tree), the
+Raw data: one file per run in [`gait_step1/`](gait_step1/) (trained at commit `3ea445b`,
+evaluated at `9a55b47` with the sole-slip measure, clean tree; every other number is unchanged
+from the first evaluation at `3ea445b`), the
 summary in [`gait_step1_compare.json`](gait_step1_compare.json), the training-side numbers in
 [`gait_step1_training.json`](gait_step1_training.json). Rerun with
 `scripts/train_eval_local.sh PiWbc-G1-Gait 3000 results/stage1/gait_step1 gait-v3 1 2 3`.
@@ -63,24 +67,45 @@ What the numbers show:
   0.07 m/s with 38-39 cm steps.
 - **The three runs agree** on step rate, step length, foot lift and tracking. They differ in
   how much they bend the knee: seed 3 uses 14° of knee range against 25-30° for the others, and
-  has the most slip (0.21 m/s) and time with both feet down (10%).
+  has the most slip (0.10 m/s at the sole) and time with both feet down (10%).
 - **Foot lift drops at slower commands:** 3.9-4.6 cm at 0.5 m/s and 1.6-2.9 cm when stepping
   sideways or turning in place. The gait targets are measured at 1 m/s (D-010).
-- **Slip rose as the steps grew longer:** 0.13 m/s for the 1000-iteration run, 0.15-0.21 m/s
-  now (Newton's model: 0.11-0.15 m/s).
+- **The ankle moves more in stance as the steps grow longer:** 0.13 m/s for the 1000-iteration
+  run, 0.15-0.21 m/s now. Most of that is the foot rolling, not sliding (next section).
 
-### Slip: the one target not met, and a question about the measure
+### Slip: measured at the sole
 
-The bench measures slip as the planar speed of each ankle-roll link's origin while that foot
-touches the floor. That point sits above the sole, so it also moves when the foot rolls from
-heel to toe or pivots without sliding. Part of the 0.15-0.21 m/s may therefore be rolling. The
-next check measures the speed of the contact points themselves (or only of feet flat on the
-floor) on these same runs, before any reward is changed. Stage 0's numbers were measured the
-same way, so the comparisons on this page hold either way.
+The first slip measure was the planar speed of each ankle-roll link's origin while its foot
+touched the floor. That point sits 3.5 cm above the sole, so it also moves when the foot rolls
+from heel to toe or pivots on its toe without sliding. The bench now also measures the speed of
+the sole itself at each floor contact, weighted by the contact's force (D-016). A unit test
+pivots the robot on its toe at 2 rad/s: the ankle measure reads 0.07 m/s, the sole measure
+0.0002 m/s.
+
+Walking at 1 m/s, per run:
+
+| Run | Sole slip, Menagerie | Sole slip, Newton | Ankle speed, Menagerie | Ankle speed, Newton |
+|---|---:|---:|---:|---:|
+| seed 1 | 0.042 m/s | 0.005 m/s | 0.150 m/s | 0.107 m/s |
+| seed 2 | 0.062 m/s | 0.012 m/s | 0.154 m/s | 0.131 m/s |
+| seed 3 | 0.102 m/s | 0.044 m/s | 0.212 m/s | 0.151 m/s |
+| stage 0 default (13 runs) | 0.14 m/s (0.03-0.27) | 0.03 m/s (0.01-0.05) | 0.31 m/s (0.20-0.42) | 0.22 m/s (0.20-0.26) |
+
+- **Most of the first measure was rolling.** At the sole, the three runs slip 0.04-0.10 m/s on
+  Menagerie's model, 30-50% of the ankle measure. Two runs meet the target clearly; seed 3 is
+  at the line.
+- **Gait v3 slips about half as much as the stage 0 shuffle** at the sole (0.07 against
+  0.14 m/s on Menagerie's model).
+- **Every policy slips more on Menagerie's model than on Newton's**, the stage 0 shuffle as
+  well (0.14 against 0.03 m/s). That points at the models rather than the policies: Menagerie's
+  contacts are softer (stage 0 results, part 4), which may let a loaded foot creep. Not yet
+  checked.
+- **Training's slip penalty uses the ankle's velocity too,** so it also discourages rolling.
+  Whether that matters is a question for the reward work in later steps (D-016).
 
 ### Development runs: three versions, 1000 iterations, one run each
 
-| Version | Change | Falls (all commands, both models) | Steps/s | Step length | Foot lift | Foot speed in stance | Speed error | Heading drift | Turn-in-place error | Stands still |
+| Version | Change | Falls (all commands, both models) | Steps/s | Step length | Foot lift | Ankle speed in stance | Speed error | Heading drift | Turn-in-place error | Stands still |
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|---|
 | stage 0 bench (13 runs) | built-in rewards | 17/1560 | 10.2 | 9 cm | 3.0 cm | 0.31 m/s | 0.12 m/s | — | 0.11-0.80 rad/s | yes |
 | v1 | gait clock, Unitree's rewards | 0/120 | 2.5 | 37 cm | 5.8 cm | 0.15 m/s | 0.11 m/s | 0.08 rad/s | 0.18 rad/s | no: steps in place |

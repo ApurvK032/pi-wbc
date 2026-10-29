@@ -315,14 +315,15 @@ Same protocol as part 2: both MuJoCo models, 6 commands, 10 seeded starts each, 
 measured on the Menagerie model at a 1 m/s command, after the first 2 s. Mean over runs, with
 the lowest and highest run in brackets:
 
-| Runs | Falls (all commands) | Speed error | Steps/s | Step length | Foot lift | Foot speed in stance | Both feet down | Knee range | Arm swing |
-|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 13 | 17/1560 (1%-2%) | 0.12 m/s | 10.2 (9.1-11.4) | 9 cm (8-11) | 3.0 cm (2.3-3.9) | 0.31 m/s (0.20-0.42) | 40% (9-59) | 18° (14-23) | 3° (2-4) |
+| Runs | Falls (all commands) | Speed error | Steps/s | Step length | Foot lift | Ankle speed in stance | Sole slip | Both feet down | Knee range | Arm swing |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 13 | 17/1560 (1%-2%) | 0.12 m/s | 10.2 (9.1-11.4) | 9 cm (8-11) | 3.0 cm (2.3-3.9) | 0.31 m/s (0.20-0.42) | 0.14 m/s (0.03-0.27) | 40% (9-59) | 18° (14-23) | 3° (2-4) |
 
-Raw data: one file per run in [`base_runs/`](base_runs/) (evaluated at commit `f456e84`, clean
-tree), the summary in [`base_runs_compare.json`](base_runs_compare.json), and the training-side
-numbers of the 12 overnight runs in [`base_runs_training.json`](base_runs_training.json). The
-per-run table: `uv run pi-wbc-sim2sim-compare results/stage0/base_runs/*.json --per-run`.
+Raw data: one file per run in [`base_runs/`](base_runs/) (evaluated at commit `9a55b47`, clean
+tree; first evaluated at `f456e84`, which gave the same numbers without sole slip), the summary
+in [`base_runs_compare.json`](base_runs_compare.json), and the training-side numbers of the 12
+overnight runs in [`base_runs_training.json`](base_runs_training.json). The per-run table:
+`uv run pi-wbc-sim2sim-compare results/stage0/base_runs/*.json --per-run`.
 
 ### What this shows
 
@@ -340,7 +341,7 @@ per-run table: `uv run pi-wbc-sim2sim-compare results/stage0/base_runs/*.json --
   95% CI 0.7%-1.7%) fell, 15 of them turning in place. 10 of these come from one run, which falls
   every time it turns in place on Newton's model and never on Menagerie's.
 
-### Three measurement fixes found on the way
+### Four measurement fixes found on the way
 
 - **Inactive contacts.** Newton's exported model gives every collision shape a 1 cm `gap`, so
   MuJoCo also lists shapes up to 2 cm apart as contacts that carry no force. The evaluation
@@ -355,15 +356,20 @@ per-run table: `uv run pi-wbc-sim2sim-compare results/stage0/base_runs/*.json --
   constant of 1.8 ms, which MuJoCo raises to its minimum of two steps (5 ms). Menagerie uses
   MuJoCo's default of 20 ms, so its feet sink further into the floor (median 3 mm while
   walking). This adds to the model-description differences listed in part 2.
+- **Slip at the sole, not the ankle** (found in stage 1, D-016). "Foot speed in stance" is the
+  speed of the ankle, 3.5 cm above the sole, so it also counts the foot rolling from heel to
+  toe. The evaluation now also reports the sole's own speed at its floor contacts ("sole
+  slip"). For these 13 runs it is 0.14 m/s (0.03-0.27) on Menagerie's model, against 0.31 m/s
+  at the ankle; every other number is unchanged.
 
 ## 5. Reward pilot: four reward changes, two runs each
 
 **In short:** a stronger foot-air-time reward with a longer target air time is enough to turn
 the shuffle into a walk: both runs take about 3 steps per second of 32 cm, far outside all 13
 default runs. Stronger slip and smoothness penalties only halve the step rate, and a stronger
-torque penalty changes nothing. All four changes together walk at 2.5 steps per second of
-38 cm with the least slip, but one of the two runs sways from side to side with its arms
-thrown out. No change improves turning, and the slower walks track commands worse in training.
+torque penalty changes nothing. All four changes together walk at 2.5 steps per second of 38
+cm, but one of the two runs sways from side to side with its arms thrown out. No change
+improves turning, and the slower walks track commands worse in training.
 
 ### Setup
 
@@ -388,14 +394,14 @@ MuJoCo protocol as in part 2.
 Menagerie model, 1 m/s command. Mean over runs, with the lower and higher run in brackets; the
 default row is part 4's 13 runs:
 
-| Variant | Runs | Falls (all commands) | Speed error | Steps/s | Step length | Foot lift | Foot speed in stance | Both feet down | Knee range | Arm swing |
-|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| default | 13 | 17/1560 (1%-2%) | 0.12 m/s | 10.2 (9.1-11.4) | 9 cm (8-11) | 3.0 cm (2.3-3.9) | 0.31 m/s (0.20-0.42) | 40% (9-59) | 18° (14-23) | 3° (2-4) |
-| airtime | 2 | 0/240 (0%-2%) | 0.10 m/s | 3.0 (2.9-3.1) | 32 cm (32-32) | 6.8 cm (6.6-6.9) | 0.24 m/s (0.23-0.24) | 1% (0-1) | 18° (16-21) | 9° (8-11) |
-| slide | 2 | 0/240 (0%-2%) | 0.07 m/s | 5.7 (5.2-6.2) | 18 cm (16-19) | 3.7 cm (3.6-3.8) | 0.20 m/s (0.17-0.23) | 4% (3-5) | 23° (23-23) | 5° (4-6) |
-| smooth | 2 | 3/240 (0%-4%) | 0.07 m/s | 6.9 (6.6-7.1) | 15 cm (15-16) | 5.5 cm (4.8-6.2) | 0.30 m/s (0.27-0.34) | 46% (36-56) | 29° (28-29) | 4° (4-5) |
-| energy | 2 | 15/240 (4%-10%) | 0.10 m/s | 9.2 (8.3-10.2) | 10 cm (8-12) | 4.0 cm (3.7-4.3) | 0.38 m/s (0.34-0.43) | 33% (14-51) | 20° (18-22) | 3° (2-3) |
-| all | 2 | 0/240 (0%-2%) | 0.09 m/s | 2.5 (2.4-2.5) | 38 cm (37-39) | 8.1 cm (6.4-9.9) | 0.16 m/s (0.14-0.17) | 1% (0-2) | 41° (19-63) | 16° (10-22) |
+| Variant | Runs | Falls (all commands) | Speed error | Steps/s | Step length | Foot lift | Ankle speed in stance | Sole slip | Both feet down | Knee range | Arm swing |
+|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| default | 13 | 17/1560 (1%-2%) | 0.12 m/s | 10.2 (9.1-11.4) | 9 cm (8-11) | 3.0 cm (2.3-3.9) | 0.31 m/s (0.20-0.42) | 0.14 m/s (0.03-0.27) | 40% (9-59) | 18° (14-23) | 3° (2-4) |
+| airtime | 2 | 0/240 (0%-2%) | 0.10 m/s | 3.0 (2.9-3.1) | 32 cm (32-32) | 6.8 cm (6.6-6.9) | 0.24 m/s (0.23-0.24) | 0.13 m/s (0.12-0.14) | 1% (0-1) | 18° (16-21) | 9° (8-11) |
+| slide | 2 | 0/240 (0%-2%) | 0.07 m/s | 5.7 (5.2-6.2) | 18 cm (16-19) | 3.7 cm (3.6-3.8) | 0.20 m/s (0.17-0.23) | 0.15 m/s (0.13-0.16) | 4% (3-5) | 23° (23-23) | 5° (4-6) |
+| smooth | 2 | 3/240 (0%-4%) | 0.07 m/s | 6.9 (6.6-7.1) | 15 cm (15-16) | 5.5 cm (4.8-6.2) | 0.30 m/s (0.27-0.34) | 0.16 m/s (0.15-0.18) | 46% (36-56) | 29° (28-29) | 4° (4-5) |
+| energy | 2 | 15/240 (4%-10%) | 0.10 m/s | 9.2 (8.3-10.2) | 10 cm (8-12) | 4.0 cm (3.7-4.3) | 0.38 m/s (0.34-0.43) | 0.18 m/s (0.11-0.25) | 33% (14-51) | 20° (18-22) | 3° (2-3) |
+| all | 2 | 0/240 (0%-2%) | 0.09 m/s | 2.5 (2.4-2.5) | 38 cm (37-39) | 8.1 cm (6.4-9.9) | 0.16 m/s (0.14-0.17) | 0.09 m/s (0.09-0.09) | 1% (0-2) | 41° (19-63) | 16° (10-22) |
 
 Turning in MuJoCo (Menagerie model, 0.8 rad/s in place) and Isaac Lab's training statistics
 (mean of the last 50 iterations, over the random training commands), per run, seed 2 then
@@ -419,7 +425,7 @@ seed 3:
   out. Right: all four changes, seed 3, upright.</em>
 </p>
 
-Raw data: one file per run in [`pilot_runs/`](pilot_runs/) (evaluated at commit `3ea445b`,
+Raw data: one file per run in [`pilot_runs/`](pilot_runs/) (evaluated at commit `9a55b47`,
 clean tree), the summary with the default runs in
 [`pilot_runs_compare.json`](pilot_runs_compare.json), and the training-side numbers in
 [`pilot_runs_training.json`](pilot_runs_training.json). The per-run table:
@@ -433,8 +439,10 @@ clean tree), the summary with the default runs in
 - **The penalties on their own slow the shuffle but don't make it a walk.** slide and smooth
   take 5-7 steps per second of 15-19 cm (smooth also lifts its feet higher, 4.8-6.2 cm).
   energy stays inside the default range on every gait measure.
-- **All four together give the longest steps and the least slip** (0.14-0.17 m/s, below every
-  default run), but the two runs walk differently: seed 2 sways, lifts its knees high (63° of
+- **All four together give the longest steps,** and their ankles move least in stance
+  (0.14-0.17 m/s, below every default run). Measured at the sole (D-016), their slip of
+  0.09 m/s is the lowest of the variants but inside the default runs' range (0.03-0.27 m/s).
+  The two runs walk differently: seed 2 sways, lifts its knees high (63° of
   knee range) and swings its arms 22°; seed 3 walks upright (19°, 10°).
 - **Slower walking costs tracking in training.** Over Isaac Lab's random training commands,
   airtime and all have speed errors of 0.19-0.20 m/s (default 0.13-0.15), turn-rate errors of
