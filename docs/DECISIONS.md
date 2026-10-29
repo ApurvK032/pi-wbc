@@ -186,13 +186,18 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 
 ## Open items
 
+- The stage 1 design is a draft under review: [STAGE1_DESIGN.md](STAGE1_DESIGN.md). Its
+  section 15 lists seven decisions; the two items below are among them.
 - Hands: Dex3 (default, recommended) or a five-finger hand such as Inspire. NVIDIA's controller
   ships G1 29-DoF + Dex3 scenes; Isaac Lab 3.0 has fixed-base G1 configs for both Dex3 and
-  Inspire, but neither is set up for walking. Decide before stage 3.
+  Inspire, but neither is set up for walking. NVIDIA's Decoupled WBC and IsaacLab-Arena both
+  use three-finger hands with Dex3's joint layout (checked 2026-10-29). Decide before stage 3.
 - The built-in G1 velocity tasks use an older 37-joint G1 (`torso_joint`, two elbow joints,
   seven hand joints per side), not the 29-DoF robot. Stage 0's bench already uses
   `G1_29DOF_CFG` (D-007); stage 1 keeps it.
 - GR00T N1.7 is now the main Isaac-GR00T release (N1.6 is on branch `n1d6`). N1.7 inference
-  is listed at 16 GB+, above the RTX 4070. Choose the version before stage 4.
+  is listed at 16 GB+, above the RTX 4070. N1.7's G1 path uses the SONIC controller, which takes
+  latent motion tokens rather than velocity commands, so it can't be swapped under our command
+  interface (checked 2026-10-29). Choose the version before stage 4.
 - Motion data: the LAFAN1 retargeting mirror used by BeyondMimic is CC BY-NC-ND 4.0 (no
   derivatives), which limits what processed clips can be released. Check before stage 2.
