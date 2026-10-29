@@ -33,7 +33,12 @@ def _first_env(values: Any) -> list[float]:
 
 
 def collect(env: Any) -> dict[str, Any]:
-    """Everything a sim-to-sim runner needs, from an unwrapped ManagerBasedRLEnv."""
+    """Everything a sim-to-sim runner needs, from an unwrapped ManagerBasedRLEnv.
+
+    Resets the environment first, so the PD targets of joints no action drives are the ones
+    training uses (reset events may set them).
+    """
+    env.reset()
     robot = env.scene["robot"]
     joint_names = list(robot.joint_names)
     default_pos = _first_env(robot.data.default_joint_pos)
@@ -57,6 +62,9 @@ def collect(env: Any) -> dict[str, Any]:
         joints[name].update({key: vals[i] for key, vals in values.items()})
 
     action_term = env.action_manager.get_term("joint_pos")
+    driven = set(action_term._joint_names)
+    targets = _first_env(robot.data.joint_pos_target)
+    hold_targets = {n: targets[i] for i, n in enumerate(joint_names) if n not in driven}
     obs_mgr = env.observation_manager
     terms = obs_mgr.active_terms["policy"]
     dims = obs_mgr.group_obs_term_dim["policy"]
@@ -111,6 +119,8 @@ def collect(env: Any) -> dict[str, Any]:
         },
         "observation": {"dim": start, "terms": obs_layout, "joint_names": obs_joint_names},
         "gait": None if gait is None else gait.to_dict(),
+        # PD targets of joints the policy does not drive, as held during training
+        "hold_targets": hold_targets,
         "commands": {
             "lin_vel_x": list(command_cfg.ranges.lin_vel_x),
             "lin_vel_y": list(command_cfg.ranges.lin_vel_y),

@@ -89,6 +89,9 @@ class PolicyIO:
     # joints of each joint observation, in observation order (stage 0: the action's joints)
     obs_joint_names: dict[str, list[str]] = field(default_factory=dict)
     gait: dict[str, float] | None = None  # gait clock settings (stage 1 tasks)
+    # PD targets of joints the policy does not drive. Isaac Lab leaves these at 0 unless the
+    # task sets them, so exports that don't record them (stage 0, the first gait runs) get 0.
+    hold_targets: dict[str, float] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> PolicyIO:
@@ -131,6 +134,7 @@ class PolicyIO:
                 k: list(v) for k, v in raw["observation"].get("joint_names", {}).items()
             },
             gait=raw.get("gait"),
+            hold_targets={k: float(v) for k, v in (raw.get("hold_targets") or {}).items()},
         )
 
     @classmethod
@@ -201,6 +205,15 @@ class G1MujocoSim:
         self.actuator_ids = np.array([actuator_names.index(f"pd_{n}") for n in io.joint_names])
         self.policy_ids = np.array([io.joint_names.index(n) for n in io.action_joint_names])
         self.default_pos = np.array([io.default_pos[n] for n in io.joint_names])
+        # PD targets with a zero action: the default pose for driven joints, the hold target
+        # (as in Isaac Lab) for the rest
+        driven = set(io.action_joint_names)
+        self.base_target = np.array(
+            [
+                io.default_pos[n] if n in driven else io.hold_targets.get(n, 0.0)
+                for n in io.joint_names
+            ]
+        )
         self.obs_ids = {
             term: np.array([io.joint_names.index(n) for n in io.obs_joint_names.get(term, [])])
             if io.obs_joint_names.get(term)
@@ -253,7 +266,7 @@ class G1MujocoSim:
             q[self.policy_ids] += joint_offsets
         d.qpos[self.qpos_adr] = q
         d.qvel[self.root_qvel_adr : self.root_qvel_adr + 3] = root_lin_vel
-        d.ctrl[self.actuator_ids] = self.default_pos
+        d.ctrl[self.actuator_ids] = self.base_target
         self.last_action = np.zeros(len(self.policy_ids))
         self.steps = 0
         mujoco.mj_forward(m, d)
@@ -299,7 +312,7 @@ class G1MujocoSim:
     def step(self, action: np.ndarray) -> None:
         """Apply one policy action and advance one policy period."""
         action = np.asarray(action, dtype=float).ravel()
-        target = self.default_pos.copy()
+        target = self.base_target.copy()
         target[self.policy_ids] += self.io.action_scale * action
         self.data.ctrl[self.actuator_ids] = target
         for _ in range(self.steps_per_action):

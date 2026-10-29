@@ -3,7 +3,8 @@
 Changes from the stage 0 bench task:
 
 - The robot uses the PD gains of NVIDIA's Decoupled WBC (D-012). Arms and hands are held at
-  their default pose by their PD controllers; later steps give them commands.
+  their default pose by their PD controllers (a reset event sets those targets; Isaac Lab
+  would otherwise hold them at 0); later steps give them commands.
 - The policy drives the 12 leg joints and 3 waist joints, action scale 0.25.
 - Velocity commands sample the yaw rate directly (no heading controller), with 10% standing,
   10% turning in place, and a deadband for very slow walking.
@@ -17,6 +18,7 @@ teacher-student split (steps 2-4).
 
 import isaaclab_tasks.core.velocity.mdp as mdp
 from isaaclab.actuators import ImplicitActuatorCfg
+from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
@@ -39,6 +41,8 @@ LEG_JOINTS = [
 ]
 WAIST_JOINTS = ["waist_yaw_joint", "waist_roll_joint", "waist_pitch_joint"]
 POLICY_JOINTS = LEG_JOINTS + WAIST_JOINTS
+# joints no action drives; held at the default pose by their PD controllers
+HELD_JOINTS = [".*_shoulder_.*_joint", ".*_elbow_joint", ".*_wrist_.*_joint", ".*_hand_.*_joint"]
 FEET = ".*_ankle_roll_link"
 
 # NVIDIA Decoupled WBC gains (g1_29dof_gear_wbc.yaml, MOTOR_KP / MOTOR_KD). Effort and velocity
@@ -243,9 +247,14 @@ class G1GaitEnvCfg(G1FlatStage0EnvCfg):
         gait = self.gait
         self.scene.robot = G1_29DOF_GAIT_CFG
 
-        # the policy drives legs and waist; arms and hands keep their default targets
+        # the policy drives legs and waist; arms and hands are held at the default pose
         self.actions.joint_pos.joint_names = POLICY_JOINTS
         self.actions.joint_pos.scale = 0.25
+        self.events.hold_upper_body = EventTerm(
+            func=pi_mdp.hold_joints_at_default,
+            mode="reset",
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=HELD_JOINTS)},
+        )
 
         self.commands.base_velocity = pi_mdp.GaitVelocityCommandCfg(
             asset_name="robot",
