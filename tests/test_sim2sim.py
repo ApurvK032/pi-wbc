@@ -228,6 +228,61 @@ def test_gait_recorder_sees_both_feet_down_when_standing(sim: G1MujocoSim) -> No
     assert g["step_rate_hz"] == 0 and g["double_support"] == 1.0
 
 
+def _standing_rigid(sim: G1MujocoSim) -> GaitRecorder:
+    """Land the robot on both feet, then stop every joint so it moves as one rigid body."""
+    for _ in range(20):
+        sim.step(np.zeros(29))
+    sim.data.qvel[:] = 0
+    return GaitRecorder(sim)
+
+
+def _move_rigid(sim: G1MujocoSim, ang_w: np.ndarray, point_w: np.ndarray) -> None:
+    """Give the whole robot angular velocity `ang_w` about a fixed point (world axes)."""
+    a, v = sim.root_qpos_adr, sim.root_qvel_adr
+    root_pos = sim.data.qpos[a : a + 3].copy()
+    rot = sim.data.xmat[sim.base_body].reshape(3, 3)
+    sim.data.qvel[v : v + 3] = np.cross(ang_w, root_pos - point_w)  # the point stays still
+    sim.data.qvel[v + 3 : v + 6] = rot.T @ ang_w  # free joint: angular velocity, body axes
+    mujoco.mj_forward(sim.model, sim.data)
+
+
+@needs_model
+def test_sole_slip_is_the_sliding_speed(sim: G1MujocoSim) -> None:
+    recorder = _standing_rigid(sim)
+    v = sim.root_qvel_adr
+    sim.data.qvel[v] = 0.3  # the whole robot slides forward at 0.3 m/s
+    mujoco.mj_forward(sim.model, sim.data)
+    recorder.sample()
+    assert recorder.down[-1] == [True, True]
+    assert recorder.sole_slip[-1] == pytest.approx([0.3, 0.3], abs=1e-6)
+    assert recorder.foot_speed[-1] == pytest.approx([0.3, 0.3], abs=1e-6)
+
+
+@needs_model
+def test_sole_slip_ignores_a_foot_pivoting_on_its_toe(sim: G1MujocoSim) -> None:
+    recorder = _standing_rigid(sim)
+    foot = recorder.feet[0]
+    rot = sim.data.xmat[foot].reshape(3, 3)
+    # Menagerie's toe spheres sit at x = 0.12 m, z = -0.03 m in the foot frame, radius 5 mm:
+    # pitch the whole robot about the line under them, as at toe-off.
+    toe_w = sim.data.xpos[foot] + rot @ np.array([0.12, 0.0, -0.035])
+    _move_rigid(sim, 2.0 * rot[:, 1], toe_w)
+    recorder.sample()
+    assert recorder.down[-1][0]
+    assert recorder.sole_slip[-1][0] < 0.01
+    # The ankle, 3.5 cm above the sole, still moves sideways by about 2 rad/s x 3.5 cm.
+    assert recorder.foot_speed[-1][0] == pytest.approx(0.07, abs=0.015)
+
+
+def test_gait_metrics_sole_slip_skips_unloaded_samples() -> None:
+    down, foot_z, foot_speed, base_speed, knee, shoulder, dt = _walk()
+    slip = np.where(down, 0.02, np.nan)
+    slip[50, :] = np.nan  # a down sample whose contact carried no load: left out
+    g = gait_metrics(down, foot_z, foot_speed, base_speed, knee, shoulder, dt, sole_slip=slip)
+    assert g["sole_slip_mps"] == pytest.approx(0.02)
+    assert gait_metrics(*_walk())["sole_slip_mps"] is None  # not recorded
+
+
 def test_summarize_and_table() -> None:
     eps = [
         evaluate.Episode(
