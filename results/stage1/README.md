@@ -182,10 +182,11 @@ falls are over all 11 commands and both models.
 | v5 | + leg actions centred on a crouch pose | 0/220 | 0/40 | 0.40 m/s | 0.74 rad/s | 1.7 cm | 0.3 cm, 0.37 m/s | 0.043 rad | 0.046 rad |
 | v6 | + arm poses every 2-4 s instead of 1-3 s | 0/220 | 0/40 | 0.42 m/s | 0.42 rad/s | 3.5 cm | 0.7 cm, 0.43 m/s | 0.096 rad | 0.041 rad |
 | v7 | + curriculum also needs turning to hold | 0/220 | 0/40 | 0.54 m/s | 0.49 rad/s | 4.8 cm | 2.0 cm, 0.32 m/s | 0.063 rad | 0.041 rad |
+| v8 | + turning reward ×2, 20% turn-in-place commands | 0/220 | 0/40 | 0.72 m/s | 0.32 rad/s | 0.5 cm | 1.1 cm, 0.50 m/s | 0.064 rad | 0.041 rad |
 
 Raw data in [`body_dev/`](body_dev/). Each run was trained, exported and evaluated at its own
-commit (v2 `d1b35cb`, v3 `c1d08b2`, v5 `27728b4`, v6 `39c9079`, v7 `7fd051b`; v3's tree
-differed only in `docs/`). v7's first attempt stopped at iteration 182 when the workstation
+commit (v2 `d1b35cb`, v3 `c1d08b2`, v5 `27728b4`, v6 `39c9079`, v7 `7fd051b`, v8 `8188cdb`;
+v3's tree differed only in `docs/`). v7's first attempt stopped at iteration 182 when the workstation
 crashed (no error in the system log); the run above is its restart. v4 was trained at `71bf947`; its first export picked up a half-written change and was
 redone from `71bf947`, then evaluated at `39c9079` (below). Single runs: differences between
 versions smaller than stage 0's run-to-run spread (D-011) are not evidence; v5 against v6 is one
@@ -243,9 +244,18 @@ back, as it brought walking speed back in step 1?).
 
 Raw data in [`body_dev/`](body_dev/) (`probeA-*`, `probeB-*`, `probeC-*`).
 
+**v8: turning kept, walking lost.** With the turning reward doubled and twice the share of
+turn-in-place commands, v8 is the first version whose training yaw-rate error stays flat
+(0.44-0.45 rad/s) all the way to the full range, and it turns in place best in MuJoCo
+(0.26-0.32 rad/s off a 0.8 rad/s command). But it walks slowest: asked for 1 m/s it makes about
+0.3 m/s, in 7 cm steps. Every run so far stops at 1400 iterations with the curriculum taking
+the second half, while step 1 needed 3000 iterations to walk well; whether full-length training
+recovers walking is the next question (v7 at 3000 iterations on the cluster, v8 at 3000 on the
+workstation).
+
 ### Next
 
-- Turning in place: v8, then the cluster runs above.
+- Full-length runs (3000 iterations) of v7 and v8.
 - Longer training: step 1 needed 3000 iterations to walk well, and here the curriculum takes
   the second half of a 1400-iteration run. Then 3 seeds, as in step 1.
 - The stand-still penalty costs about 0.35 per second in training, mostly from the exploration
