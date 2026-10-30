@@ -217,7 +217,9 @@ such case.
 ### Next
 
 - Keep turning in the curriculum's criteria, so the ranges widen only while turning holds.
-- Look at the stand-still penalty: it costs about 0.35 per second from early on (step 1:
-  0.07), because the legs keep moving while the robot is told to stand.
+- Look at the stand-still penalty: it costs about 0.35 per second in training, mostly from the
+  exploration noise added to actions (the policy itself stands still in MuJoCo: both feet down
+  95-100% of the time). Step 1's version measured the offset from the default pose, so the two
+  values don't compare.
 - Longer training: step 1 needed 3000 iterations to walk well, and here the curriculum takes
   the second half of a 1400-iteration run. Then 3 seeds, as in step 1.
