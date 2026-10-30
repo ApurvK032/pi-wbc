@@ -102,6 +102,8 @@ class PolicyIO:
     height_pose: dict[str, Any] | None = None
     # uniform noise range per observation term as trained ({} for exports that don't record it)
     obs_noise: dict[str, tuple[float, float]] = field(default_factory=dict)
+    # frames of observation history the policy sees, oldest first (0: the current step only)
+    obs_history: int = 0
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> PolicyIO:
@@ -152,6 +154,7 @@ class PolicyIO:
                 k: (float(v[0]), float(v[1]))
                 for k, v in (raw["observation"].get("noise") or {}).items()
             },
+            obs_history=int(raw["observation"].get("history_length") or 0),
         )
 
     @classmethod
@@ -160,7 +163,7 @@ class PolicyIO:
 
     @property
     def obs_dim(self) -> int:
-        return sum(size for _, size in self.obs_terms)
+        return sum(size for _, size in self.obs_terms) * max(self.obs_history, 1)
 
 
 def build_model(
@@ -312,6 +315,7 @@ class G1MujocoSim:
         self.noise: dict[str, tuple[float, float]] = {}
         self.noise_rng = np.random.default_rng(0)
         self._last_target: np.ndarray | None = None
+        self._history: list[np.ndarray] = []  # observation frames, oldest first
 
     # -- state -------------------------------------------------------------------------------
 
@@ -343,6 +347,7 @@ class G1MujocoSim:
         self.last_action = np.zeros(len(self.policy_ids))
         self.steps = 0
         self._last_target = None
+        self._history = []
         mujoco.mj_forward(m, d)
 
     def set_upper_body_targets(self, targets: np.ndarray) -> None:
@@ -390,7 +395,17 @@ class G1MujocoSim:
                 lo, hi = self.noise[name]
                 value = value + self.noise_rng.uniform(lo, hi, value.size)
             parts.append(value)
-        return np.concatenate(parts).astype(np.float32)
+        frame = np.concatenate(parts).astype(np.float32)
+        history = self.io.obs_history
+        if not history:
+            return frame
+        # as Isaac Lab's history buffer: the first frame after a reset fills every slot, then
+        # each call shifts in one frame (call once per policy step)
+        if not self._history:
+            self._history = [frame] * history
+        else:
+            self._history = [*self._history[1:], frame]
+        return np.concatenate(self._history)
 
     def step(self, action: np.ndarray) -> None:
         """Apply one policy action and advance one policy period."""
