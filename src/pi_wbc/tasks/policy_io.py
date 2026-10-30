@@ -95,9 +95,10 @@ def collect(env: Any) -> dict[str, Any]:
 
     # Uniform observation noise per term, as configured for training (recorded even when the
     # export itself runs without noise, e.g. after make_nominal).
+    # Read from the task config: the observation manager drops noise when it is switched off.
     obs_noise: dict[str, list[float]] = {}
-    for name, term_cfg in zip(terms, obs_mgr._group_obs_term_cfgs["policy"], strict=True):
-        noise = term_cfg.noise
+    for name in terms:
+        noise = getattr(getattr(group_cfg, name, None), "noise", None)
         if noise is not None and hasattr(noise, "n_min"):
             obs_noise[name] = [float(noise.n_min), float(noise.n_max)]
 
