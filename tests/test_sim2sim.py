@@ -608,3 +608,23 @@ def test_condition_noise_stays_in_its_range(sim: G1MujocoSim) -> None:
         if name in DEFAULT_OBS_NOISE:
             assert np.abs(diff).max() > 0
         start += size
+
+
+@needs_model
+def test_observation_history_fills_then_shifts_like_isaac_lab() -> None:
+    raw = json.loads(BODY_IO_PATH.read_text())
+    raw["observation"]["history_length"] = 3
+    io = PolicyIO.from_dict(raw)
+    sim = G1MujocoSim(build_model(SCENE, io), io)
+    sim.reset()
+    frame = 91
+    assert io.obs_dim == 3 * frame
+    first = sim.observation((0, 0, 0))
+    assert np.allclose(first[:frame], first[frame : 2 * frame])  # backfilled after reset
+    assert np.allclose(first[:frame], first[2 * frame :])
+    sim.step(np.zeros(15))
+    second = sim.observation((0, 0, 0))
+    assert np.allclose(second[: 2 * frame], first[frame:])  # shifted by one frame
+    assert not np.allclose(second[2 * frame :], first[2 * frame :])  # newest frame last
+    sim.reset()
+    assert np.allclose(*np.split(sim.observation((0, 0, 0)), 3)[:2])  # backfilled again

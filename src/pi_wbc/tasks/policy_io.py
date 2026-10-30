@@ -78,11 +78,18 @@ def collect(env: Any) -> dict[str, Any]:
     obs_mgr = env.observation_manager
     terms = obs_mgr.active_terms["policy"]
     dims = obs_mgr.group_obs_term_dim["policy"]
+    # With history (stage 1, step 4), the policy sees the last `history_length` frames, oldest
+    # first, each frame holding every term ("time" order); the layout below is one frame.
+    group_cfg = env.cfg.observations.policy
+    history = int(group_cfg.history_length or 0)
+    if history and getattr(group_cfg, "history_order", "term") != "time":
+        raise ValueError("only time-major observation history is supported")
     obs_layout, start = [], 0
     for name, dim in zip(terms, dims, strict=True):
         size = 1
         for d in dim:
             size *= d
+        size //= max(history, 1)
         obs_layout.append({"name": name, "start": start, "size": size})
         start += size
 
@@ -158,7 +165,9 @@ def collect(env: Any) -> dict[str, Any]:
             "height_pose": height_pose,
         },
         "observation": {
-            "dim": start,
+            "dim": start * max(history, 1),
+            "history_length": history,
+            "frame_dim": start,
             "terms": obs_layout,
             "joint_names": obs_joint_names,
             "noise": obs_noise,
