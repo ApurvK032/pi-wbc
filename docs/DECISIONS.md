@@ -115,8 +115,8 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 - **Friction on Newton:** Newton's MuJoCo-Warp solver uses the larger of the two touching
   surfaces' friction (like MuJoCo) and ignores Isaac Lab's `friction_combine_mode`. Isaac Lab's
   ground has friction 1.0, so randomizing the robot's friction below 1.0 has no effect. Stage 1
-  must randomize the ground's friction instead. (Read from Newton's code; not yet confirmed in
-  a running simulation.)
+  sets the ground low and randomizes the robot's friction instead. (Read from Newton's code;
+  seen in a running simulation in stage 1, D-018.)
 - **Isaac's G1 hands:** in Isaac Lab's 29-DoF G1 model, the left palm weighs 0.161 kg and the
   right 0.373 kg. Menagerie's hands are symmetric. This accounts for the whole 0.21 kg
   total-mass difference between the two models (34.18 vs 34.39 kg).
@@ -301,6 +301,37 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 - **Cost:** a robot keeps its payload for the whole run (variety comes from 4096 robots, not
   from episodes). The torso command must be converted if a VLA sends torso roll, pitch and yaw
   in another convention (stage 3).
+
+## D-018: How step 3 randomizes, and how its groups are switched off (2026-10-30)
+
+- **What:** `PiWbc-G1-Robust` (`src/pi_wbc/tasks/g1_robust.py`) is the body task plus six
+  randomization groups: friction (robot shapes 0.1-1.25 on a 0.05 ground), mass (torso -1 to
+  +3 kg, links ×0.9-1.1, torso centre of mass ±3 cm, the hand payload), actuators (stiffness,
+  damping, armature ×0.8-1.2), latency (0-4 physics steps between a new action and its
+  targets, drawn per robot at each reset), sensor noise (the base task's, Unitree's values),
+  and pushes (every 4-6 s, ±0.5 m/s growing to ±1.5 m/s with the upper-body curriculum's
+  level). Masses, centre of mass and gains are drawn once per robot at startup.
+  `ABLATION_OVERRIDES` gives, per group, the config overrides that switch it off;
+  `make_nominal` switches all of them off, and the export uses it.
+- **Why:**
+  - Overrides, not switches read in `__post_init__`: Isaac Lab applies config overrides after
+    `__post_init__`, so each group is removed by deleting its event terms or setting a value
+    the simulation reads at run time.
+  - Startup, not reset, for masses and gains: per-reset mass changes made Newton 2.3 times
+    slower (D-017); 4096 robots give the variety.
+  - Joint friction is not randomized: it is 0 in this model, so scaling it changes nothing.
+  - Nominal export: the export builds one robot, and with the groups on it would record that
+    robot's randomized gains and masses as the policy's robot.
+- **Checked in a running simulation** (`scripts/check_randomization.py`, results in
+  `results/stage1/randomization_check/`): masses, centre of mass and gains read back inside
+  their ranges; PD targets switch after exactly the drawn delay; pushes set at most the
+  configured speed; the centre-of-mass change keeps the state finite. Friction: kicked
+  sideways, feet slide 8.7-9.2 cm in 0.1 s at robot friction 0.1 on the 0.05 ground against
+  3.7-4.8 cm at 1.0 or 1.25, and a 0.1 robot on a 1.0 ground slides like a 1.0 robot on the
+  0.05 ground, as Newton taking the larger of the two values predicts (the stage 0 finding,
+  now seen in simulation).
+- **Cost:** a robot keeps its masses and gains for the whole run. Latency and noise are not
+  yet in the MuJoCo bench (step 5's test conditions).
 
 ## Open items
 
