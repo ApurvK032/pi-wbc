@@ -59,3 +59,53 @@ def test_interpolate_moves_in_a_straight_line_then_holds() -> None:
     start, goal = torch.zeros(3, 2), torch.ones(3, 2)
     out = mdp.interpolate(start, goal, torch.tensor([0.0, 0.5, 2.0]), torch.tensor([1.0, 1.0, 1.0]))
     assert out[:, 0].tolist() == pytest.approx([0.0, 0.5, 1.0])
+
+
+def _curriculum_env(falls: list[bool], track_per_s: list[float], step: int):
+    """A stand-in env with what `upper_body_level` reads, for envs that just ended."""
+    from types import SimpleNamespace
+
+    terms = {n: SimpleNamespace(level=0.5, last_level_change=0) for n in ("body", "arms")}
+    return SimpleNamespace(
+        device="cpu",
+        command_manager=SimpleNamespace(get_term=terms.__getitem__),
+        reward_manager=SimpleNamespace(
+            _episode_sums={"track": torch.tensor(track_per_s) * 20.0},
+            get_term_cfg=lambda name: SimpleNamespace(weight=1.0),
+        ),
+        termination_manager=SimpleNamespace(terminated=torch.tensor(falls)),
+        max_episode_length_s=20.0,
+        common_step_counter=step,
+    ), terms
+
+
+CURRICULUM = {
+    "command_names": ["body", "arms"],
+    "reward_term": "track",
+    "track_threshold": 0.6,
+    "raise_below": 0.1,
+    "lower_above": 0.25,
+    "level_step": 0.05,
+    "min_interval_steps": 480,
+    "min_episodes": 4,
+}
+
+
+def test_curriculum_rises_when_few_fall_and_waits_for_its_window() -> None:
+    env, terms = _curriculum_env([False] * 4, [0.8] * 4, step=100)
+    ids = torch.arange(4)
+    assert mdp.upper_body_level(env, ids, **CURRICULUM).item() == pytest.approx(0.5)  # too soon
+    env.common_step_counter = 480
+    assert mdp.upper_body_level(env, ids, **CURRICULUM).item() == pytest.approx(0.55)
+    assert terms["arms"].level == pytest.approx(0.55)  # every named command moves together
+    assert terms["body"].tally_episodes == 0  # the tally restarts
+
+
+def test_curriculum_drops_when_many_fall_and_holds_in_between() -> None:
+    env, _ = _curriculum_env([True, True, False, False], [0.8] * 4, step=480)
+    assert mdp.upper_body_level(env, slice(None), **CURRICULUM).item() == pytest.approx(0.45)
+    env, _ = _curriculum_env([True, False, False, False, False, False], [0.8] * 6, step=480)
+    level = mdp.upper_body_level(env, slice(None), **CURRICULUM).item()
+    assert level == pytest.approx(0.5)  # 17% fell: neither raise nor drop
+    env, _ = _curriculum_env([False] * 4, [0.5] * 4, step=480)
+    assert mdp.upper_body_level(env, slice(None), **CURRICULUM).item() == pytest.approx(0.5)

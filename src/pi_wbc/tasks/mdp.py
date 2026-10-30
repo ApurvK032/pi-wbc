@@ -458,34 +458,53 @@ class UpperBodyMotionCommandCfg(CommandTermCfg):
 
 def upper_body_level(
     env: ManagerBasedRLEnv,
-    env_ids: Sequence[int],
+    env_ids: Sequence[int] | slice,
     command_names: Sequence[str],
     reward_term: str,
-    threshold: float,
+    track_threshold: float,
+    raise_below: float,
+    lower_above: float,
     level_step: float,
     min_interval_steps: int,
+    min_episodes: int = 100,
 ) -> torch.Tensor:
-    """Curriculum: widen the body-pose and arm-motion ranges while velocity tracking is good.
+    """Curriculum: widen the body-pose and arm-motion ranges while the robot walks well.
 
-    When the resetting envs' tracking reward per second exceeds `threshold` x its weight, the
-    level of every named command rises by `level_step` (up to 1); below half of that it falls
-    by the same step. Changes are at least `min_interval_steps` policy steps apart. Returns the
-    level, which Isaac Lab logs.
+    Every episode that ends adds to a tally: whether it ended in a fall, and its velocity-
+    tracking reward per second. At most every `min_interval_steps` policy steps, and once at
+    least `min_episodes` have ended, the tally decides: if under `raise_below` of them fell and
+    tracking averaged over `track_threshold` x the reward's weight, the level of every named
+    command rises by `level_step` (up to 1); if over `lower_above` fell, it drops by the same
+    step. Then the tally restarts. Judging a whole window, not each step's few resetting envs,
+    keeps the level from moving on noise. Returns the level, which Isaac Lab logs.
     """
     terms = [env.command_manager.get_term(n) for n in command_names]
-    level = terms[0].level
-    since = env.common_step_counter - terms[0].last_level_change
+    lead = terms[0]
+    if not hasattr(lead, "tally_episodes"):
+        lead.tally_episodes = 0
+        lead.tally_falls = torch.zeros((), device=env.device)
+        lead.tally_track = torch.zeros((), device=env.device)
     sums = env.reward_manager._episode_sums[reward_term][env_ids]  # env_ids may be a slice
-    if sums.numel() > 0 and since >= min_interval_steps:
+    lead.tally_episodes += sums.numel()
+    lead.tally_falls += env.termination_manager.terminated[env_ids].sum()
+    lead.tally_track += sums.sum() / env.max_episode_length_s
+    level = lead.level
+    since = env.common_step_counter - lead.last_level_change
+    if since >= min_interval_steps and lead.tally_episodes >= min_episodes:
+        n = lead.tally_episodes
+        fall_share = lead.tally_falls.item() / n
+        track = lead.tally_track.item() / n
         weight = env.reward_manager.get_term_cfg(reward_term).weight
-        per_s = sums.mean().item() / env.max_episode_length_s
-        if per_s > threshold * weight:
+        if fall_share < raise_below and track > track_threshold * weight:
             level = min(1.0, level + level_step)
-        elif per_s < 0.5 * threshold * weight:
+        elif fall_share > lower_above:
             level = max(0.0, level - level_step)
         for term in terms:
             term.level = level
             term.last_level_change = env.common_step_counter
+        lead.tally_episodes = 0
+        lead.tally_falls.zero_()
+        lead.tally_track.zero_()
     return torch.tensor(level)
 
 

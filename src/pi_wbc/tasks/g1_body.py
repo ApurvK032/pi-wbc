@@ -11,7 +11,8 @@ Changes from `PiWbc-G1-Gait`:
 - A payload of 0-1 kg is added to each palm, drawn once per robot at startup: changing masses
   at every reset made Newton training 2.3 times slower (1.5 s more per iteration).
 - A curriculum widens the body-pose and arm ranges from nothing (level 0) to full (level 1)
-  while velocity tracking stays good.
+  while few episodes end in a fall and velocity tracking stays good, judged over windows of
+  20 iterations.
 - Standing still is enforced through joint speed rather than the offset from the default pose,
   so the robot may crouch while standing.
 
@@ -118,7 +119,9 @@ class G1BodyEnvCfg(G1GaitEnvCfg):
             params={
                 "command_names": ["body_pose", "upper_body"],
                 "reward_term": "track_lin_vel_xy_exp",
-                "threshold": 0.75,
+                "track_threshold": 0.6,
+                "raise_below": 0.10,  # share of ended episodes that fell
+                "lower_above": 0.25,
                 "level_step": 0.05,
                 "min_interval_steps": 480,  # 20 PPO iterations of 24 steps
             },
