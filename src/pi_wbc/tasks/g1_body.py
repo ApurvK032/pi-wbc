@@ -155,8 +155,9 @@ class G1BodyEnvCfg(G1GaitEnvCfg):
             func=pi_mdp.upper_body_level,
             params={
                 "command_names": ["body_pose", "upper_body"],
-                "reward_term": "track_lin_vel_xy_exp",
-                "track_threshold": 0.6,
+                # per-second reward over its weight; v7 adds turning (v3-v6 gave it up as the
+                # ranges widened: 0.39 to 0.26 per second while speed tracking held)
+                "reward_thresholds": {"track_lin_vel_xy_exp": 0.6, "track_ang_vel_z_exp": 0.35},
                 "raise_below": 0.10,  # share of ended episodes that fell
                 "lower_above": 0.25,
                 "level_step": 0.05,

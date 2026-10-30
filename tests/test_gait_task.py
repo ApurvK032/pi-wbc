@@ -61,16 +61,22 @@ def test_interpolate_moves_in_a_straight_line_then_holds() -> None:
     assert out[:, 0].tolist() == pytest.approx([0.0, 0.5, 1.0])
 
 
-def _curriculum_env(falls: list[bool], track_per_s: list[float], step: int):
+def _curriculum_env(
+    falls: list[bool], track_per_s: list[float], step: int, turn_per_s: list[float] | None = None
+):
     """A stand-in env with what `upper_body_level` reads, for envs that just ended."""
     from types import SimpleNamespace
 
     terms = {n: SimpleNamespace(level=0.5, last_level_change=0) for n in ("body", "arms")}
+    turn = [0.5] * len(track_per_s) if turn_per_s is None else turn_per_s
     return SimpleNamespace(
         device="cpu",
         command_manager=SimpleNamespace(get_term=terms.__getitem__),
         reward_manager=SimpleNamespace(
-            _episode_sums={"track": torch.tensor(track_per_s) * 20.0},
+            _episode_sums={
+                "track": torch.tensor(track_per_s) * 20.0,
+                "turn": torch.tensor(turn) * 20.0,
+            },
             get_term_cfg=lambda name: SimpleNamespace(weight=1.0),
         ),
         termination_manager=SimpleNamespace(terminated=torch.tensor(falls)),
@@ -81,8 +87,7 @@ def _curriculum_env(falls: list[bool], track_per_s: list[float], step: int):
 
 CURRICULUM = {
     "command_names": ["body", "arms"],
-    "reward_term": "track",
-    "track_threshold": 0.6,
+    "reward_thresholds": {"track": 0.6, "turn": 0.35},
     "raise_below": 0.1,
     "lower_above": 0.25,
     "level_step": 0.05,
@@ -117,3 +122,8 @@ def test_interp_table_is_linear_between_rows_and_clamped_outside() -> None:
     out = mdp.interp_table(torch.tensor([0.4, 0.55, 0.6, 0.69, 0.9]), xs, ys)
     assert out[:, 0].tolist() == pytest.approx([2.0, 1.8, 1.6, 0.95, 0.3])
     assert out[:, 1].tolist() == pytest.approx([0.0, 0.5, 1.0, 1.5, 2.0])
+
+
+def test_curriculum_holds_while_turning_is_poor() -> None:
+    env, _ = _curriculum_env([False] * 4, [0.8] * 4, step=480, turn_per_s=[0.2] * 4)
+    assert mdp.upper_body_level(env, slice(None), **CURRICULUM).item() == pytest.approx(0.5)

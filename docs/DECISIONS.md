@@ -267,8 +267,8 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   - height rewarded like velocity: exp(-error² / 0.1²), weight 1, on top of the squared
     penalty (weight -10) that step 1 used for its fixed height;
   - a curriculum that widens both from nothing to the full ranges, in steps of 5%, judged
-    over 20-iteration windows (raise when under 10% of ended episodes fell and velocity
-    tracking is over 60% of its reward; lower when over 25% fell).
+    over 20-iteration windows (raise when under 10% of ended episodes fell, speed tracking is
+    over 60% of its reward and turn-rate tracking over 35%; lower when over 25% fell).
 - **Why, where it departs from the design:**
   - The torso command is the waist joint angles: the G1's waist turns in the order yaw, roll,
     pitch, so these angles are the torso's orientation relative to the pelvis.
@@ -292,6 +292,9 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   - Arm poses every 2-4 s rather than 1-3 s: the faster motion (shoulders up to 2.5 rad/s,
     with up to 1 kg in the hand) went with turning in place being unlearned as the curriculum
     widened (training yaw-rate error 0.65 to 1.05 rad/s).
+  - Turning in the curriculum's criteria: in runs v3-v6 the ranges widened while turning in
+    place was being unlearned (turn-rate tracking fell from 0.39 to 0.26 per second, speed
+    tracking held).
   - Height bonus: with the squared penalty alone, a 1400-iteration run never crouched (its
     training height error, 10 cm, was what standing still gives), while the waist, rewarded
     with the exp form, was tracked.
