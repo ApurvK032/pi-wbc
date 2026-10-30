@@ -4,7 +4,7 @@
 #   scripts/sim2sim_runs.sh OUT_DIR RUN_DIR...
 #
 # RUN_DIR is logs/rsl_rl/<experiment>/slurm-<jobid>[-<variant>] with an exported/ bundle. The
-# training seed is read from the job log logs/slurm/piwbc-stage0-<jobid>.out, and each result
+# training seed is read from the job log logs/slurm/piwbc-<script>-<jobid>.out, and each result
 # is labelled <variant>-s<seed> (variant "base" when the folder has none) and written to
 # OUT_DIR/<label>-<jobid>.json; GPU training is not bit-reproducible, so runs with the same
 # seed still differ. Each run is checked on Newton's own model and on MuJoCo Menagerie's G1,
@@ -26,7 +26,8 @@ evaluate() {
     job=${rest%%-*}
     variant=base
     [[ ${rest} == *-* ]] && variant=${rest#*-}
-    seed=$(sed -n 's/^seed \([0-9][0-9]*\),.*/\1/p' "logs/slurm/piwbc-stage0-${job}.out" | head -1)
+    # the job log is logs/slurm/piwbc-<script>-<jobid>.out; its third line names the seed
+    seed=$(sed -n 's/.*seed \([0-9][0-9]*\),.*/\1/p' logs/slurm/piwbc-*-"${job}".out | head -1)
     [[ -n ${seed} ]] || { echo "no seed in the job log of ${run}" >&2; return 1; }
     label=${variant}-s${seed}
     uv run --frozen pi-wbc-sim2sim --label "${label}" \

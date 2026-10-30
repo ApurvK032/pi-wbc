@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +36,8 @@ SUPPORTED_OBS_TERMS = {
     "joint_pos",
     "joint_vel",
     "actions",
+    "gait_clock",
+    "body_pose_command",
 }
 
 
@@ -69,7 +71,7 @@ class PolicyIO:
     """The parts of policy_io.json the MuJoCo side uses."""
 
     joint_names: list[str]  # every joint, in Isaac Lab's order
-    action_joint_names: list[str]  # joints the policy drives; also the joint-observation order
+    action_joint_names: list[str]  # joints the policy drives, in action order
     default_pos: dict[str, float]
     stiffness: dict[str, float]
     damping: dict[str, float]
@@ -85,6 +87,19 @@ class PolicyIO:
     root_pos: tuple[float, float, float]
     root_quat_wxyz: tuple[float, float, float, float]
     command_ranges: dict[str, tuple[float, float]]
+    # joints of each joint observation, in observation order (stage 0: the action's joints)
+    obs_joint_names: dict[str, list[str]] = field(default_factory=dict)
+    gait: dict[str, float] | None = None  # gait clock settings (stage 1 tasks)
+    # PD targets of joints the policy does not drive. Isaac Lab leaves these at 0 unless the
+    # task sets them, so exports that don't record them (stage 0, the first gait runs) get 0.
+    hold_targets: dict[str, float] = field(default_factory=dict)
+    # body-pose command (pelvis height, waist yaw, roll, pitch) and random arm and hand motion
+    # (stage 1, step 2): their settings as exported, or None
+    body_pose: dict[str, Any] | None = None
+    upper_body: dict[str, Any] | None = None
+    # leg actions centred on a crouch that follows the commanded height: pelvis heights and
+    # each listed joint's offset from the default pose at them; None for plain actions
+    height_pose: dict[str, Any] | None = None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> PolicyIO:
@@ -123,6 +138,14 @@ class PolicyIO:
             root_pos=tuple(raw["root_init"]["pos"]),
             root_quat_wxyz=tuple(xyzw_to_wxyz(raw["root_init"]["rot_xyzw"])),
             command_ranges={k: tuple(v) for k, v in raw["commands"].items()},
+            obs_joint_names={
+                k: list(v) for k, v in raw["observation"].get("joint_names", {}).items()
+            },
+            gait=raw.get("gait"),
+            hold_targets={k: float(v) for k, v in (raw.get("hold_targets") or {}).items()},
+            body_pose=raw.get("body_pose"),
+            upper_body=raw.get("upper_body"),
+            height_pose=raw["action"].get("height_pose"),
         )
 
     @classmethod
@@ -193,6 +216,51 @@ class G1MujocoSim:
         self.actuator_ids = np.array([actuator_names.index(f"pd_{n}") for n in io.joint_names])
         self.policy_ids = np.array([io.joint_names.index(n) for n in io.action_joint_names])
         self.default_pos = np.array([io.default_pos[n] for n in io.joint_names])
+        # PD targets with a zero action: the default pose for driven joints, the hold target
+        # (as in Isaac Lab) for the rest
+        driven = set(io.action_joint_names)
+        self.base_target = np.array(
+            [
+                io.default_pos[n] if n in driven else io.hold_targets.get(n, 0.0)
+                for n in io.joint_names
+            ]
+        )
+        self.obs_ids = {
+            term: np.array([io.joint_names.index(n) for n in io.obs_joint_names.get(term, [])])
+            if io.obs_joint_names.get(term)
+            else self.policy_ids
+            for term in ("joint_pos", "joint_vel")
+        }
+        if any(t == "gait_clock" for t, _ in io.obs_terms) and not io.gait:
+            raise ValueError("the policy observes a gait clock but policy_io has no gait settings")
+        self._base_target0 = self.base_target.copy()
+        # body-pose command: what the policy is asked for now (nominal unless a scenario says
+        # otherwise), and the waist joints it sets
+        self.body_command: np.ndarray | None = None
+        self.waist_ids = np.zeros(0, dtype=int)
+        if io.body_pose:
+            self.body_command = np.array(io.body_pose["nominal"], dtype=float)
+            self.waist_ids = np.array(
+                [io.joint_names.index(n) for n in io.body_pose["waist_joint_names"]]
+            )
+        elif any(t == "body_pose_command" for t, _ in io.obs_terms):
+            raise ValueError("the policy observes a body-pose command but policy_io has none")
+        self.pose_ids = np.zeros(0, dtype=int)
+        if io.height_pose:
+            if self.body_command is None:
+                raise ValueError("crouch-centred actions need a body-pose command")
+            offsets = io.height_pose["joint_offsets"]
+            self.pose_ids = np.array([io.joint_names.index(n) for n in offsets])
+            self.pose_heights = np.asarray(io.height_pose["heights"], dtype=float)
+            self.pose_offsets = np.array(list(offsets.values()), dtype=float)
+        # joints moved by the arm and hand motion (their PD targets bypass the policy)
+        self.upper_ids = np.zeros(0, dtype=int)
+        if io.upper_body:
+            self.upper_ids = np.array(
+                [io.joint_names.index(n) for n in io.upper_body["joint_names"]]
+            )
+            if set(self.upper_ids) & set(self.policy_ids):
+                raise ValueError("arm and hand motion would move joints the policy drives")
 
         free = [j for j in range(m.njnt) if m.jnt_type[j] == mujoco.mjtJoint.mjJNT_FREE]
         if len(free) != 1:
@@ -209,6 +277,8 @@ class G1MujocoSim:
             raise ValueError("the model has no floor plane")
 
         self.steps_per_action = io.decimation * io.num_substeps
+        self.policy_dt = io.physics_dt * io.decimation
+        self.steps = 0  # policy steps since reset, as Isaac Lab's episode_length_buf
         self.last_action = np.zeros(len(self.policy_ids))
         self._vel6 = np.zeros(6)
 
@@ -235,9 +305,17 @@ class G1MujocoSim:
             q[self.policy_ids] += joint_offsets
         d.qpos[self.qpos_adr] = q
         d.qvel[self.root_qvel_adr : self.root_qvel_adr + 3] = root_lin_vel
-        d.ctrl[self.actuator_ids] = self.default_pos
+        self.base_target = self._base_target0.copy()
+        d.ctrl[self.actuator_ids] = self.base_target
+        if self.io.body_pose:
+            self.body_command = np.array(self.io.body_pose["nominal"], dtype=float)
         self.last_action = np.zeros(len(self.policy_ids))
+        self.steps = 0
         mujoco.mj_forward(m, d)
+
+    def set_upper_body_targets(self, targets: np.ndarray) -> None:
+        """PD targets of the arm and hand joints (in `io.upper_body` order), from the next step."""
+        self.base_target[self.upper_ids] = targets
 
     def base_rotation(self) -> np.ndarray:
         """3x3 rotation from the pelvis frame to the world frame."""
@@ -263,10 +341,14 @@ class G1MujocoSim:
             "base_ang_vel": rot.T @ ang_w,
             "projected_gravity": rot.T @ GRAVITY_DIR,
             "velocity_commands": np.asarray(command, dtype=float),
-            "joint_pos": (q - self.default_pos)[self.policy_ids],
-            "joint_vel": qd[self.policy_ids],
+            "joint_pos": (q - self.default_pos)[self.obs_ids["joint_pos"]],
+            "joint_vel": qd[self.obs_ids["joint_vel"]],
             "actions": self.last_action,
         }
+        if self.io.gait:
+            terms["gait_clock"] = self.gait_clock(command)
+        if self.body_command is not None:
+            terms["body_pose_command"] = self.body_command
         parts = []
         for name, size in self.io.obs_terms:
             value = np.asarray(terms[name], dtype=float).ravel()
@@ -278,12 +360,33 @@ class G1MujocoSim:
     def step(self, action: np.ndarray) -> None:
         """Apply one policy action and advance one policy period."""
         action = np.asarray(action, dtype=float).ravel()
-        target = self.default_pos.copy()
+        target = self.base_target.copy()
         target[self.policy_ids] += self.io.action_scale * action
+        if self.pose_ids.size:  # as pi_wbc.tasks.mdp.HeightPoseJointPositionAction
+            height = self.body_command[0]
+            target[self.pose_ids] += [
+                np.interp(height, self.pose_heights, row) for row in self.pose_offsets
+            ]
         self.data.ctrl[self.actuator_ids] = target
         for _ in range(self.steps_per_action):
             mujoco.mj_step(self.model, self.data)
         self.last_action = action.copy()
+        self.steps += 1
+
+    def gait_clock(self, command: Sequence[float] = (0.0, 0.0, 0.0)) -> np.ndarray:
+        """sin and cos of the left leg's gait phase, as `pi_wbc.tasks.mdp.gait_clock`.
+
+        Policies trained with `clock_off_when_standing` see (0, 0) while the command says
+        "stand" (speed and yaw rate both below the threshold).
+        """
+        gait = self.io.gait
+        period = float(gait["period"])
+        if gait.get("clock_off_when_standing"):
+            threshold = float(gait["stand_threshold"])
+            if np.hypot(command[0], command[1]) < threshold and abs(command[2]) < threshold:
+                return np.zeros(2)
+        phase = (self.steps * self.policy_dt % period) / period
+        return np.array([np.sin(2 * np.pi * phase), np.cos(2 * np.pi * phase)])
 
     # -- measurements ------------------------------------------------------------------------
 

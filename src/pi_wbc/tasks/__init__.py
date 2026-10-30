@@ -17,3 +17,25 @@ gym.register(
         "default_agent": "rsl_rl",
     },
 )
+
+gym.register(
+    id="PiWbc-G1-Gait",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.g1_gait:G1GaitEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{__name__}.g1_gait:G1GaitPPORunnerCfg",
+        "default_agent": "rsl_rl",
+    },
+)
+
+gym.register(
+    id="PiWbc-G1-Body",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.g1_body:G1BodyEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{__name__}.g1_body:G1BodyPPORunnerCfg",
+        "default_agent": "rsl_rl",
+    },
+)

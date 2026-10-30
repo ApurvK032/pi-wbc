@@ -1,7 +1,8 @@
 # Stage 1 design: the π-WBC whole-body controller
 
-**Status: draft for review (2026-10-29).** Nothing here is built yet. The choices that need
-Apurv's answer are listed in section 15; everything else is a proposal that can still change.
+**Status: accepted (2026-10-29).** Apurv accepted all seven recommendations of section 15;
+they are recorded as D-012 to D-015 in [DECISIONS.md](DECISIONS.md). Details below may still
+change as the work shows what is needed; changes are logged there.
 
 Stage 0 left us with a working pipeline (Isaac Lab training on the workstation and on MSI, a
 MuJoCo sim-to-sim bench, gait measurements) and a bench policy that walks without falling but
@@ -26,7 +27,7 @@ fall rates and at least 3 training runs per configuration (D-011):
 | Step rate at 1 m/s | 1.5-3 steps/s | 10.7 |
 | Step length at 1 m/s | at least 0.3 m | 0.08 m |
 | Foot lift | at least 5 cm | 2.8 cm |
-| Foot speed in stance (slip) | at most 0.1 m/s | 0.31 m/s |
+| Slip: sole speed at its floor contacts (D-016) | at most 0.1 m/s | 0.14 m/s (ankle speed: 0.31 m/s) |
 | Push recovery | report the largest push survived 95% of the time | not tested |
 | Arm tracking while walking | report joint error | not applicable |
 
@@ -131,7 +132,9 @@ produce a normal gait on this robot:
   cycle and in the air in the rest. The policy sees the phase (as sin and cos), and a reward
   pays each foot for matching the schedule. When the command is near zero, the clock switches
   to standing: both feet down.
-- **Foot lift.** A penalty on the swing foot's height away from a target of about 8 cm.
+- **Foot lift.** A penalty on the swing foot's height away from a target: the ankle at 8 cm,
+  which is about 4.5 cm of clearance under the sole (Unitree's value; raised if the measured
+  lift falls short of the section 1 target).
 - **No slipping.** A penalty on foot speed while the foot is on the ground.
 - **Posture.** Penalties on hip yaw and roll away from neutral (no splayed or crossed legs), on
   body tilt, and on pelvis height away from the target height.
@@ -149,7 +152,7 @@ explained.
 | Task | pelvis height to the commanded height | -10 | Unitree tracks a fixed 0.78 m; here it tracks the height command |
 | Task | torso orientation to the command | 0.5 (exp) | new: the torso command of section 3 |
 | Gait | contact matches the gait clock | 0.18 | Unitree; clock period 0.8 s (2.5 steps/s), right foot half a period behind, stance in the first 55% |
-| Gait | swing-foot height, (height - 0.08 m)² | -20 | Unitree |
+| Gait | swing-foot height, (ankle height - 0.08 m)² | -20 | Unitree; the ankle sits about 3.6 cm above the sole |
 | Gait | foot speed while in contact | -0.2 | Unitree (`contact_no_vel`) |
 | Gait | hip roll and yaw away from zero | -1.0 | Unitree (`hip_pos`) |
 | Gait | feet air time | 0 | dropped: the clock replaces it |
@@ -295,9 +298,9 @@ Rough terrain; a realistic motor model (torque-speed limits); a Unitree SDK depl
 a third simulator (PhysX); natural arm swing. These are hardware-readiness and polish items
 to revisit after stage 1.
 
-## 15. Decisions needed
+## 15. Decisions (all accepted 2026-10-29)
 
-Each has a recommendation; the design above assumes the recommended answer.
+Each was accepted as recommended.
 
 1. **Who moves the arms.** Recommended: arm and hand targets go straight to PD controllers and
    the policy moves legs and waist (what NVIDIA, HOMIE, AMO and AGILE do). Alternative: the

@@ -126,7 +126,8 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 - Joint limits agree to 1e-5 rad. Joint order differs only within the hands; joints are matched
   by name.
 - **Bench policy gait:** with the built-in rewards, PPO learns a fast, low shuffle: about 11
-  steps/s of 8 cm, 2-3 cm foot lift, feet sliding at about 0.35 m/s in stance, nearly straight
+  steps/s of 8 cm, 2-3 cm foot lift, ankles moving at about 0.3 m/s in stance (0.14 m/s of
+  slip at the sole, D-016), nearly straight
   knees, no arm swing (measured in MuJoCo at 1 m/s; all 13 runs of the setup do this, see
   `results/stage0/README.md` part 4). Stage 1's rewards
   must shape the gait: a stepping rhythm of about 1.5-2 steps/s, swing-foot clearance, stronger
@@ -140,6 +141,17 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 - **Newton's exported MJCF differs from Menagerie in contact settings:** every geom has a 1 cm
   `gap` (MuJoCo then lists force-free contacts up to 2 cm apart), and contacts are stiffer
   (time constant 1.8 ms requested, raised by MuJoCo to 5 ms, vs Menagerie's default 20 ms).
+- **Isaac Lab holds undriven joints at 0.** Joints that no action term drives keep a PD
+  target of 0 unless the task sets one, not the default pose. Stage 0's hands and the first
+  stage 1 gait policies' arms were held at 0 in training but at the default pose in the
+  MuJoCo bench; the bench now uses the targets the export records, and the stage 1 task holds
+  arms and hands at the default pose with a reset event. Stage 0's numbers were re-run (small
+  changes, same conclusions).
+- **Runs must not pick up code edited while they go on.** `train_eval_local.sh` exported and
+  evaluated each run with whatever code was on disk when training finished. One export
+  (step 2, v4) picked up a half-written task change and was tested with leg offsets its
+  policy never trained with (10 of 10 falls when crouching; re-exported from the training
+  commit: 0 falls). The script now runs every step from a copy of the starting commit.
 - **Cluster jobs must not write tracked files.** The stage 0 benchmark wrote a results file into
   the cluster clone; once that file was committed on the workstation, `git pull` on the cluster
   failed and the next 12 jobs ran old code (the planned reward pilot became 12 default runs).
@@ -161,13 +173,13 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 
 ## D-010: Gait measures in the MuJoCo evaluation (2026-10-28)
 
-- **What:** `pi-wbc-sim2sim` reports, after the 2 s settling time and for episodes that did
-  not fall: step rate, step length, swing time, foot lift, foot speed while in stance, time
-  with both feet down and with none, knee range and arm swing (`src/pi_wbc/sim2sim/gait.py`).
-  A foot is down when one of its contacts with the floor carries force; a step is a touchdown
-  after at least 60 ms in the air; swings cut off by the start or end of recording are left
-  out; joint ranges are 5th-95th percentile. Training changes are compared on the Menagerie
-  model at a 1 m/s command.
+- **What:** `pi-wbc-sim2sim` reports, after the 2 s settling time and for episodes that did not
+  fall: step rate, step length, swing time, foot lift, foot speed while in stance (for slip,
+  see D-016), time with both feet down and with none, knee range and arm swing
+  (`src/pi_wbc/sim2sim/gait.py`). A foot is down when one of its contacts with the floor
+  carries force; a step is a touchdown after at least 60 ms in the air; swings cut off by the
+  start or end of recording are left out; joint ranges are 5th-95th percentile. Training
+  changes are compared on the Menagerie model at a 1 m/s command.
 - **Why:** stage 0's policies walk without falling but shuffle, and falls and tracking error
   don't show that. Stage 1's reward design needs a number for "walks like a person". Contact
   is defined by force so that a model's inactive contacts (Newton's `gap`) don't count.
@@ -184,20 +196,118 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 - **Cost:** two to three times the cluster time per change. The 13 default runs give the
   baseline range at no extra cost.
 
+## D-012: Stage 1 controller interface follows NVIDIA's Decoupled WBC (2026-10-29)
+
+- **What:** the controller takes NVIDIA's Decoupled WBC commands: navigate (forward and
+  sideways speed, yaw rate), pelvis height, torso roll, pitch and yaw, and 7 + 7 arm and
+  7 + 7 hand joint targets. The RL policy drives the 12 leg and 3 waist joints; arm and hand
+  targets go straight to their PD controllers. The simulated robot uses NVIDIA's PD gains and
+  default leg pose. Details: [STAGE1_DESIGN.md](STAGE1_DESIGN.md), sections 3-4.
+- **Why:** this is the interface GR00T N1.6 uses with NVIDIA's controller on the G1, so either
+  controller can sit under the same VLA, and swapping them changes only the lower body. HOMIE,
+  AMO and NVIDIA's WBC-AGILE split the robot the same way. Arm accuracy does not depend on RL.
+- **Cost:** the RL policy never moves the arms, so "whole-body" here means legs and waist
+  balancing against whatever the arms do, not learned arm motion (FALCON's approach was
+  considered and not chosen). The stage 0 gains are replaced.
+
+## D-013: Hands are Dex3 (2026-10-29)
+
+- **What:** the G1 keeps Unitree's Dex3 three-finger hands (7 joints each) for all stages.
+  Settles the open item from D-001.
+- **Why:** NVIDIA's Decoupled WBC and IsaacLab-Arena's G1 both use three-finger hands with
+  Dex3's joint layout, and the GR00T N1.6 G1 action space has 7 values per hand.
+- **Cost:** no five-finger dexterity; grasps stay simple.
+
+## D-014: GR00T N1.6 for stage 4 (2026-10-29)
+
+- **What:** the VLA is GR00T N1.6 (Isaac-GR00T's `n1.6.1-release`), not N1.7. Settles the open
+  item on the GR00T version.
+- **Why:** N1.7's G1 path drives NVIDIA's SONIC controller with latent motion tokens, which
+  has no command interface to swap another controller under. N1.6 sends the D-012 commands.
+- **Cost:** not the newest model. Since NVIDIA's pretrained G1 data comes from its own
+  controller, fine-tuning uses the `NEW_EMBODIMENT` tag on our own demonstrations.
+
+## D-015: Stage 1 scope and compute (2026-10-29)
+
+- **What:** stage 1 trains on flat ground only. Before the ablation (about 45 GPU-hours), the
+  cluster's partition limits are checked with read-only commands to decide between queueing
+  on the current partition, a partition with parallel jobs, or longer workstation runs.
+- **Why:** the stage 3 task is indoors on a flat floor, and Newton's rough-terrain support is
+  newer. The ablation is the largest compute item of the project so far.
+- **Cost:** no rough-terrain robustness claims from stage 1.
+
+## D-016: Slip is measured at the sole's floor contacts (2026-10-29)
+
+- **What:** the MuJoCo evaluation's slip measure (`sole_slip_mps`, "sole slip") is the planar
+  speed of the foot itself at each of its floor contacts that carry force, averaged over that
+  foot's contacts with their normal forces as weights, over the samples where the foot is
+  down. The stage 1 slip target (at most 0.1 m/s) applies to it. D-010's measure, the planar
+  speed of the ankle-roll link's origin while the foot is down (`stance_foot_speed_mps`,
+  "stance foot speed"), is still reported for comparison with earlier results.
+- **Why:** the ankle sits 3.5 cm above the sole, so it moves whenever the foot rolls from heel
+  to toe or pivots, without any sliding. With the robot pivoting on its toe at 2 rad/s, the
+  ankle measure reads 0.07 m/s and the sole measure 0.0002 m/s (a unit test). On the stage 1
+  gait at 1 m/s (Menagerie model), the ankle measure gives 0.15-0.21 m/s and the sole measure
+  0.04-0.10 m/s: more than half of what had been read as slip was rolling. Re-running all 26
+  evaluated policies with the new measure changed no other number.
+- **Cost:** the stage 1 target is now easier to meet than it was as first measured, so both
+  numbers are reported side by side. The training penalty `feet_contact_velocity` also uses
+  the ankle's velocity (including its vertical part), so it discourages rolling as well as
+  sliding; whether that shapes the gait badly is open for the later reward work.
+
+## D-017: How step 2 carries out the body and arm commands (2026-10-30)
+
+- **What:** `PiWbc-G1-Body` (`src/pi_wbc/tasks/g1_body.py`) adds to the gait task:
+  - a body-pose command of pelvis height (0.50-0.78 m) and the three waist angles (yaw ±0.6,
+    roll ±0.2, pitch 0-0.45 rad), moving at most 0.25 m/s and 1 rad/s towards a new goal every
+    4-8 s;
+  - random arm and hand motion written straight to those joints' PD targets: a new pose every
+    2-4 s, reached in a straight line;
+  - 0-1 kg added to each palm, drawn once per robot at startup;
+  - height rewarded like velocity: exp(-error² / 0.1²), weight 1, on top of the squared
+    penalty (weight -10) that step 1 used for its fixed height;
+  - a curriculum that widens both from nothing to the full ranges, in steps of 5%, judged
+    over 20-iteration windows (raise when under 10% of ended episodes fell, speed tracking is
+    over 60% of its reward and turn-rate tracking over 35%; lower when over 25% fell).
+- **Why, where it departs from the design:**
+  - The torso command is the waist joint angles: the G1's waist turns in the order yaw, roll,
+    pitch, so these angles are the torso's orientation relative to the pelvis.
+  - Waist pitch stops at 0.45 rad, not 0.6: the joint's limit is 0.52 rad, and the joint-limit
+    penalty starts at 90% of it.
+  - "Stand still" penalizes leg joint speed instead of the offset from the default pose,
+    which would have penalized crouching on command.
+  - Arm ranges keep the arms beside and in front of the body. Training has no self-collisions
+    (Isaac Lab's G1 asset turns them off, on PhysX and Newton); MuJoCo Menagerie's model has
+    them.
+  - Payload once per robot: changing masses at every reset made Newton training 2.3 times
+    slower (2.7 instead of 1.2 s per iteration on the workstation).
+  - Curriculum windows: the first version judged each step's few resetting robots on their
+    own, so the level moved in fits and started late (iteration 750 of 1000).
+  - Leg actions centre on a crouch pose that follows the commanded height (hip, knee and
+    ankle angles from `scripts/crouch_table.py`: feet flat, pelvis level, centre of mass over
+    the feet; zero offset at the nominal height). Without it, two runs never held a crouch: a
+    0.60 m crouch needs knee actions of about 5 at the action scale of 0.25. With the height
+    bonus alone the robot still stood at its nominal height (17 cm short of a 0.60 m command
+    in MuJoCo).
+  - Arm poses every 2-4 s rather than 1-3 s: the faster motion (shoulders up to 2.5 rad/s,
+    with up to 1 kg in the hand) went with turning in place being unlearned as the curriculum
+    widened (training yaw-rate error 0.65 to 1.05 rad/s).
+  - Turning in the curriculum's criteria: in runs v3-v6 the ranges widened while turning in
+    place was being unlearned (turn-rate tracking fell from 0.39 to 0.26 per second, speed
+    tracking held).
+  - Height bonus: with the squared penalty alone, a 1400-iteration run never crouched (its
+    training height error, 10 cm, was what standing still gives), while the waist, rewarded
+    with the exp form, was tracked.
+- **Cost:** a robot keeps its payload for the whole run (variety comes from 4096 robots, not
+  from episodes). The torso command must be converted if a VLA sends torso roll, pitch and yaw
+  in another convention (stage 3).
+
 ## Open items
 
-- The stage 1 design is a draft under review: [STAGE1_DESIGN.md](STAGE1_DESIGN.md). Its
-  section 15 lists seven decisions; the two items below are among them.
-- Hands: Dex3 (default, recommended) or a five-finger hand such as Inspire. NVIDIA's controller
-  ships G1 29-DoF + Dex3 scenes; Isaac Lab 3.0 has fixed-base G1 configs for both Dex3 and
-  Inspire, but neither is set up for walking. NVIDIA's Decoupled WBC and IsaacLab-Arena both
-  use three-finger hands with Dex3's joint layout (checked 2026-10-29). Decide before stage 3.
+- The stage 1 design ([STAGE1_DESIGN.md](STAGE1_DESIGN.md)) was accepted on 2026-10-29
+  (D-012 to D-015).
 - The built-in G1 velocity tasks use an older 37-joint G1 (`torso_joint`, two elbow joints,
   seven hand joints per side), not the 29-DoF robot. Stage 0's bench already uses
   `G1_29DOF_CFG` (D-007); stage 1 keeps it.
-- GR00T N1.7 is now the main Isaac-GR00T release (N1.6 is on branch `n1d6`). N1.7 inference
-  is listed at 16 GB+, above the RTX 4070. N1.7's G1 path uses the SONIC controller, which takes
-  latent motion tokens rather than velocity commands, so it can't be swapped under our command
-  interface (checked 2026-10-29). Choose the version before stage 4.
 - Motion data: the LAFAN1 retargeting mirror used by BeyondMimic is CC BY-NC-ND 4.0 (no
   derivatives), which limits what processed clips can be released. Check before stage 2.

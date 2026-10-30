@@ -36,10 +36,14 @@ def test_git_info_clean_then_dirty(repo: Path) -> None:
     assert info["changes"] == ["a.txt"]
 
 
-def test_new_result_files_do_not_make_the_tree_dirty(repo: Path) -> None:
+def test_result_files_do_not_make_the_tree_dirty(repo: Path) -> None:
     (repo / "results" / "stage0").mkdir(parents=True)
     (repo / "results" / "stage0" / "run.json").write_text("{}")
     assert provenance.git_info(repo)["dirty"] is False
+    _git(repo, "add", "results")
+    _git(repo, "commit", "-q", "-m", "Add a result")
+    (repo / "results" / "stage0" / "run.json").write_text('{"rerun": true}')
+    assert provenance.git_info(repo)["dirty"] is False  # rewriting a result doesn't count
 
     (repo / "new_module.py").write_text("")
     info = provenance.git_info(repo)
