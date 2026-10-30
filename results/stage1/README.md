@@ -181,10 +181,12 @@ falls are over all 11 commands and both models.
 | v4 | + height bonus (exp form) | 0/220 | 0/40 | 0.58 m/s | 0.53 rad/s | 17.0 cm | 13.1 cm, 0.32 m/s | 0.074 rad | 0.044 rad |
 | v5 | + leg actions centred on a crouch pose | 0/220 | 0/40 | 0.40 m/s | 0.74 rad/s | 1.7 cm | 0.3 cm, 0.37 m/s | 0.043 rad | 0.046 rad |
 | v6 | + arm poses every 2-4 s instead of 1-3 s | 0/220 | 0/40 | 0.42 m/s | 0.42 rad/s | 3.5 cm | 0.7 cm, 0.43 m/s | 0.096 rad | 0.041 rad |
+| v7 | + curriculum also needs turning to hold | 0/220 | 0/40 | 0.54 m/s | 0.49 rad/s | 4.8 cm | 2.0 cm, 0.32 m/s | 0.063 rad | 0.041 rad |
 
 Raw data in [`body_dev/`](body_dev/). Each run was trained, exported and evaluated at its own
-commit (v2 `d1b35cb`, v3 `c1d08b2`, v5 `27728b4`, v6 `39c9079`; v3's tree differed only in
-`docs/`). v4 was trained at `71bf947`; its first export picked up a half-written change and was
+commit (v2 `d1b35cb`, v3 `c1d08b2`, v5 `27728b4`, v6 `39c9079`, v7 `7fd051b`; v3's tree
+differed only in `docs/`). v7's first attempt stopped at iteration 182 when the workstation
+crashed (no error in the system log); the run above is its restart. v4 was trained at `71bf947`; its first export picked up a half-written change and was
 redone from `71bf947`, then evaluated at `39c9079` (below). Single runs: differences between
 versions smaller than stage 0's run-to-run spread (D-011) are not evidence; v5 against v6 is one
 such case.
@@ -207,7 +209,10 @@ such case.
   error improves until the curriculum starts and then rises as it widens (v5: 0.65 to
   1.05 rad/s; step 1 kept improving to 0.45). Slower arm motion (v6) did not change that
   trend in training. The turning rewards lose the most as the curriculum widens (turn-rate
-  tracking 0.39 to 0.26, heading 0.54 to 0.30, per second); speed tracking holds.
+  tracking 0.39 to 0.26, heading 0.54 to 0.30, per second); speed tracking holds. Holding the
+  curriculum once turning dropped (v7) stopped it at 90% of the full range, but turning kept
+  degrading there (training yaw-rate error 0.67 to 0.97 rad/s at a fixed range), so the cause
+  is something the wider commands bring, not the widening itself.
 - **An export once used code edited during the run.** v4's first export picked up the
   crouch-pose change while it was half-written, so MuJoCo tested its policy with leg offsets it
   never trained with (10 of 10 falls when crouching). Re-exported from its training commit, it
