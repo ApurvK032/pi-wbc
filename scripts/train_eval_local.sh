@@ -9,6 +9,10 @@
 # stop it. It runs at the lowest CPU priority on 16 of the 24 CPU threads (the workstation's
 # CPU cap). Each result is OUT_DIR/<LABEL>-s<seed>-<run>.json, labelled <LABEL>-s<seed> for
 # pi-wbc-sim2sim-compare. A seed whose training fails is skipped; the next one still runs.
+#
+# Every step runs the code of the commit checked out at the start, from a temporary copy of
+# it, so edits made while the runs go on can't reach a later export or evaluation (one export
+# once picked up a half-written task change). Uncommitted changes are not used.
 set -uo pipefail
 
 TASK=${1:?usage: $0 TASK ITERATIONS OUT_DIR LABEL SEED...}
@@ -21,7 +25,13 @@ export PATH=$HOME/.local/bin:$PATH
 run() { nice -n 19 taskset -c 0-15 uv run --frozen "$@"; }
 mkdir -p "${OUT}" logs
 
-echo "[$(date +%H:%M)] commit $(git rev-parse --short HEAD), uncommitted: $(git status --porcelain | wc -l)"
+COMMIT=$(git rev-parse HEAD)
+SNAP=$(mktemp -d)/pi-wbc-${COMMIT:0:7}
+git worktree add --detach --quiet "${SNAP}" "${COMMIT}" || exit 1
+trap 'git worktree remove --force "${SNAP}"' EXIT
+export PYTHONPATH="${SNAP}/src${PYTHONPATH:+:${PYTHONPATH}}"
+echo "[$(date +%H:%M)] commit ${COMMIT:0:7}, run from a copy at ${SNAP}" \
+    "(uncommitted changes, not used: $(git status --porcelain -- src | wc -l) in src/)"
 for SEED in "$@"; do
     RUN=pc-${LABEL}-s${SEED}-${ITERS}it
     echo "[$(date +%H:%M)] seed ${SEED}: training ${TASK} for ${ITERS} iterations (${RUN})"

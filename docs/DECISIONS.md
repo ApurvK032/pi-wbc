@@ -147,6 +147,11 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   MuJoCo bench; the bench now uses the targets the export records, and the stage 1 task holds
   arms and hands at the default pose with a reset event. Stage 0's numbers were re-run (small
   changes, same conclusions).
+- **Runs must not pick up code edited while they go on.** `train_eval_local.sh` exported and
+  evaluated each run with whatever code was on disk when training finished. One export
+  (step 2, v4) picked up a half-written task change and was tested with leg offsets its
+  policy never trained with (10 of 10 falls when crouching; re-exported from the training
+  commit: 0 falls). The script now runs every step from a copy of the starting commit.
 - **Cluster jobs must not write tracked files.** The stage 0 benchmark wrote a results file into
   the cluster clone; once that file was committed on the workstation, `git pull` on the cluster
   failed and the next 12 jobs ran old code (the planned reward pilot became 12 default runs).
@@ -281,8 +286,9 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   - Leg actions centre on a crouch pose that follows the commanded height (hip, knee and
     ankle angles from `scripts/crouch_table.py`: feet flat, pelvis level, centre of mass over
     the feet; zero offset at the nominal height). Without it, two runs never held a crouch: a
-    0.60 m crouch needs knee actions of about 5 at the action scale of 0.25; with the height
-    bonus alone the robot tried and fell (10 of 10 MuJoCo episodes).
+    0.60 m crouch needs knee actions of about 5 at the action scale of 0.25. With the height
+    bonus alone the robot still stood at its nominal height (17 cm short of a 0.60 m command
+    in MuJoCo).
   - Arm poses every 2-4 s rather than 1-3 s: the faster motion (shoulders up to 2.5 rad/s,
     with up to 1 kg in the hand) went with turning in place being unlearned as the curriculum
     widened (training yaw-rate error 0.65 to 1.05 rad/s).

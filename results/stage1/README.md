@@ -141,3 +141,83 @@ than stage 0's run-to-run spread (D-011) are not evidence.
 - **v3 holds the arms as designed** (default pose, elbows bent) instead of hanging. At 1000
   iterations it fell short of 1 m/s, with its training curves still improving; 3000 iterations
   closed the gap (result above).
+
+## Step 2: body pose and moving arms (in progress)
+
+**In short:** the task works end to end. After five development runs, the current policy
+stands, walks, crouches to 0.60 m (within 2-4 cm), leans its torso forward and keeps its balance
+while its arms move through their full range with up to 1 kg in each hand: no falls in 220
+MuJoCo episodes on either model. But walking and turning got worse than in step 1: at 1 m/s the
+speed error is about 0.4 m/s (step 1, 1000 iterations: 0.27; 3000 iterations: 0.06), and turning
+in place is 0.42-0.74 rad/s off a 0.8 rad/s command (step 1: 0.07). These are single
+1400-iteration runs on the workstation; the result proper needs longer runs and 3 seeds.
+
+Task: `PiWbc-G1-Body` (`src/pi_wbc/tasks/g1_body.py`, D-017), the gait task plus:
+
+- a body-pose command: pelvis height 0.50-0.78 m and the three waist angles (yaw ±0.6, roll
+  ±0.2, pitch 0-0.45 rad), moving smoothly to a new goal every 4-8 s; the policy sees it;
+- random arm and hand poses, written straight to those joints' PD targets (the policy still
+  drives only legs and waist), a new pose every 2-4 s;
+- 0-1 kg added to each palm;
+- a curriculum that widens body-pose and arm ranges from none to full while few episodes end
+  in a fall and velocity tracking holds;
+- leg actions centred on a crouch pose that follows the commanded height
+  (`scripts/crouch_table.py`).
+
+The MuJoCo bench gained five scenarios: crouch to 0.60 m, walk at 0.5 m/s at 0.65 m, lean
+forward 0.4 rad, and arms moving at full range while standing and while walking at 0.5 m/s
+(`src/pi_wbc/sim2sim/commands.py`), with height, waist and arm joint errors.
+
+### Development runs
+
+1400 iterations each (v2: 1000), training seed 1, MuJoCo Menagerie model unless stated;
+falls are over all 11 commands and both models.
+
+| Run | Change | Falls | Arms moving: falls | Speed error, 1 m/s | Turn-in-place error | Crouch 0.60 m: height error | Walk low: height, speed error | Lean 0.4: waist error | Arms walking: arm error |
+|---|---|---|---|---:|---:|---:|---|---:|---:|
+| v1 | payload changed at every reset | stopped: training 2.3x slower | | | | | | | |
+| v2 | payload once per robot | 24/220 | 24/40 | 0.28 m/s | 0.18 rad/s | 18.8 cm | 13.7 cm, 0.17 m/s | 0.119 rad | 0.044 rad |
+| v3 | curriculum judged over 20-iteration windows | 0/220 | 0/40 | 0.36 m/s | 0.61 rad/s | 18.3 cm | 13.4 cm, 0.19 m/s | 0.085 rad | 0.045 rad |
+| v4 | + height bonus (exp form) | 0/220 | 0/40 | 0.58 m/s | 0.53 rad/s | 17.0 cm | 13.1 cm, 0.32 m/s | 0.074 rad | 0.044 rad |
+| v5 | + leg actions centred on a crouch pose | 0/220 | 0/40 | 0.40 m/s | 0.74 rad/s | 1.7 cm | 0.3 cm, 0.37 m/s | 0.043 rad | 0.046 rad |
+| v6 | + arm poses every 2-4 s instead of 1-3 s | 0/220 | 0/40 | 0.42 m/s | 0.42 rad/s | 3.5 cm | 0.7 cm, 0.43 m/s | 0.096 rad | 0.041 rad |
+
+Raw data in [`body_dev/`](body_dev/). Each run was trained, exported and evaluated at its own
+commit (v2 `d1b35cb`, v3 `c1d08b2`, v5 `27728b4`, v6 `39c9079`; v3's tree differed only in
+`docs/`). v4 was trained at `71bf947`; its first export picked up a half-written change and was
+redone from `71bf947`, then evaluated at `39c9079` (below). Single runs: differences between
+versions smaller than stage 0's run-to-run spread (D-011) are not evidence; v5 against v6 is one
+such case.
+
+### What happened on the way
+
+- **Changing masses at reset is slow on Newton.** Adding the payload at every reset made each
+  training iteration take 2.7 s instead of 1.2 s; the payload is now drawn once per robot.
+- **The curriculum needed whole windows.** Judging each step's few resetting robots on their
+  own made it start late (iteration 750 of 1000) and move in fits; v2 reached only 45% of the
+  full range and fell in 24 of 40 episodes with the arms at full range. Judged over
+  20-iteration windows, it reaches the full range by about iteration 1050 with falls at 5-10%.
+- **Crouching needs the crouch pose.** v3 and v4 never crouched: their training height error,
+  10 cm, was what standing still gives, and in MuJoCo they stayed 17-18 cm above a 0.60 m
+  command. A 0.60 m crouch needs knee actions of about 5 at the action scale of 0.25 (actions
+  are usually within ±2), and a stronger height reward (v4) did not get the policy there.
+  Centring the leg actions on the crouch for the commanded height (v5) gets crouching within
+  2-4 cm, with no falls.
+- **Turning in place is given up as the ranges widen.** In every run the training yaw-rate
+  error improves until the curriculum starts and then rises as it widens (v5: 0.65 to
+  1.05 rad/s; step 1 kept improving to 0.45). Slower arm motion (v6) did not change that
+  trend in training. The turning rewards lose the most as the curriculum widens (turn-rate
+  tracking 0.39 to 0.26, heading 0.54 to 0.30, per second); speed tracking holds.
+- **An export once used code edited during the run.** v4's first export picked up the
+  crouch-pose change while it was half-written, so MuJoCo tested its policy with leg offsets it
+  never trained with (10 of 10 falls when crouching). Re-exported from its training commit, it
+  doesn't fall; it just doesn't crouch. `scripts/train_eval_local.sh` now runs every step from
+  a copy of the starting commit.
+
+### Next
+
+- Keep turning in the curriculum's criteria, so the ranges widen only while turning holds.
+- Look at the stand-still penalty: it costs about 0.35 per second from early on (step 1:
+  0.07), because the legs keep moving while the robot is told to stand.
+- Longer training: step 1 needed 3000 iterations to walk well, and here the curriculum takes
+  the second half of a 1400-iteration run. Then 3 seeds, as in step 1.
