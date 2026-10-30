@@ -1,6 +1,7 @@
 """Stage 1, step 3: the body task plus domain randomization in six groups (design, section 6).
 
-- friction: robot shape friction 0.1-1.25, with the ground set to 0.05;
+- friction: robot friction 0.1-1.25 (one value per robot, for all its shapes), with the ground
+  set to 0.05;
 - mass: torso -1 to +3 kg, every link x0.9-1.1, torso centre of mass ±3 cm, hand payload
   0-1 kg (the payload comes from the body task);
 - actuators: PD stiffness and damping, joint armature, x0.8-1.2;
@@ -26,6 +27,7 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils import configclass
 from isaaclab_tasks.core.velocity import mdp
 
+from pi_wbc.tasks import mdp as pi_mdp
 from pi_wbc.tasks.g1_body import G1BodyEnvCfg, G1BodyPPORunnerCfg
 
 GROUND_FRICTION = 0.05
@@ -35,8 +37,7 @@ PUSH_SPEEDS = (0.5, 1.5)  # m/s at curriculum level 0 and 1
 
 ABLATION_OVERRIDES: dict[str, list[str]] = {
     "friction": [
-        f"env.events.physics_material.params.static_friction_range=[{NOMINAL_FRICTION},{NOMINAL_FRICTION}]",
-        f"env.events.physics_material.params.dynamic_friction_range=[{NOMINAL_FRICTION},{NOMINAL_FRICTION}]",
+        f"env.events.physics_material.params.friction_range=[{NOMINAL_FRICTION},{NOMINAL_FRICTION}]",
     ],
     "mass": [
         "env.events.add_base_mass=null",
@@ -59,11 +60,15 @@ class G1RobustEnvCfg(G1BodyEnvCfg):
         super().__post_init__()
         events = self.events
 
-        # friction
+        # friction: one value per robot for all its shapes (Isaac Lab's event draws one per
+        # shape, which averages the four spheres of each foot towards the middle of the range)
         ground = self.scene.terrain.physics_material
         ground.static_friction = ground.dynamic_friction = GROUND_FRICTION
-        events.physics_material.params["static_friction_range"] = ROBOT_FRICTION
-        events.physics_material.params["dynamic_friction_range"] = ROBOT_FRICTION
+        events.physics_material = EventTerm(
+            func=pi_mdp.randomize_robot_friction,
+            mode="startup",
+            params={"asset_cfg": SceneEntityCfg("robot"), "friction_range": ROBOT_FRICTION},
+        )
 
         # mass (the hand payload comes from the body task)
         events.add_base_mass.params.update(
@@ -122,9 +127,7 @@ class G1RobustEnvCfg(G1BodyEnvCfg):
     def make_nominal(self) -> None:
         """Switch every randomization group off (for exporting with nominal properties)."""
         events = self.events
-        for name in ("physics_material",):
-            getattr(events, name).params["static_friction_range"] = (NOMINAL_FRICTION,) * 2
-            getattr(events, name).params["dynamic_friction_range"] = (NOMINAL_FRICTION,) * 2
+        events.physics_material.params["friction_range"] = (NOMINAL_FRICTION,) * 2
         for name in (
             "add_base_mass",
             "link_masses",

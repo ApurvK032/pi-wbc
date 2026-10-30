@@ -680,3 +680,121 @@ class HeightPoseJointPositionActionCfg(JointPositionActionCfg):
     """Pelvis heights of the table (m), ascending."""
     poses: dict[str, list[float]] = MISSING
     """Joint-name pattern -> joint angle (rad) at each height."""
+
+
+# -- privileged observations for the teacher (stage 1, step 4) -----------------------------------
+
+
+def feet_contact(env: ManagerBasedRLEnv, sensor_cfg) -> torch.Tensor:
+    """(num_envs, feet): 1 where a foot presses on the ground (net force over 1 N), else 0."""
+    return _feet_in_contact(env, sensor_cfg).float()
+
+
+def feet_height(env: ManagerBasedRLEnv, asset_cfg) -> torch.Tensor:
+    """(num_envs, feet): height of each foot link origin above the (flat) ground."""
+    asset = env.scene[asset_cfg.name]
+    return asset.data.body_pos_w.torch[:, asset_cfg.body_ids, 2]
+
+
+def _first_read(env: ManagerBasedRLEnv, key: str, values: torch.Tensor) -> torch.Tensor:
+    """`values` as first seen (cached on the env): startup randomization has already run, so
+    this is each robot's own value; the mean over robots stands in for the nominal one."""
+    cache = env.__dict__.setdefault("_pi_wbc_first_read", {})
+    if key not in cache:
+        cache[key] = values.clone()
+    return cache[key]
+
+
+def body_mass_offset(env: ManagerBasedRLEnv, asset_cfg) -> torch.Tensor:
+    """(num_envs, bodies): each listed body's mass minus its mean over all robots (kg)."""
+    asset = env.scene[asset_cfg.name]
+    mass = asset.data.body_mass.torch[:, asset_cfg.body_ids]
+    return mass - mass.mean(dim=0, keepdim=True)
+
+
+def body_com_offset(env: ManagerBasedRLEnv, asset_cfg) -> torch.Tensor:
+    """(num_envs, 3 x bodies): each listed body's centre of mass minus its mean over robots."""
+    asset = env.scene[asset_cfg.name]
+    com = asset.data.body_com_pos_b.torch[:, asset_cfg.body_ids]
+    return (com - com.mean(dim=0, keepdim=True)).reshape(env.num_envs, -1)
+
+
+def stiffness_scale(env: ManagerBasedRLEnv, asset_cfg) -> torch.Tensor:
+    """(num_envs, 1): mean PD stiffness of the listed joints over its mean across robots."""
+    asset = env.scene[asset_cfg.name]
+    k = asset.data.joint_stiffness.torch[:, asset_cfg.joint_ids]
+    return (k / k.mean(dim=0, keepdim=True).clamp_min(1e-9)).mean(dim=-1, keepdim=True)
+
+
+def action_delay(env: ManagerBasedRLEnv, action_name: str = "joint_pos") -> torch.Tensor:
+    """(num_envs, 1): this episode's action delay in physics steps (0 without latency)."""
+    term = env.action_manager.get_term(action_name)
+    delay = getattr(term, "_delay", None)
+    if delay is None:
+        return torch.zeros(env.num_envs, 1, device=env.device)
+    return delay.float().unsqueeze(-1)
+
+
+def _shape_friction(env: ManagerBasedRLEnv, asset_name: str) -> dict:
+    """Newton's per-shape friction of an articulation, as a writable torch view (cached).
+
+    The same binding Isaac Lab's friction randomization writes to. Returns {"view": (num_envs,
+    shapes), "shape_body": body index of each shape in the view's body order, "body_names"}.
+    """
+    cache = env.__dict__.setdefault("_pi_wbc_shape_friction", {})
+    if asset_name not in cache:
+        import warp as wp
+
+        view = env.scene[asset_name]._root_view
+        model = env.sim.physics_manager.get_model()
+        mu = view.get_attribute("shape_material_mu", model)
+        mu = mu[:, 0] if len(mu.shape) == 3 else mu
+        shape_body = view.get_attribute("shape_body", model)
+        shape_body = shape_body[:, 0] if len(shape_body.shape) == 3 else shape_body
+        cache[asset_name] = {
+            "binding": mu,  # keeps the warp array alive
+            "view": wp.to_torch(mu),
+            "shape_body": wp.to_torch(shape_body)[0].tolist(),
+            "body_names": list(view.body_names),
+        }
+    return cache[asset_name]
+
+
+def randomize_robot_friction(
+    env: ManagerBasedRLEnv,
+    env_ids: torch.Tensor | None,
+    asset_cfg,
+    friction_range: tuple[float, float],
+) -> None:
+    """Event (Newton): one friction per robot, drawn uniformly and given to all its shapes.
+
+    Isaac Lab's material randomization draws a value per collision shape. A G1 foot touches
+    the ground through four spheres, so each foot's friction would be a mix of four draws and
+    every robot would sit near the middle of the range; one value per robot covers the range.
+    """
+    from newton import ModelFlags
+
+    friction = _shape_friction(env, asset_cfg.name)
+    view = friction["view"]
+    rows = slice(None) if env_ids is None else env_ids
+    n = _count(rows, env.num_envs)
+    lo, hi = friction_range
+    values = lo + (hi - lo) * torch.rand(n, device=view.device)
+    view[rows, :] = values.unsqueeze(-1)
+    env.sim.physics_manager.add_model_change(ModelFlags.SHAPE_PROPERTIES)
+
+
+def feet_friction(env: ManagerBasedRLEnv, asset_cfg) -> torch.Tensor:
+    """(num_envs, 1): mean friction of the listed bodies' collision shapes, as Newton holds it
+    (the value the solver uses)."""
+    friction = _shape_friction(env, asset_cfg.name)
+    cache = env.__dict__.setdefault("_pi_wbc_friction_cols", {})
+    key = (asset_cfg.name, tuple(asset_cfg.body_ids))
+    if key not in cache:
+        asset = env.scene[asset_cfg.name]
+        wanted = {friction["body_names"].index(asset.body_names[i]) for i in asset_cfg.body_ids}
+        cols = [k for k, b in enumerate(friction["shape_body"]) if b in wanted]
+        if not cols:
+            raise RuntimeError("no collision shapes found for the friction observation")
+        cache[key] = torch.tensor(cols, device=env.device)
+    return friction["view"][:, cache[key]].mean(dim=-1, keepdim=True)
