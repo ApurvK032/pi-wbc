@@ -219,12 +219,78 @@ such case.
   doesn't fall; it just doesn't crouch. `scripts/train_eval_local.sh` now runs every step from
   a copy of the starting commit.
 
+### Where turning goes: three probes
+
+Each probe is v7 with one ingredient of the upper-body commands removed, through config
+overrides (1200 iterations, seed 1; `scripts/train_eval_local.sh` with `OVERRIDES`):
+
+| Probe | Removed | Training yaw-rate error, start of curriculum → end | MuJoCo turn-in-place error | MuJoCo speed error, 1 m/s |
+|---|---|---|---:|---:|
+| v7 | nothing | 0.67 → 0.97 rad/s | 0.49 rad/s | 0.54 m/s |
+| A | crouching (height fixed at 0.78 m) | 0.67 → 0.83 rad/s | 0.38 rad/s | 0.29 m/s |
+| B | arm motion (arms held still) | 0.71 → 0.91 rad/s | 0.35 rad/s | 0.34 m/s |
+| C | the waist command (waist held at 0) | 0.61 → 0.82 rad/s | 0.44 rad/s | 0.32 m/s |
+
+(Probes A and B also fell 40 of 220 times in MuJoCo, all in the scenarios they did not train
+for: crouching for A, moving arms for B.) No single ingredient is the cause: with any two of
+the three, turning in place is still given up as the curriculum widens, while removing one
+helps walking speed a little. The likeliest reading is that turning while the upper body
+disturbs the robot risks a fall, which costs far more than turning earns, so the policy stops
+trying. v8 doubles the turning reward and the share of turn-in-place commands (20%). Two
+cluster runs test the rest: the same task with every upper-body command off (is it the
+commands at all?) and v7 trained for 3000 iterations (does longer training bring turning
+back, as it brought walking speed back in step 1?).
+
+Raw data in [`body_dev/`](body_dev/) (`probeA-*`, `probeB-*`, `probeC-*`).
+
 ### Next
 
-- Keep turning in the curriculum's criteria, so the ranges widen only while turning holds.
-- Look at the stand-still penalty: it costs about 0.35 per second in training, mostly from the
-  exploration noise added to actions (the policy itself stands still in MuJoCo: both feet down
-  95-100% of the time). Step 1's version measured the offset from the default pose, so the two
-  values don't compare.
+- Turning in place: v8, then the cluster runs above.
 - Longer training: step 1 needed 3000 iterations to walk well, and here the curriculum takes
   the second half of a 1400-iteration run. Then 3 seeds, as in step 1.
+- The stand-still penalty costs about 0.35 per second in training, mostly from the exploration
+  noise added to actions (the policy itself stands still in MuJoCo: both feet down 95-100% of
+  the time). Step 1's version measured the offset from the default pose, so the two values
+  don't compare.
+
+## Step 3: domain randomization (in progress)
+
+Task: `PiWbc-G1-Robust` (`src/pi_wbc/tasks/g1_robust.py`, D-018), the body task plus six
+randomization groups, each removable for the ablation by the config overrides in
+`ABLATION_OVERRIDES`:
+
+| Group | What varies | Range |
+|---|---|---|
+| Friction | robot shape friction, on a 0.05 ground | 0.1-1.25 |
+| Mass | torso; every link; torso centre of mass; hand payload | -1 to +3 kg; ×0.9-1.1; ±3 cm; 0-1 kg |
+| Actuators | PD stiffness and damping, joint armature | ×0.8-1.2 |
+| Latency | physics steps between a new action and its PD targets | 0-4 (0-20 ms) |
+| Sensor noise | the policy's readings | Unitree's values |
+| Pushes | pelvis velocity kicks every 4-6 s | ±0.5 m/s, growing to ±1.5 m/s with the curriculum |
+
+### Each group checked in a running simulation
+
+`scripts/check_randomization.py`, 256 robots in Isaac Lab (Newton), results in
+[`randomization_check/`](randomization_check/) (commit `8188cdb`, clean tree):
+
+- **Mass, actuators:** the simulation holds torso masses of 6.2-11.5 kg (nominal 7.8), link
+  masses ×0.90-1.10, torso centres of mass within ±3 cm, and stiffness, damping and armature
+  ×0.80-1.20.
+- **Latency:** after a jump in the action, every robot's PD targets switch exactly after its
+  drawn delay (246 of 246 robots that did not reset in between).
+- **Pushes:** 252 pushes, the largest 0.50 m/s per axis for a ±0.5 m/s setting.
+- **Sensor noise:** two reads of the same state differ (up to 3.0, from the ±1.5 rad/s noise
+  on joint speeds).
+- **Stability:** 10 s with the centre of mass moved: the state stays finite.
+- **Friction:** standing robots kicked sideways at 1 m/s; mean foot travel in the next 0.1 s
+  (about 200 robots each):
+
+  | Robot friction | Ground friction | Larger of the two | Foot travel |
+  |---|---|---:|---:|
+  | 0.1 | 0.05 | 0.1 | 8.7 cm |
+  | 1.0 | 0.05 | 1.0 | 4.7 cm |
+  | 1.25 | 0.05 | 1.25 | 3.7 cm |
+  | 0.1 | 1.0 | 1.0 | 4.8 cm |
+
+  On the low ground the robot's friction decides, and two pairs with the same larger value
+  slide alike: Newton uses the larger of the two surfaces' friction, as its code says.
