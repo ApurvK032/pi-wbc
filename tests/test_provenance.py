@@ -31,11 +31,24 @@ def test_git_info_clean_then_dirty(repo: Path) -> None:
     assert info["dirty"] is False
 
     (repo / "a.txt").write_text("two\n")
-    assert provenance.git_info(repo)["dirty"] is True
+    info = provenance.git_info(repo)
+    assert info["dirty"] is True
+    assert info["changes"] == ["a.txt"]
+
+
+def test_new_result_files_do_not_make_the_tree_dirty(repo: Path) -> None:
+    (repo / "results" / "stage0").mkdir(parents=True)
+    (repo / "results" / "stage0" / "run.json").write_text("{}")
+    assert provenance.git_info(repo)["dirty"] is False
+
+    (repo / "new_module.py").write_text("")
+    info = provenance.git_info(repo)
+    assert info["dirty"] is True
+    assert info["changes"] == ["new_module.py"]
 
 
 def test_git_info_outside_repo(tmp_path: Path) -> None:
-    assert provenance.git_info(tmp_path) == {"commit": None, "dirty": None}
+    assert provenance.git_info(tmp_path) == {"commit": None, "dirty": None, "changes": None}
 
 
 def test_package_versions_reports_missing_as_none() -> None:
