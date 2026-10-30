@@ -371,6 +371,50 @@ Checked so far:
 - **Plumbing:** 5 iterations each of teacher and student train, the student exports (ONNX and
   PyTorch actions agree to 1e-7) and runs in the MuJoCo bench with its 528 inputs.
 
+### Full-length result, seed 1
+
+Teacher 3000 iterations, then student 1000 iterations starting at the teacher's curriculum level
+(0.85), with v7's turning settings; workstation, commit `e9b92f0`, 2026-10-30
+(`scripts/teacher_student_local.sh 3000 1000 results/stage1/student_dev ts-full 1`). The first
+attempt carried v8's turning settings and was stopped after a minute when v8's full-length run
+showed that setting stops walking.
+
+**The student in MuJoCo** (both models, 11 commands × 10 starts; Menagerie model for the
+tracking numbers):
+
+| Condition | Falls | Speed error, 1 m/s | Speed error, 0.5 m/s | Turn in place | Crouch 0.60 m: height error | Arm joints, walking |
+|---|---|---:|---:|---:|---:|---:|
+| nominal | 0/220 | 0.20 m/s | 0.14 m/s | 0.19 rad/s | 3.6 cm | 0.040 rad |
+| floor friction 0.4 | 0/220 | 0.20 m/s | 0.14 m/s | 0.15 rad/s | 3.6 cm | 0.039 rad |
+| 1 kg in each hand | 0/220 | 0.18 m/s | 0.13 m/s | 0.19 rad/s | 3.4 cm | 0.058 rad |
+| 20 ms extra delay | 0/220 | 0.18 m/s | 0.12 m/s | 0.20 rad/s | 3.6 cm | 0.041 rad |
+| sensor noise | 0/220 | 0.24 m/s | 0.15 m/s | 0.24 rad/s | 3.7 cm | 0.041 rad |
+| 1 m/s pushes every 4 s | 2/220 | 0.34 m/s | 0.25 m/s | 0.26 rad/s | 3.7 cm | 0.041 rad |
+
+At 1 m/s it walks at 2.5 steps per second of 32 cm. Against step 2's best (v7 at 3000
+iterations: 0.25 m/s off at 1 m/s, 0.22 rad/s turning), the student walks and turns a little
+better, with only what a real G1 measures as input, and under every test condition: of 1320
+MuJoCo episodes, 2 fell, both under 1 m/s pushes.
+
+**Teacher against student in Isaac Lab** (`pi-wbc-isaac-eval`, nominal robots, 10 per command,
+reset seed 0; achieved velocity in the heading frame):
+
+| Command | Teacher: falls, speed error, turn error | Student: falls, speed error, turn error |
+|---|---|---|
+| walk 1.0 m/s | 0/10, 0.28 m/s, 0.24 rad/s (achieves 0.73 m/s) | 0/10, 0.28 m/s, 0.19 rad/s (0.73 m/s) |
+| walk 0.5 m/s | 0/10, 0.10 m/s, 0.17 rad/s | 0/10, 0.13 m/s, 0.10 rad/s |
+| sideways 0.3 m/s | 0/10, 0.11 m/s, 0.13 rad/s | 0/10, 0.12 m/s, 0.13 rad/s |
+| turn 0.8 rad/s | 0/10, achieves 0.70 rad/s | 0/10, achieves 0.64 rad/s |
+| crouch 0.60 m | 0/10, 4.5 cm off | 0/10, 3.8 cm off |
+| arms moving, standing | 0/10, drifts 0.07 m/s | 0/10, drifts 0.20 m/s |
+
+The student, without base velocity, matches its privileged teacher nearly everywhere; the gap
+is standing still while the arms swing, where it drifts more. Isaac Lab reads a bit slower than
+MuJoCo at 1 m/s (0.73 against about 0.80 m/s achieved). One seed so far; seeds 2 and 3 are
+running.
+
+Raw data: [`student_dev/`](student_dev/) (`ts-full-s1-*`, `isaac/ts-full-*`).
+
 ## Step 5: test conditions in the MuJoCo bench (in progress)
 
 `pi-wbc-sim2sim --condition` (`src/pi_wbc/sim2sim/commands.py`), the conditions of design
