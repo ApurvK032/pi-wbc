@@ -489,6 +489,9 @@ def upper_body_level(
         lead.tally_episodes = 0
         lead.tally_falls = torch.zeros((), device=env.device)
         lead.tally_rewards = {k: torch.zeros((), device=env.device) for k in reward_thresholds}
+        # a run may start above level 0 (a student distilled at its teacher's level): the
+        # pushes follow the starting level from the first step
+        _set_push_speed(env, push_event, push_speeds, lead.level)
     for name in reward_thresholds:
         sums = env.reward_manager._episode_sums[name][env_ids]  # env_ids may be a slice
         lead.tally_rewards[name] += sums.sum() / env.max_episode_length_s
@@ -511,15 +514,21 @@ def upper_body_level(
         for term in terms:
             term.level = level
             term.last_level_change = env.common_step_counter
-        if push_event is not None and push_event in _event_names(env):
-            speed = push_speeds[0] + level * (push_speeds[1] - push_speeds[0])
-            params = env.event_manager.get_term_cfg(push_event).params
-            params["velocity_range"] = {"x": (-speed, speed), "y": (-speed, speed)}
+        _set_push_speed(env, push_event, push_speeds, level)
         lead.tally_episodes = 0
         lead.tally_falls.zero_()
         for value in lead.tally_rewards.values():
             value.zero_()
     return torch.tensor(level)
+
+
+def _set_push_speed(env, push_event: str | None, push_speeds: tuple[float, float], level: float):
+    """Set the push event's top speed for this curriculum level (if there are pushes)."""
+    if push_event is None or push_event not in _event_names(env):
+        return
+    speed = push_speeds[0] + level * (push_speeds[1] - push_speeds[0])
+    params = env.event_manager.get_term_cfg(push_event).params
+    params["velocity_range"] = {"x": (-speed, speed), "y": (-speed, speed)}
 
 
 def _event_names(env: ManagerBasedRLEnv) -> set[str]:
