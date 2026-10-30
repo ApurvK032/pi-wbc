@@ -27,19 +27,17 @@ from typing import Any
 import numpy as np
 
 from pi_wbc import provenance
+from pi_wbc.sim2sim.commands import (  # noqa: F401  (SCENARIOS: re-exported)
+    ALL_SCENARIOS,
+    SCENARIOS,
+    CommandDriver,
+    Scenario,
+    scenarios_for,
+)
 from pi_wbc.sim2sim.gait import METRICS, GaitRecorder
 from pi_wbc.sim2sim.mujoco_g1 import G1MujocoSim, PolicyIO, build_model
 from pi_wbc.stats import wilson_interval
 
-# (vx m/s, vy m/s, yaw rate rad/s), all inside the training command ranges.
-SCENARIOS: dict[str, tuple[float, float, float]] = {
-    "stand": (0.0, 0.0, 0.0),
-    "walk_0.5": (0.5, 0.0, 0.0),
-    "walk_1.0": (1.0, 0.0, 0.0),
-    "side_0.3": (0.0, 0.3, 0.0),
-    "turn_0.8": (0.0, 0.0, 0.8),
-    "walk_turn": (0.6, 0.0, 0.5),
-}
 FALL_HEIGHT = 0.35  # m, pelvis height
 SETTLE_S = 2.0
 
@@ -89,18 +87,31 @@ class Episode:
     # mean yaw rate over the run after settling, minus the command (rad/s): steady turning
     # that the per-step error hides under the rocking of each step
     yaw_drift: float | None = None
+    # body-pose policies only, after settling: mean |pelvis height - command| (height_m), mean
+    # |waist angle - command| (waist_rad), mean |arm joint - target| (arm_rad)
+    body_err: dict[str, float | None] | None = None
 
 
 def run_episode(
     sim: G1MujocoSim,
     policy: Callable[[np.ndarray], np.ndarray],
-    command: tuple[float, float, float],
+    scenario: Scenario | tuple[float, float, float],
     seed: int,
     duration_s: float,
 ) -> tuple[
-    bool, float | None, float | None, float | None, dict[str, float | None] | None, float | None
+    bool,
+    float | None,
+    float | None,
+    float | None,
+    dict[str, float | None] | None,
+    float | None,
+    dict[str, float | None] | None,
 ]:
-    """One episode: (fell, fall time, linear error, yaw-rate error, gait metrics, yaw drift)."""
+    """One episode: (fell, fall time, linear error, yaw-rate error, gait metrics, yaw drift,
+    body-pose errors). A plain (vx, vy, yaw rate) is a velocity-only scenario."""
+    if not isinstance(scenario, Scenario):
+        scenario = Scenario(tuple(scenario))
+    command = scenario.velocity
     rng = np.random.default_rng(seed)
     n = len(sim.policy_ids)
     sim.reset(
@@ -108,16 +119,26 @@ def run_episode(
         yaw=rng.uniform(-np.pi, np.pi),
         root_lin_vel=(*rng.uniform(-0.1, 0.1, 2), 0.0),
     )
+    driver = CommandDriver(sim, scenario, seed)
     gait = GaitRecorder(sim)
     dt = sim.io.physics_dt * sim.io.decimation
     lin_errs, ang_errs = [], []
     yaw_prev, yaw_turned, settled_steps = None, 0.0, 0
+    arm_ids = _arm_ids(sim)
+    height_errs, waist_errs, arm_errs = [], [], []
     for k in range(round(duration_s / dt)):
+        driver.before_step()
         sim.step(policy(sim.observation(command)))
         t = (k + 1) * dt
         if sim.torso_touches_floor() or sim.base_height() < FALL_HEIGHT:
-            return True, t, _mean(lin_errs), _mean(ang_errs), None, None
+            return True, t, _mean(lin_errs), _mean(ang_errs), None, None, None
         if t >= SETTLE_S:
+            if sim.body_command is not None:
+                q = sim.data.qpos[sim.qpos_adr]
+                height_errs.append(abs(sim.base_height() - sim.body_command[0]))
+                waist_errs.append(float(np.mean(np.abs(q[sim.waist_ids] - sim.body_command[1:]))))
+                if arm_ids.size:
+                    arm_errs.append(float(np.mean(np.abs(q[arm_ids] - sim.base_target[arm_ids]))))
             v_xy, yaw_rate = sim.velocity_yaw_frame()
             lin_errs.append(float(np.linalg.norm(np.asarray(command[:2]) - v_xy)))
             ang_errs.append(abs(command[2] - yaw_rate))
@@ -129,7 +150,22 @@ def run_episode(
                 settled_steps += 1
             yaw_prev = yaw
     drift = yaw_turned / (settled_steps * dt) - command[2] if settled_steps else None
-    return False, None, _mean(lin_errs), _mean(ang_errs), gait.metrics(), drift
+    body_err = None
+    if sim.body_command is not None:
+        body_err = {
+            "height_m": _mean(height_errs),
+            "waist_rad": _mean(waist_errs),
+            "arm_rad": _mean(arm_errs),
+        }
+    return False, None, _mean(lin_errs), _mean(ang_errs), gait.metrics(), drift, body_err
+
+
+def _arm_ids(sim: G1MujocoSim) -> np.ndarray:
+    """Indices of the arm joints (not the hands) among the joints the arm motion moves."""
+    if not sim.io.upper_body:
+        return np.zeros(0, dtype=int)
+    names = sim.io.upper_body["joint_names"]
+    return np.array([i for i, n in zip(sim.upper_ids, names, strict=True) if "_hand_" not in n])
 
 
 def _mean(values: list[float]) -> float | None:
@@ -138,7 +174,7 @@ def _mean(values: list[float]) -> float | None:
 
 def summarize(episodes: list[Episode]) -> list[dict[str, Any]]:
     """Per (model, scenario): fall rate with a 95% Wilson interval, mean tracking errors."""
-    order = list(SCENARIOS)
+    order = list(ALL_SCENARIOS)
     models = list(dict.fromkeys(e.model for e in episodes))  # first-seen order
     scenarios = sorted(
         {e.scenario for e in episodes},
@@ -154,11 +190,15 @@ def summarize(episodes: list[Episode]) -> list[dict[str, Any]]:
         drift = [abs(e.yaw_drift) for e in group if e.yaw_drift is not None and not e.fell]
         gaits = [e.gait for e in group if e.gait is not None and not e.fell]
         gait = {k: _mean([g[k] for g in gaits if g.get(k) is not None]) for k in METRICS}
+        body = [e.body_err for e in group if e.body_err is not None and not e.fell]
+        spec = ALL_SCENARIOS.get(scenario)
         rows.append(
             {
                 "model": model,
                 "scenario": scenario,
-                "command": SCENARIOS.get(scenario),
+                "command": None if spec is None else list(spec.velocity),
+                "body": None if spec is None or spec.body is None else list(spec.body),
+                "arm_motion": None if spec is None else spec.arm_motion,
                 "episodes": len(group),
                 "falls": falls,
                 "fall_rate": falls / len(group),
@@ -167,9 +207,38 @@ def summarize(episodes: list[Episode]) -> list[dict[str, Any]]:
                 "ang_err_mean": _mean(ang),
                 "yaw_drift_abs_mean": _mean(drift),
                 "gait": gait,
+                "height_err_mean": _mean(
+                    [b["height_m"] for b in body if b["height_m"] is not None]
+                ),
+                "waist_err_mean": _mean(
+                    [b["waist_rad"] for b in body if b["waist_rad"] is not None]
+                ),
+                "arm_err_mean": _mean([b["arm_rad"] for b in body if b["arm_rad"] is not None]),
             }
         )
     return rows
+
+
+def body_table(rows: list[dict[str, Any]]) -> str:
+    """Body-pose and arm tracking per (model, command), for body-pose policies."""
+    out = [
+        "| Model | Command | Height error | Waist error | Arm joint error |",
+        "|---|---|---:|---:|---:|",
+    ]
+
+    def cell(value: float | None, scale: float, fmt: str) -> str:
+        return "—" if value is None else fmt.format(scale * value)
+
+    for r in rows:
+        if r.get("height_err_mean") is None and r.get("arm_err_mean") is None:
+            continue
+        out.append(
+            f"| {r['model']} | {r['scenario']} "
+            f"| {cell(r.get('height_err_mean'), 100, '{:.1f} cm')} "
+            f"| {cell(r.get('waist_err_mean'), 1, '{:.3f} rad')} "
+            f"| {cell(r.get('arm_err_mean'), 1, '{:.3f} rad')} |"
+        )
+    return "\n".join(out)
 
 
 def markdown_table(rows: list[dict[str, Any]]) -> str:
@@ -234,7 +303,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--seeds", type=int, default=10, help="episodes per command and model")
     parser.add_argument("--duration-s", type=float, default=20.0)
-    parser.add_argument("--scenario", action="append", choices=list(SCENARIOS), default=None)
+    parser.add_argument("--scenario", action="append", choices=list(ALL_SCENARIOS), default=None)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--label", default=None, help="name of this policy in comparisons")
     parser.add_argument(
@@ -250,7 +319,7 @@ def main(argv: list[str] | None = None) -> None:
     policy = OnnxPolicy(args.policy)
     if policy.input_dim != io.obs_dim:
         raise SystemExit(f"policy takes {policy.input_dim} inputs, policy_io says {io.obs_dim}")
-    scenarios = args.scenario or list(SCENARIOS)
+    scenarios = args.scenario or scenarios_for(io)
 
     gifs: dict[tuple[str, str], Path] = {}
     for item in args.gif:
@@ -268,17 +337,27 @@ def main(argv: list[str] | None = None) -> None:
             if gif_model == name:
                 from pi_wbc.sim2sim.render import record_gif
 
-                record_gif(sim, policy, SCENARIOS[scenario], gif_path)
+                record_gif(sim, policy, ALL_SCENARIOS[scenario], gif_path)
                 print(f"[sim2sim] wrote {gif_path}", flush=True)
         start = time.monotonic()
         for scenario in scenarios:
             for seed in range(args.seeds):
-                fell, t_fall, lin, ang, gait, drift = run_episode(
-                    sim, policy, SCENARIOS[scenario], seed, args.duration_s
+                fell, t_fall, lin, ang, gait, drift, body_err = run_episode(
+                    sim, policy, ALL_SCENARIOS[scenario], seed, args.duration_s
                 )
                 episodes.append(
                     Episode(
-                        name, scenario, seed, fell, t_fall, args.duration_s, lin, ang, gait, drift
+                        name,
+                        scenario,
+                        seed,
+                        fell,
+                        t_fall,
+                        args.duration_s,
+                        lin,
+                        ang,
+                        gait,
+                        drift,
+                        body_err,
                     )
                 )
         model_info[name] = {
@@ -293,6 +372,9 @@ def main(argv: list[str] | None = None) -> None:
     print(markdown_table(rows))
     print()
     print(gait_table(rows))
+    if any(r.get("height_err_mean") is not None for r in rows):
+        print()
+        print(body_table(rows))
     provenance.save_json(
         args.out,
         {

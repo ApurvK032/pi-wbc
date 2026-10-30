@@ -37,3 +37,25 @@ def test_standing_keeps_both_feet_down() -> None:
 def test_is_standing_needs_both_speed_and_turn_rate_small() -> None:
     cmd = torch.tensor([[0.0, 0.0, 0.0], [0.05, 0.05, 0.05], [0.3, 0.0, 0.0], [0.0, 0.0, 0.5]])
     assert mdp.is_standing(cmd, 0.1).tolist() == [True, True, False, False]
+
+
+def test_scaled_range_shrinks_towards_the_nominal_value() -> None:
+    nominal, lo, hi = (
+        torch.tensor([0.78, 0.0]),
+        torch.tensor([0.5, -0.6]),
+        torch.tensor([0.78, 0.6]),
+    )
+    low, high = mdp.scaled_range(nominal, lo, hi, 0.0)
+    assert torch.equal(low, nominal) and torch.equal(high, nominal)
+    low, high = mdp.scaled_range(nominal, lo, hi, 1.0)
+    assert torch.allclose(low, lo) and torch.allclose(high, hi)
+    low, high = mdp.scaled_range(nominal, lo, hi, 0.5)
+    assert low.tolist() == pytest.approx([0.64, -0.3]) and high.tolist() == pytest.approx(
+        [0.78, 0.3]
+    )
+
+
+def test_interpolate_moves_in_a_straight_line_then_holds() -> None:
+    start, goal = torch.zeros(3, 2), torch.ones(3, 2)
+    out = mdp.interpolate(start, goal, torch.tensor([0.0, 0.5, 2.0]), torch.tensor([1.0, 1.0, 1.0]))
+    assert out[:, 0].tolist() == pytest.approx([0.0, 0.5, 1.0])
