@@ -4,7 +4,12 @@
 # Submit from the repository root; account and partition stay on the command line so they
 # never enter the repository:
 #   mkdir -p logs/slurm
-#   sbatch -A <account> -p <partition> msi/jobs/train.sbatch <task> [seed] [tag] [overrides...]
+#   sbatch -A <account> -p <partition> --export=ALL,PIWBC_COMMIT=$(git rev-parse HEAD) \
+#       msi/jobs/train.sbatch <task> [seed] [tag] [overrides...]
+#
+# The job runs from a copy of PIWBC_COMMIT (the commit checked out at submission; without it,
+# the one checked out when the job starts), made under logs/snapshots/, so a `git pull` while
+# jobs wait or run cannot change their code. Uncommitted changes are not used.
 #
 #   task       registered task id, e.g. PiWbc-G1-Gait
 #   seed       training seed (default 1)
@@ -34,7 +39,12 @@ SIF=${PIWBC_SIF:-$HOME/containers/pi-wbc.sif}
 RUN=slurm-${SLURM_JOB_ID}-${TAG}
 cd "${SLURM_SUBMIT_DIR}"
 
-echo "commit $(git rev-parse --short HEAD), uncommitted changes: $(git status --porcelain | wc -l)"
+COMMIT=${PIWBC_COMMIT:-$(git rev-parse HEAD)}
+SNAP=logs/snapshots/${SLURM_JOB_ID}
+git worktree add --detach --quiet "${SNAP}" "${COMMIT}"
+trap 'git worktree remove --force "${SNAP}"' EXIT
+export PYTHONPATH="${PWD}/${SNAP}/src${PYTHONPATH:+:${PYTHONPATH}}"
+echo "commit ${COMMIT:0:7}, run from a copy at ${SNAP} (uncommitted changes, not used: $(git status --porcelain -- src | wc -l) in src/)"
 echo "node $(hostname -s), GPU $(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader)"
 echo "task ${TASK}, seed ${SEED}, variant ${TAG}, overrides: ${OVERRIDES[*]:-none}"
 
