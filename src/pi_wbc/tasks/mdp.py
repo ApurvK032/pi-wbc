@@ -467,6 +467,8 @@ def upper_body_level(
     level_step: float,
     min_interval_steps: int,
     min_episodes: int = 100,
+    push_event: str | None = None,
+    push_speeds: tuple[float, float] = (0.5, 1.5),
 ) -> torch.Tensor:
     """Curriculum: widen the body-pose and arm-motion ranges while the robot walks well.
 
@@ -477,8 +479,9 @@ def upper_body_level(
     the level of every named command rises by `level_step` (up to 1); if over `lower_above`
     fell, it drops by the same step. Then the tally restarts. Judging a whole window, not each
     step's few resetting envs, keeps the level from moving on noise. Listing the turning reward
-    keeps the ranges from widening while turning is being unlearned. Returns the level, which
-    Isaac Lab logs.
+    keeps the ranges from widening while turning is being unlearned. With `push_event`, the
+    pushes' top speed also follows the level, from `push_speeds[0]` at 0 to `push_speeds[1]`
+    at 1 (m/s, both horizontal directions). Returns the level, which Isaac Lab logs.
     """
     terms = [env.command_manager.get_term(n) for n in command_names]
     lead = terms[0]
@@ -508,11 +511,20 @@ def upper_body_level(
         for term in terms:
             term.level = level
             term.last_level_change = env.common_step_counter
+        if push_event is not None and push_event in _event_names(env):
+            speed = push_speeds[0] + level * (push_speeds[1] - push_speeds[0])
+            params = env.event_manager.get_term_cfg(push_event).params
+            params["velocity_range"] = {"x": (-speed, speed), "y": (-speed, speed)}
         lead.tally_episodes = 0
         lead.tally_falls.zero_()
         for value in lead.tally_rewards.values():
             value.zero_()
     return torch.tensor(level)
+
+
+def _event_names(env: ManagerBasedRLEnv) -> set[str]:
+    """Names of the active event terms, over all modes."""
+    return {name for names in env.event_manager.active_terms.values() for name in names}
 
 
 def base_height_command_l2(env: ManagerBasedRLEnv, command_name: str, asset_cfg) -> torch.Tensor:
@@ -580,6 +592,10 @@ class HeightPoseJointPositionAction(JointPositionAction):
     between). At the nominal height the offset is zero. A zero action then holds the commanded
     crouch, and the policy learns corrections rather than having to find a crouch that needs
     actions of 5 or more on its own.
+
+    With `max_delay_steps` > 0 (step 3's latency randomization), each env draws a delay of 0 to
+    that many physics steps at every reset, and for that many physics steps after a new action
+    the PD targets stay at the previous action's (`delayed_targets`).
     """
 
     cfg: HeightPoseJointPositionActionCfg
@@ -601,6 +617,10 @@ class HeightPoseJointPositionAction(JointPositionAction):
         )[0]
         self._pose_cols = torch.tensor(cols, device=self.device)
         self._pose_delta = table - nominal.unsqueeze(-1)  # zero at the nominal height
+        self._delay = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        self._previous = self._offset.expand(self.num_envs, -1).clone()
+        self._fresh = torch.ones(self.num_envs, dtype=torch.bool, device=self.device)
+        self._substep = 0
 
     @property
     def pose_joint_names(self) -> list[str]:
@@ -611,9 +631,41 @@ class HeightPoseJointPositionAction(JointPositionAction):
         return interp_table(height, self._pose_heights, self._pose_delta)
 
     def process_actions(self, actions: torch.Tensor):
+        # envs that just reset keep the default pose as their "previous" targets
+        fresh = self._fresh.unsqueeze(-1)
+        self._previous = torch.where(fresh, self._previous, self._processed_actions)
+        self._fresh[:] = False
         super().process_actions(actions)
         height = self._env.command_manager.get_command(self.cfg.command_name)[:, 0]
         self._processed_actions[:, self._pose_cols] += self.pose_offset(height)
+        self._substep = 0
+
+    def apply_actions(self):
+        if self.cfg.max_delay_steps == 0:
+            super().apply_actions()
+            return
+        target = delayed_targets(
+            self._previous, self._processed_actions, self._substep, self._delay
+        )
+        self._asset.set_joint_position_target_index(target=target, joint_ids=self._joint_ids)
+        self._substep += 1
+
+    def reset(self, env_ids: Sequence[int] | None = None) -> None:
+        super().reset(env_ids)
+        ids = slice(None) if env_ids is None else env_ids
+        n = _count(ids, self.num_envs)
+        self._delay[ids] = torch.randint(0, self.cfg.max_delay_steps + 1, (n,), device=self.device)
+        # no stale target from the last episode: the "previous" action is the default pose
+        self._previous[ids] = self._offset.expand(self.num_envs, -1)[ids]
+        self._fresh[ids] = True
+
+
+def delayed_targets(
+    previous: torch.Tensor, current: torch.Tensor, substep: int, delay: torch.Tensor
+) -> torch.Tensor:
+    """PD targets at physics step `substep` of a policy step: the previous action's targets
+    while `substep` < the env's `delay`, the current ones after."""
+    return torch.where((substep < delay).unsqueeze(-1), previous, current)
 
 
 @configclass
@@ -621,6 +673,8 @@ class HeightPoseJointPositionActionCfg(JointPositionActionCfg):
     class_type: type = HeightPoseJointPositionAction
     command_name: str = "body_pose"
     """Command whose first value is the pelvis height."""
+    max_delay_steps: int = 0
+    """Largest action delay drawn per env at reset, in physics steps (0: no delay)."""
     nominal_height: float = 0.78
     heights: list[float] = MISSING
     """Pelvis heights of the table (m), ascending."""

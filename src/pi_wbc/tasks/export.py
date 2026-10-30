@@ -57,6 +57,8 @@ def main(argv: list[str] | None = None) -> None:
     )
     agent_cfg = handle_deprecated_rsl_rl_cfg(agent_cfg, check_rsl_rl_version())
     env_cfg.scene.num_envs = 1
+    if hasattr(env_cfg, "make_nominal"):  # export nominal gains and masses, no noise or delay
+        env_cfg.make_nominal()
     env_cfg.sim.physics.solver_cfg.save_to_mjcf = str(out_dir / "newton_model.xml")
 
     with launch_simulation(env_cfg, args):

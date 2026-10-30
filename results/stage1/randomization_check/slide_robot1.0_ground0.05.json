@@ -1,0 +1,62 @@
+{
+  "task": "PiWbc-G1-Robust",
+  "overrides": [
+    "env.events.physics_material.params.static_friction_range=[1.0,1.0]",
+    "env.events.physics_material.params.dynamic_friction_range=[1.0,1.0]",
+    "physics=newton_mjwarp"
+  ],
+  "num_envs": 256,
+  "friction_setting": {
+    "robot": [
+      1.0,
+      1.0
+    ],
+    "ground": 0.05
+  },
+  "slide": {
+    "robots_kept": 211,
+    "foot_travel_cm_mean": 4.57,
+    "foot_travel_cm_range": [
+      0.1,
+      16.22
+    ]
+  },
+  "provenance": {
+    "time_utc": "2026-10-30T11:44:54+00:00",
+    "git": {
+      "commit": "372736cd44100ce5657b68b3084d4c742e7d6535",
+      "dirty": true,
+      "changes": [
+        "src/pi_wbc/tasks/__init__.py",
+        "src/pi_wbc/tasks/export.py",
+        "src/pi_wbc/tasks/mdp.py",
+        "src/pi_wbc/tasks/policy_io.py",
+        "tests/test_gait_task.py",
+        "scripts/check_randomization.py",
+        "src/pi_wbc/tasks/g1_robust.py"
+      ]
+    },
+    "python": "3.12.3",
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+    "host": "godzilla",
+    "packages": {
+      "pi-wbc": "0.0.1",
+      "isaaclab": "3.0.0",
+      "newton": "1.6.1",
+      "warp-lang": "1.17.0",
+      "torch": "2.11.0+cu130",
+      "rsl-rl-lib": "5.5.1",
+      "mujoco": "3.12.0",
+      "onnxruntime": "1.31.1",
+      "numpy": "2.5.4"
+    },
+    "torch_cuda": "13.0",
+    "gpus": [
+      {
+        "name": "NVIDIA GeForce RTX 4070",
+        "driver": "595.99.02",
+        "memory_mib": "12282"
+      }
+    ]
+  }
+}
