@@ -8,7 +8,8 @@ Changes from `PiWbc-G1-Gait`:
 - The arms and hands move: every 1-3 s a new random pose, reached in a straight line, written
   straight to their PD targets (they are not part of the policy's action). 20% of episodes keep
   them still.
-- A payload of 0-1 kg is added to each palm at every episode start.
+- A payload of 0-1 kg is added to each palm, drawn once per robot at startup: changing masses
+  at every reset made Newton training 2.3 times slower (1.5 s more per iteration).
 - A curriculum widens the body-pose and arm ranges from nothing (level 0) to full (level 1)
   while velocity tracking stays good.
 - Standing still is enforced through joint speed rather than the offset from the default pose,
@@ -73,10 +74,10 @@ class G1BodyEnvCfg(G1GaitEnvCfg):
             func=mdp.generated_commands, params={"command_name": "body_pose"}
         )
 
-        # payload in each hand, new every episode
+        # payload in each hand, one per robot for the whole run (see the module docstring)
         self.events.hand_payload = EventTerm(
             func=mdp.randomize_rigid_body_mass,
-            mode="reset",
+            mode="startup",
             params={
                 "asset_cfg": SceneEntityCfg("robot", body_names=PALMS),
                 "mass_distribution_params": (0.0, 1.0),
