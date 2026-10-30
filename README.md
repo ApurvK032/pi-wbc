@@ -11,10 +11,19 @@
 
 </div>
 
-> **Status: stage 0 (setup) done.** The same code trains a G1 walking policy on an RTX 4070 and
-> on an MSI L40S (up to 218,000 steps/s), and both policies walk in plain MuJoCo on two different
-> G1 models without falling ([stage 0 results](results/stage0/README.md)). Their gait is still
-> a fast shuffle; stage 1 builds the project's own controller.
+> **Status: stage 1 (whole-body controller) in progress.** The G1 now walks like a person: a
+> gait clock and Unitree's G1 rewards turn stage 0's fast shuffle into about 2.5 steps per
+> second of 39 cm at 1 m/s, with no falls in 360 MuJoCo episodes across 3 training runs
+> ([stage 1 results](results/stage1/README.md)). Step 2 adds height, torso and arm commands:
+> the robot crouches, leans and keeps its balance while its arms move, but its walking and
+> turning have regressed and are being worked on. Stage 0 (setup, sim-to-sim bench, cluster
+> runs) is done ([stage 0 results](results/stage0/README.md)).
+
+<p align="center">
+  <img src="results/stage1/gait_v3_s1_walk_1.0.gif" alt="G1 walking at 1 m/s in MuJoCo" width="400"><br>
+  <em>Stage 1 gait policy, trained in Isaac Lab, walking at 1 m/s in plain MuJoCo on MuJoCo
+  Menagerie's G1 model.</em>
+</p>
 
 ## What this is
 
@@ -39,7 +48,7 @@ the same VLA, through the same command interface.
 | Stage | What | Status |
 |---|---|---|
 | 0 | Setup: Isaac Lab training, MuJoCo sim-to-sim bench, cluster jobs | done |
-| 1 | Whole-body controller: PPO, rewards, curriculum, domain randomization, teacher-student | planned |
+| 1 | Whole-body controller: PPO, rewards, curriculum, domain randomization, teacher-student | in progress: gait done; height, torso and arm commands under way |
 | 2 | Human motion imitation (retargeted motion capture) | planned |
 | 3 | Pick-and-place task, scripted expert, rendered demonstrations | planned |
 | 4 | VLA fine-tuning (GR00T N1.6, π0.5) and closed-loop evaluation | planned |
