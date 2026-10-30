@@ -150,6 +150,11 @@ class G1BodyEnvCfg(G1GaitEnvCfg):
             },
         )
 
+        # v8: turning in place was given up whenever the upper body moved (v3-v7 and probes
+        # A-C, each without one ingredient); double its reward and its share of commands
+        rewards.track_ang_vel_z_exp.weight = 2.0
+        self.commands.base_velocity.rel_turning_envs = 0.2
+
         # curriculum: widen body-pose and arm ranges while walking stays good
         self.curriculum.upper_body_level = CurrTerm(
             func=pi_mdp.upper_body_level,
