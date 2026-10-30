@@ -15,6 +15,9 @@ Changes from `PiWbc-G1-Gait`:
   20 iterations.
 - Standing still is enforced through joint speed rather than the offset from the default pose,
   so the robot may crouch while standing.
+- The leg actions centre on a crouch pose that follows the commanded height (a table of hip,
+  knee and ankle angles; zero offset at the nominal height). Without it, two runs never
+  crouched: a 0.60 m crouch needs knee actions of about 5 at the action scale of 0.25.
 
 The waist pitch range stops at 0.45 rad: the joint's limit is 0.52 rad and the joint-limit
 penalty starts at 90% of it (the design's 0.6 rad was beyond the joint).
@@ -32,6 +35,7 @@ from pi_wbc.tasks import mdp as pi_mdp
 from pi_wbc.tasks.g1_gait import (
     HELD_JOINTS,
     LEG_JOINTS,
+    POLICY_JOINTS,
     WAIST_JOINTS,
     G1GaitEnvCfg,
     G1GaitPPORunnerCfg,
@@ -51,6 +55,16 @@ ARM_RANGES = {
 }
 PALMS = ".*_hand_palm_link"
 
+# Crouch poses the leg actions centre on (v5): feet flat, pelvis level, centre of mass over the
+# feet, from scripts/crouch_table.py on MuJoCo Menagerie's G1. Pelvis heights (m), ascending,
+# and the hip pitch, knee and ankle pitch angles (rad) at each; the top row is the default pose.
+CROUCH_HEIGHTS = [0.492, 0.550, 0.600, 0.643, 0.714, 0.784]
+CROUCH_POSES = {
+    ".*_hip_pitch_joint": [-1.13, -0.93, -0.75, -0.65, -0.45, -0.10],
+    ".*_knee_joint": [2.00, 1.80, 1.60, 1.40, 1.00, 0.30],
+    ".*_ankle_pitch_joint": [-0.87, -0.87, -0.85, -0.75, -0.55, -0.20],
+}
+
 
 @configclass
 class G1BodyEnvCfg(G1GaitEnvCfg):
@@ -58,6 +72,18 @@ class G1BodyEnvCfg(G1GaitEnvCfg):
 
     def __post_init__(self):
         super().__post_init__()
+
+        # leg actions centre on the crouch pose for the commanded height (v5)
+        self.actions.joint_pos = pi_mdp.HeightPoseJointPositionActionCfg(
+            asset_name="robot",
+            joint_names=POLICY_JOINTS,
+            scale=0.25,
+            use_default_offset=True,
+            command_name="body_pose",
+            nominal_height=self.gait.base_height,
+            heights=CROUCH_HEIGHTS,
+            poses=CROUCH_POSES,
+        )
 
         # commands
         self.commands.body_pose = pi_mdp.BodyPoseCommandCfg(

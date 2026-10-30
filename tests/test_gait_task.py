@@ -109,3 +109,11 @@ def test_curriculum_drops_when_many_fall_and_holds_in_between() -> None:
     assert level == pytest.approx(0.5)  # 17% fell: neither raise nor drop
     env, _ = _curriculum_env([False] * 4, [0.5] * 4, step=480)
     assert mdp.upper_body_level(env, slice(None), **CURRICULUM).item() == pytest.approx(0.5)
+
+
+def test_interp_table_is_linear_between_rows_and_clamped_outside() -> None:
+    xs = torch.tensor([0.5, 0.6, 0.78])
+    ys = torch.tensor([[2.0, 1.6, 0.3], [0.0, 1.0, 2.0]])
+    out = mdp.interp_table(torch.tensor([0.4, 0.55, 0.6, 0.69, 0.9]), xs, ys)
+    assert out[:, 0].tolist() == pytest.approx([2.0, 1.8, 1.6, 0.95, 0.3])
+    assert out[:, 1].tolist() == pytest.approx([0.0, 0.5, 1.0, 1.5, 2.0])

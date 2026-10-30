@@ -97,6 +97,9 @@ class PolicyIO:
     # (stage 1, step 2): their settings as exported, or None
     body_pose: dict[str, Any] | None = None
     upper_body: dict[str, Any] | None = None
+    # leg actions centred on a crouch that follows the commanded height: pelvis heights and
+    # each listed joint's offset from the default pose at them; None for plain actions
+    height_pose: dict[str, Any] | None = None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> PolicyIO:
@@ -142,6 +145,7 @@ class PolicyIO:
             hold_targets={k: float(v) for k, v in (raw.get("hold_targets") or {}).items()},
             body_pose=raw.get("body_pose"),
             upper_body=raw.get("upper_body"),
+            height_pose=raw["action"].get("height_pose"),
         )
 
     @classmethod
@@ -241,6 +245,14 @@ class G1MujocoSim:
             )
         elif any(t == "body_pose_command" for t, _ in io.obs_terms):
             raise ValueError("the policy observes a body-pose command but policy_io has none")
+        self.pose_ids = np.zeros(0, dtype=int)
+        if io.height_pose:
+            if self.body_command is None:
+                raise ValueError("crouch-centred actions need a body-pose command")
+            offsets = io.height_pose["joint_offsets"]
+            self.pose_ids = np.array([io.joint_names.index(n) for n in offsets])
+            self.pose_heights = np.asarray(io.height_pose["heights"], dtype=float)
+            self.pose_offsets = np.array(list(offsets.values()), dtype=float)
         # joints moved by the arm and hand motion (their PD targets bypass the policy)
         self.upper_ids = np.zeros(0, dtype=int)
         if io.upper_body:
@@ -350,6 +362,11 @@ class G1MujocoSim:
         action = np.asarray(action, dtype=float).ravel()
         target = self.base_target.copy()
         target[self.policy_ids] += self.io.action_scale * action
+        if self.pose_ids.size:  # as pi_wbc.tasks.mdp.HeightPoseJointPositionAction
+            height = self.body_command[0]
+            target[self.pose_ids] += [
+                np.interp(height, self.pose_heights, row) for row in self.pose_offsets
+            ]
         self.data.ctrl[self.actuator_ids] = target
         for _ in range(self.steps_per_action):
             mujoco.mj_step(self.model, self.data)

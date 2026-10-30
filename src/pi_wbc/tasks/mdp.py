@@ -16,6 +16,7 @@ from dataclasses import MISSING, field
 from typing import TYPE_CHECKING
 
 import torch
+from isaaclab.envs.mdp.actions import JointPositionAction, JointPositionActionCfg
 from isaaclab.envs.mdp.commands import UniformVelocityCommand, UniformVelocityCommandCfg
 from isaaclab.managers import CommandTerm, CommandTermCfg
 from isaaclab.utils import configclass
@@ -547,3 +548,75 @@ def stand_still_joint_vel(
     speed = asset.data.joint_vel.torch[:, asset_cfg.joint_ids].abs().sum(dim=-1)
     standing = is_standing(env.command_manager.get_command(command_name), stand_threshold)
     return speed * standing
+
+
+# -- actions -------------------------------------------------------------------------------------
+
+
+def interp_table(x: torch.Tensor, xs: torch.Tensor, ys: torch.Tensor) -> torch.Tensor:
+    """Piecewise-linear lookup, clamped at the ends: ys (rows, len(xs)) at each x (n,).
+
+    Returns (n, rows). `xs` must be ascending.
+    """
+    x = x.clamp(xs[0], xs[-1])
+    hi = torch.searchsorted(xs, x.contiguous()).clamp(1, len(xs) - 1)
+    lo = hi - 1
+    frac = ((x - xs[lo]) / (xs[hi] - xs[lo])).unsqueeze(-1)
+    return ys[:, lo].T + frac * (ys[:, hi].T - ys[:, lo].T)
+
+
+class HeightPoseJointPositionAction(JointPositionAction):
+    """Joint position actions around a leg pose that follows the commanded pelvis height.
+
+    target = default pose + crouch offset(height command) + scale x action. The offset bends
+    hips, knees and ankles into the crouch that puts the pelvis at the commanded height with
+    the feet flat, the pelvis level and the centre of mass over the feet (a table, linear in
+    between). At the nominal height the offset is zero. A zero action then holds the commanded
+    crouch, and the policy learns corrections rather than having to find a crouch that needs
+    actions of 5 or more on its own.
+    """
+
+    cfg: HeightPoseJointPositionActionCfg
+
+    def __init__(self, cfg: HeightPoseJointPositionActionCfg, env):
+        super().__init__(cfg, env)
+        self._pose_heights = torch.tensor(cfg.heights, device=self.device)
+        cols, rows = [], []
+        for pattern, values in cfg.poses.items():
+            hits = [i for i, n in enumerate(self._joint_names) if re.fullmatch(pattern, n)]
+            if not hits or len(values) != len(cfg.heights):
+                raise ValueError(f"crouch pose {pattern!r}: no joint, or not one value per height")
+            for i in hits:
+                cols.append(i)
+                rows.append(values)
+        table = torch.tensor(rows, device=self.device)
+        nominal = interp_table(
+            torch.tensor([cfg.nominal_height], device=self.device), self._pose_heights, table
+        )[0]
+        self._pose_cols = torch.tensor(cols, device=self.device)
+        self._pose_delta = table - nominal.unsqueeze(-1)  # zero at the nominal height
+
+    @property
+    def pose_joint_names(self) -> list[str]:
+        return [self._joint_names[i] for i in self._pose_cols.tolist()]
+
+    def pose_offset(self, height: torch.Tensor) -> torch.Tensor:
+        """(num_envs, joints in the table): offset from the default pose at these heights."""
+        return interp_table(height, self._pose_heights, self._pose_delta)
+
+    def process_actions(self, actions: torch.Tensor):
+        super().process_actions(actions)
+        height = self._env.command_manager.get_command(self.cfg.command_name)[:, 0]
+        self._processed_actions[:, self._pose_cols] += self.pose_offset(height)
+
+
+@configclass
+class HeightPoseJointPositionActionCfg(JointPositionActionCfg):
+    class_type: type = HeightPoseJointPositionAction
+    command_name: str = "body_pose"
+    """Command whose first value is the pelvis height."""
+    nominal_height: float = 0.78
+    heights: list[float] = MISSING
+    """Pelvis heights of the table (m), ascending."""
+    poses: dict[str, list[float]] = MISSING
+    """Joint-name pattern -> joint angle (rad) at each height."""

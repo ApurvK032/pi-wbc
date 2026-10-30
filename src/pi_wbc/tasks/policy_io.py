@@ -63,6 +63,16 @@ def collect(env: Any) -> dict[str, Any]:
 
     action_term = env.action_manager.get_term("joint_pos")
     driven = set(action_term._joint_names)
+    height_pose = None
+    if hasattr(action_term, "pose_offset"):  # actions centred on a height-following crouch
+        height_pose = {
+            "command": action_term.cfg.command_name,
+            "heights": _plain(action_term._pose_heights),
+            # offset from the default pose of each listed joint, at each height
+            "joint_offsets": dict(
+                zip(action_term.pose_joint_names, _plain(action_term._pose_delta), strict=True)
+            ),
+        }
     targets = _first_env(robot.data.joint_pos_target)
     hold_targets = {n: targets[i] for i, n in enumerate(joint_names) if n not in driven}
     obs_mgr = env.observation_manager
@@ -137,6 +147,7 @@ def collect(env: Any) -> dict[str, Any]:
             "scale": _plain(action_term._scale),
             "offset_is_default_pos": bool(action_term.cfg.use_default_offset),
             "clip": action_term.cfg.clip,
+            "height_pose": height_pose,
         },
         "observation": {"dim": start, "terms": obs_layout, "joint_names": obs_joint_names},
         "gait": None if gait is None else gait.to_dict(),
