@@ -3,7 +3,7 @@
     uv run python scripts/check_randomization.py --out results/stage1/randomization_check/all.json \
         physics=newton_mjwarp
     uv run python scripts/check_randomization.py --slide --out <file> physics=newton_mjwarp \
-        'env.events.physics_material.params.static_friction_range=[0.1,0.1]'
+        'env.events.physics_material.params.friction_range=[0.1,0.1]'
 
 Default mode builds PiWbc-G1-Robust (256 robots, zero actions) and checks each group where the
 simulation holds it: masses, torso centre of mass, PD gains and armature read back per robot;
@@ -52,11 +52,10 @@ def main() -> None:
         env_cfg.make_nominal()
         if args.slide:  # make_nominal fixes friction at 1.0; the slide test sets its own
             pm = env_cfg.events.physics_material.params
-            for key in ("static_friction_range", "dynamic_friction_range"):
-                value = next((o.split("=", 1)[1] for o in overrides if key in o), None)
-                if value is not None:
-                    lo, hi = (float(v) for v in value.strip("[]").split(","))
-                    pm[key] = (lo, hi)
+            value = next((o.split("=", 1)[1] for o in overrides if "friction_range" in o), None)
+            if value is not None:
+                lo, hi = (float(v) for v in value.strip("[]").split(","))
+                pm["friction_range"] = (lo, hi)
 
     report: dict = {"task": TASK, "overrides": overrides, "num_envs": args.num_envs}
     with launch_simulation(env_cfg, args):
@@ -65,7 +64,7 @@ def main() -> None:
         zero = torch.zeros(env.num_envs, env.action_manager.total_action_dim, device=env.device)
         env.reset()
         report["friction_setting"] = {
-            "robot": list(env.cfg.events.physics_material.params["static_friction_range"]),
+            "robot": list(env.cfg.events.physics_material.params["friction_range"]),
             "ground": env.cfg.scene.terrain.physics_material.static_friction,
         }
         if args.slide:

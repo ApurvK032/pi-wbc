@@ -175,10 +175,14 @@ def collect(env: Any) -> dict[str, Any]:
             "lin_vel_y": list(command_cfg.ranges.lin_vel_y),
             "ang_vel_z": list(command_cfg.ranges.ang_vel_z),
         },
-        "friction": {
-            "static": list(friction["static_friction_range"]),
-            "dynamic": list(friction["dynamic_friction_range"]),
-        },
+        "friction": (
+            {"robot": list(friction["friction_range"])}  # one value per robot (stage 1, step 3)
+            if "friction_range" in friction
+            else {
+                "static": list(friction["static_friction_range"]),
+                "dynamic": list(friction["dynamic_friction_range"]),
+            }
+        ),
         "root_init": {
             "pos": list(robot.cfg.init_state.pos),
             "rot_xyzw": list(robot.cfg.init_state.rot),

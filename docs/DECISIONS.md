@@ -305,7 +305,8 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 ## D-018: How step 3 randomizes, and how its groups are switched off (2026-10-30)
 
 - **What:** `PiWbc-G1-Robust` (`src/pi_wbc/tasks/g1_robust.py`) is the body task plus six
-  randomization groups: friction (robot shapes 0.1-1.25 on a 0.05 ground), mass (torso -1 to
+  randomization groups: friction (0.1-1.25, one value per robot for all its shapes, on a 0.05
+  ground), mass (torso -1 to
   +3 kg, links ×0.9-1.1, torso centre of mass ±3 cm, the hand payload), actuators (stiffness,
   damping, armature ×0.8-1.2), latency (0-4 physics steps between a new action and its
   targets, drawn per robot at each reset), sensor noise (the base task's, Unitree's values),
@@ -320,6 +321,10 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   - Startup, not reset, for masses and gains: per-reset mass changes made Newton 2.3 times
     slower (D-017); 4096 robots give the variety.
   - Joint friction is not randomized: it is 0 in this model, so scaling it changes nothing.
+  - One friction per robot (`randomize_robot_friction`): Isaac Lab's material event draws one
+    value per collision shape, and a G1 foot touches the ground through four spheres, so each
+    foot mixed four draws: over 16 robots the mean foot friction only spanned 0.43-0.94 of the
+    0.1-1.25 range. Per robot, 256 robots span 0.10-1.24.
   - Nominal export: the export builds one robot, and with the groups on it would record that
     robot's randomized gains and masses as the policy's robot.
 - **Checked in a running simulation** (`scripts/check_randomization.py`, results in

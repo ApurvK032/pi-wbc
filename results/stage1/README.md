@@ -261,7 +261,7 @@ randomization groups, each removable for the ablation by the config overrides in
 
 | Group | What varies | Range |
 |---|---|---|
-| Friction | robot shape friction, on a 0.05 ground | 0.1-1.25 |
+| Friction | robot friction, one value per robot for all its shapes, on a 0.05 ground | 0.1-1.25 |
 | Mass | torso; every link; torso centre of mass; hand payload | -1 to +3 kg; ×0.9-1.1; ±3 cm; 0-1 kg |
 | Actuators | PD stiffness and damping, joint armature | ×0.8-1.2 |
 | Latency | physics steps between a new action and its PD targets | 0-4 (0-20 ms) |
@@ -293,4 +293,10 @@ randomization groups, each removable for the ablation by the config overrides in
   | 0.1 | 1.0 | 1.0 | 4.8 cm |
 
   On the low ground the robot's friction decides, and two pairs with the same larger value
-  slide alike: Newton uses the larger of the two surfaces' friction, as its code says.
+  slide alike: Newton uses the larger of the two surfaces' friction, as its code says. (These
+  runs used Isaac Lab's material event with a fixed value; the task now draws one value per
+  robot with its own event, which gives the same slides: 9.6 cm at 0.1, 4.0 cm at 1.25.)
+- **Friction per robot, not per shape:** Isaac Lab's material event draws a value per collision
+  shape. Each G1 foot touches the ground through four spheres, so its friction mixed four
+  draws and stayed near the middle of the range (0.43-0.94 over 16 robots). The task's own
+  event gives all of a robot's shapes one value: 0.10-1.24 over 256 robots.
