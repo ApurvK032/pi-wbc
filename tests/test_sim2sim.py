@@ -532,3 +532,30 @@ def test_body_episode_reports_body_errors(body_sim: G1MujocoSim) -> None:
     else:
         assert set(body) == {"height_m", "waist_rad", "arm_rad"}
         assert body["arm_rad"] is not None
+
+
+@needs_model
+def test_crouch_pose_moves_leg_targets_with_the_height_command() -> None:
+    from pi_wbc.tasks.g1_body import CROUCH_HEIGHTS, CROUCH_POSES
+
+    raw = json.loads(BODY_IO_PATH.read_text())
+    knee_row, nominal = CROUCH_POSES[".*_knee_joint"], 0.78
+    knee_at_nominal = float(np.interp(nominal, CROUCH_HEIGHTS, knee_row))
+    offsets = {
+        f"{side}_knee_joint": [v - knee_at_nominal for v in knee_row] for side in ("left", "right")
+    }
+    raw["action"]["height_pose"] = {
+        "command": "body_pose",
+        "heights": CROUCH_HEIGHTS,
+        "joint_offsets": offsets,
+    }
+    io = PolicyIO.from_dict(raw)
+    sim = G1MujocoSim(build_model(SCENE, io), io)
+    sim.reset()
+    knee = io.joint_names.index("left_knee_joint")
+    sim.step(np.zeros(15))
+    assert sim.data.ctrl[sim.actuator_ids][knee] == pytest.approx(io.default_pos["left_knee_joint"])
+    sim.body_command = np.array([0.6, 0.0, 0.0, 0.0])
+    sim.step(np.zeros(15))
+    expected = io.default_pos["left_knee_joint"] + 1.60 - knee_at_nominal
+    assert sim.data.ctrl[sim.actuator_ids][knee] == pytest.approx(expected)
