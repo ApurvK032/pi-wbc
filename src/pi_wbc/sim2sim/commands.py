@@ -119,3 +119,38 @@ def scenarios_for(io) -> list[str]:
     if io.body_pose and io.upper_body:
         names += list(BODY_SCENARIOS)
     return names
+
+
+# -- test conditions (design, section 9) ---------------------------------------------------------
+
+# Noise of the base G1 task, for exports from before policy_io recorded it (same values).
+DEFAULT_OBS_NOISE: dict[str, tuple[float, float]] = {
+    "base_lin_vel": (-0.1, 0.1),
+    "base_ang_vel": (-0.2, 0.2),
+    "projected_gravity": (-0.05, 0.05),
+    "joint_pos": (-0.01, 0.01),
+    "joint_vel": (-1.5, 1.5),
+}
+
+
+@dataclass(frozen=True)
+class Condition:
+    """What a test condition changes from nominal."""
+
+    floor_friction: float = 1.0
+    robot_friction: float | None = None  # set too, or the robot's own friction (1.0) decides
+    hand_payload_kg: float = 0.0
+    delay_steps: int = 0  # physics steps the previous PD targets are kept after a new action
+    noise: bool = False  # the training's observation noise
+    push_speed: float = 0.0  # m/s, horizontal kicks to the pelvis in a random direction
+    push_times: tuple[float, ...] = (3.0, 7.0, 11.0, 15.0, 19.0)  # s, when push_speed > 0
+
+
+CONDITIONS: dict[str, Condition] = {
+    "nominal": Condition(),
+    "friction_0.4": Condition(floor_friction=0.4, robot_friction=0.4),
+    "payload_1kg": Condition(hand_payload_kg=1.0),
+    "delay_20ms": Condition(delay_steps=4),
+    "noise": Condition(noise=True),
+    **{f"push_{v}": Condition(push_speed=v) for v in (0.5, 1.0, 1.5, 2.0)},
+}

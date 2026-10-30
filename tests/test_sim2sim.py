@@ -559,3 +559,52 @@ def test_crouch_pose_moves_leg_targets_with_the_height_command() -> None:
     sim.step(np.zeros(15))
     expected = io.default_pos["left_knee_joint"] + 1.60 - knee_at_nominal
     assert sim.data.ctrl[sim.actuator_ids][knee] == pytest.approx(expected)
+
+
+# -- test conditions -----------------------------------------------------------------------------
+
+
+@needs_model
+def test_condition_friction_and_payload_in_the_model(io: PolicyIO) -> None:
+    nominal = build_model(SCENE, io)
+    model = build_model(SCENE, io, floor_friction=0.4, robot_friction=0.4, hand_payload_kg=1.0)
+    planes = model.geom_type == mujoco.mjtGeom.mjGEOM_PLANE
+    assert np.allclose(model.geom_friction[:, 0], 0.4)
+    assert np.allclose(nominal.geom_friction[planes, 0], 1.0)
+    bodies = [model.body(i).name for i in range(model.nbody)]
+    for hand in ("left_wrist_yaw_link", "right_wrist_yaw_link"):  # Menagerie: palm in the wrist
+        i = match_name(bodies, hand)
+        assert model.body_mass[i] == pytest.approx(nominal.body_mass[i] + 1.0)
+    assert model.body_mass.sum() == pytest.approx(nominal.body_mass.sum() + 2.0)
+
+
+@needs_model
+def test_condition_delay_keeps_the_previous_targets(sim: G1MujocoSim) -> None:
+    knee = sim.io.joint_names.index("left_knee_joint")
+    action = np.zeros(29)
+    action[sim.io.action_joint_names.index("left_knee_joint")] = 1.0
+    sim.step(np.zeros(29))
+    first = sim.data.ctrl[sim.actuator_ids][knee]
+    sim.delay_steps = sim.io.decimation  # the whole policy period
+    sim.step(action)
+    assert sim.data.ctrl[sim.actuator_ids][knee] == pytest.approx(first)
+    sim.delay_steps = 0
+    sim.step(action)
+    assert sim.data.ctrl[sim.actuator_ids][knee] == pytest.approx(first + sim.io.action_scale)
+
+
+@needs_model
+def test_condition_noise_stays_in_its_range(sim: G1MujocoSim) -> None:
+    from pi_wbc.sim2sim.commands import DEFAULT_OBS_NOISE
+
+    clean = sim.observation((0, 0, 0))
+    sim.noise = DEFAULT_OBS_NOISE
+    noisy = [sim.observation((0, 0, 0)) for _ in range(20)]
+    start = 0
+    for name, size in sim.io.obs_terms:
+        diff = np.array([n[start : start + size] - clean[start : start + size] for n in noisy])
+        lo, hi = DEFAULT_OBS_NOISE.get(name, (0.0, 0.0))
+        assert diff.min() >= lo - 1e-5 and diff.max() <= hi + 1e-5
+        if name in DEFAULT_OBS_NOISE:
+            assert np.abs(diff).max() > 0
+        start += size

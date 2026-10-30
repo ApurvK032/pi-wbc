@@ -29,8 +29,11 @@ import numpy as np
 from pi_wbc import provenance
 from pi_wbc.sim2sim.commands import (  # noqa: F401  (SCENARIOS: re-exported)
     ALL_SCENARIOS,
+    CONDITIONS,
+    DEFAULT_OBS_NOISE,
     SCENARIOS,
     CommandDriver,
+    Condition,
     Scenario,
     scenarios_for,
 )
@@ -98,6 +101,7 @@ def run_episode(
     scenario: Scenario | tuple[float, float, float],
     seed: int,
     duration_s: float,
+    condition: Condition | None = None,
 ) -> tuple[
     bool,
     float | None,
@@ -108,9 +112,12 @@ def run_episode(
     dict[str, float | None] | None,
 ]:
     """One episode: (fell, fall time, linear error, yaw-rate error, gait metrics, yaw drift,
-    body-pose errors). A plain (vx, vy, yaw rate) is a velocity-only scenario."""
+    body-pose errors). A plain (vx, vy, yaw rate) is a velocity-only scenario. The model must
+    already carry the condition's friction and payload (`build_model`); its delay, noise and
+    pushes are applied here."""
     if not isinstance(scenario, Scenario):
         scenario = Scenario(tuple(scenario))
+    condition = condition or Condition()
     command = scenario.velocity
     rng = np.random.default_rng(seed)
     n = len(sim.policy_ids)
@@ -120,6 +127,11 @@ def run_episode(
         root_lin_vel=(*rng.uniform(-0.1, 0.1, 2), 0.0),
     )
     driver = CommandDriver(sim, scenario, seed)
+    sim.delay_steps = condition.delay_steps
+    sim.noise = (sim.io.obs_noise or DEFAULT_OBS_NOISE) if condition.noise else {}
+    sim.noise_rng = np.random.default_rng([seed, 2])
+    push_rng = np.random.default_rng([seed, 3])
+    push_steps = {round(t / (sim.io.physics_dt * sim.io.decimation)) for t in condition.push_times}
     gait = GaitRecorder(sim)
     dt = sim.io.physics_dt * sim.io.decimation
     lin_errs, ang_errs = [], []
@@ -128,6 +140,12 @@ def run_episode(
     height_errs, waist_errs, arm_errs = [], [], []
     for k in range(round(duration_s / dt)):
         driver.before_step()
+        if condition.push_speed and k in push_steps:
+            angle = push_rng.uniform(0.0, 2.0 * np.pi)
+            v = sim.root_qvel_adr
+            sim.data.qvel[v : v + 2] += condition.push_speed * np.array(
+                [np.cos(angle), np.sin(angle)]
+            )
         sim.step(policy(sim.observation(command)))
         t = (k + 1) * dt
         if sim.torso_touches_floor() or sim.base_height() < FALL_HEIGHT:
@@ -307,6 +325,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--label", default=None, help="name of this policy in comparisons")
     parser.add_argument(
+        "--condition", choices=list(CONDITIONS), default="nominal", help="test condition"
+    )
+    parser.add_argument(
         "--gif",
         metavar="MODEL:SCENARIO=PATH",
         action="append",
@@ -329,9 +350,18 @@ def main(argv: list[str] | None = None) -> None:
 
     episodes: list[Episode] = []
     model_info: dict[str, Any] = {}
+    condition = CONDITIONS[args.condition]
+    if condition.noise and not io.obs_noise:
+        print("[sim2sim] this export records no noise ranges: using the base task's", flush=True)
     for spec in args.model:
         name, _, path = spec.partition("=")
-        model = build_model(path, io)
+        model = build_model(
+            path,
+            io,
+            floor_friction=condition.floor_friction,
+            robot_friction=condition.robot_friction,
+            hand_payload_kg=condition.hand_payload_kg,
+        )
         sim = G1MujocoSim(model, io)
         for (gif_model, scenario), gif_path in gifs.items():
             if gif_model == name:
@@ -343,7 +373,7 @@ def main(argv: list[str] | None = None) -> None:
         for scenario in scenarios:
             for seed in range(args.seeds):
                 fell, t_fall, lin, ang, gait, drift, body_err = run_episode(
-                    sim, policy, ALL_SCENARIOS[scenario], seed, args.duration_s
+                    sim, policy, ALL_SCENARIOS[scenario], seed, args.duration_s, condition
                 )
                 episodes.append(
                     Episode(
@@ -379,6 +409,8 @@ def main(argv: list[str] | None = None) -> None:
         args.out,
         {
             "label": args.label,
+            "condition": args.condition,
+            "condition_settings": asdict(condition),
             "policy": str(args.policy),
             "policy_io": str(args.policy_io),
             "seeds": args.seeds,
