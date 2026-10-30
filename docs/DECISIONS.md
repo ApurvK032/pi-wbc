@@ -257,7 +257,7 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
     roll ±0.2, pitch 0-0.45 rad), moving at most 0.25 m/s and 1 rad/s towards a new goal every
     4-8 s;
   - random arm and hand motion written straight to those joints' PD targets: a new pose every
-    1-3 s, reached in a straight line;
+    2-4 s, reached in a straight line;
   - 0-1 kg added to each palm, drawn once per robot at startup;
   - height rewarded like velocity: exp(-error² / 0.1²), weight 1, on top of the squared
     penalty (weight -10) that step 1 used for its fixed height;
@@ -278,6 +278,14 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
     slower (2.7 instead of 1.2 s per iteration on the workstation).
   - Curriculum windows: the first version judged each step's few resetting robots on their
     own, so the level moved in fits and started late (iteration 750 of 1000).
+  - Leg actions centre on a crouch pose that follows the commanded height (hip, knee and
+    ankle angles from `scripts/crouch_table.py`: feet flat, pelvis level, centre of mass over
+    the feet; zero offset at the nominal height). Without it, two runs never held a crouch: a
+    0.60 m crouch needs knee actions of about 5 at the action scale of 0.25; with the height
+    bonus alone the robot tried and fell (10 of 10 MuJoCo episodes).
+  - Arm poses every 2-4 s rather than 1-3 s: the faster motion (shoulders up to 2.5 rad/s,
+    with up to 1 kg in the hand) went with turning in place being unlearned as the curriculum
+    widened (training yaw-rate error 0.65 to 1.05 rad/s).
   - Height bonus: with the squared penalty alone, a 1400-iteration run never crouched (its
     training height error, 10 cm, was what standing still gives), while the waist, rewarded
     with the exp form, was tracked.

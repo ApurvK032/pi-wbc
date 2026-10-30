@@ -5,9 +5,9 @@ Changes from `PiWbc-G1-Gait`:
 - A body-pose command: pelvis height (0.50-0.78 m) and torso orientation as the three waist
   angles (yaw ±0.6, roll ±0.2, pitch 0-0.45 rad), moved smoothly towards a new random goal
   every 4-8 s. The policy sees it; height and waist rewards track it.
-- The arms and hands move: every 1-3 s a new random pose, reached in a straight line, written
+- The arms and hands move: every 2-4 s a new random pose, reached in a straight line, written
   straight to their PD targets (they are not part of the policy's action). 20% of episodes keep
-  them still.
+  them still. (v6: was 1-3 s; arm swings of up to 2.5 rad/s cost turning in place.)
 - A payload of 0-1 kg is added to each palm, drawn once per robot at startup: changing masses
   at every reset made Newton training 2.3 times slower (1.5 s more per iteration).
 - A curriculum widens the body-pose and arm ranges from nothing (level 0) to full (level 1)
@@ -93,7 +93,7 @@ class G1BodyEnvCfg(G1GaitEnvCfg):
         )
         self.commands.upper_body = pi_mdp.UpperBodyMotionCommandCfg(
             asset_name="robot",
-            resampling_time_range=(1.0, 3.0),
+            resampling_time_range=(2.0, 4.0),
             joint_names=HELD_JOINTS,
             ranges=ARM_RANGES,
         )
