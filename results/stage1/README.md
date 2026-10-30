@@ -310,3 +310,48 @@ randomization groups, each removable for the ablation by the config overrides in
   shape. Each G1 foot touches the ground through four spheres, so its friction mixed four
   draws and stayed near the middle of the range (0.43-0.94 over 16 robots). The task's own
   event gives all of a robot's shapes one value: 0.10-1.24 over 256 robots.
+
+## Step 4: teacher and student (in progress)
+
+`src/pi_wbc/tasks/g1_student.py`: one environment, the robust task of step 3, with two
+observation groups:
+
+- **Student** (`policy`, 528 values): what a real G1 measures. The IMU's turn rate and
+  gravity direction, joint positions and speeds, the commands, the last action and the gait
+  clock, with sensor noise, over the last 6 policy steps (0.12 s). No base velocity: a real
+  robot cannot measure it, so the student has to infer it from the history.
+- **Teacher** (104 values): the same terms for the current step without noise, plus privileged
+  state: base velocity, foot contacts and heights, the robot's friction (read from the solver),
+  torso and hand mass offsets, torso centre-of-mass offset, leg gain scale and action delay.
+
+`PiWbc-G1-Teacher` trains the teacher with PPO on the teacher group; `PiWbc-G1-Student`
+distills the student from it with rsl_rl's `Distillation` (the student drives, the teacher
+labels: DAgger). `scripts/teacher_student_local.sh` runs both, exports the student and tests it
+in MuJoCo under every condition of step 5.
+
+Checked so far:
+
+- **History layout:** in Isaac Lab, with noise off, the student's 6 frames equal the teacher's
+  slice of the same terms at each of the last 6 steps, oldest first, every frame the first one
+  right after a reset; the MuJoCo bench builds the history the same way
+  (`scripts/check_student_history.py`; a unit test checks the bench side).
+- **Plumbing:** 5 iterations each of teacher and student train, the student exports (ONNX and
+  PyTorch actions agree to 1e-7) and runs in the MuJoCo bench with its 528 inputs.
+
+## Step 5: test conditions in the MuJoCo bench (in progress)
+
+`pi-wbc-sim2sim --condition` (`src/pi_wbc/sim2sim/commands.py`), the conditions of design
+section 9 that the bench can apply:
+
+| Condition | What changes |
+|---|---|
+| `friction_0.4` | floor and robot friction 0.4 (MuJoCo, like Newton, uses the larger of two surfaces) |
+| `payload_1kg` | 1 kg added to each hand (Menagerie's model: to the wrist link that holds the palm) |
+| `delay_20ms` | the previous PD targets are kept for 4 physics steps (a whole policy period) |
+| `noise` | the training's observation noise, from the export |
+| `push_0.5` to `push_2.0` | horizontal kicks to the pelvis at 3, 7, 11, 15 and 19 s, random directions |
+
+On the step 2 v7 policy (3 starts each, Menagerie model) every condition runs; 1 m/s kicks
+knock it down in 2 of 3 standing episodes, as expected of a policy trained with ±0.5 m/s
+pushes. The step 3-4 policies train with pushes growing to 1.5 m/s. The Isaac Lab side of the
+evaluation protocol (the same commands and seeds in Isaac Lab) is still to do.
