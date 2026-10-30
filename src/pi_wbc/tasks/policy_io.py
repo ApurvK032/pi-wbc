@@ -33,7 +33,12 @@ def _first_env(values: Any) -> list[float]:
 
 
 def collect(env: Any) -> dict[str, Any]:
-    """Everything a sim-to-sim runner needs, from an unwrapped ManagerBasedRLEnv."""
+    """Everything a sim-to-sim runner needs, from an unwrapped ManagerBasedRLEnv.
+
+    Resets the environment first, so the PD targets of joints no action drives are the ones
+    training uses (reset events may set them).
+    """
+    env.reset()
     robot = env.scene["robot"]
     joint_names = list(robot.joint_names)
     default_pos = _first_env(robot.data.default_joint_pos)
@@ -57,6 +62,19 @@ def collect(env: Any) -> dict[str, Any]:
         joints[name].update({key: vals[i] for key, vals in values.items()})
 
     action_term = env.action_manager.get_term("joint_pos")
+    driven = set(action_term._joint_names)
+    height_pose = None
+    if hasattr(action_term, "pose_offset"):  # actions centred on a height-following crouch
+        height_pose = {
+            "command": action_term.cfg.command_name,
+            "heights": _plain(action_term._pose_heights),
+            # offset from the default pose of each listed joint, at each height
+            "joint_offsets": dict(
+                zip(action_term.pose_joint_names, _plain(action_term._pose_delta), strict=True)
+            ),
+        }
+    targets = _first_env(robot.data.joint_pos_target)
+    hold_targets = {n: targets[i] for i, n in enumerate(joint_names) if n not in driven}
     obs_mgr = env.observation_manager
     terms = obs_mgr.active_terms["policy"]
     dims = obs_mgr.group_obs_term_dim["policy"]
@@ -92,6 +110,28 @@ def collect(env: Any) -> dict[str, Any]:
 
     command_cfg = env.cfg.commands.base_velocity
     friction = env.cfg.events.physics_material.params
+    gait = getattr(env.cfg, "gait", None)
+    commands = env.command_manager.active_terms
+    body_pose = upper_body = None
+    if "body_pose" in commands:
+        term = env.command_manager.get_term("body_pose")
+        body_pose = {
+            "order": ["height", "waist_yaw", "waist_roll", "waist_pitch"],
+            "waist_joint_names": list(term.cfg.waist_joint_names),
+            "nominal": _plain(term.nominal),
+            "low": _plain(term.lo),
+            "high": _plain(term.hi),
+            "max_rates": _plain(term.max_rate),
+            "resampling_time_range": list(term.cfg.resampling_time_range),
+        }
+    if "upper_body" in commands:
+        term = env.command_manager.get_term("upper_body")
+        upper_body = {
+            "joint_names": list(term.joint_names),
+            "low": _plain(term.lo),  # target range at curriculum level 1
+            "high": _plain(term.hi),
+            "resampling_time_range": list(term.cfg.resampling_time_range),
+        }
     return {
         "task_cfg": type(env.cfg).__name__,
         "physics_dt": env.physics_dt,
@@ -107,8 +147,16 @@ def collect(env: Any) -> dict[str, Any]:
             "scale": _plain(action_term._scale),
             "offset_is_default_pos": bool(action_term.cfg.use_default_offset),
             "clip": action_term.cfg.clip,
+            "height_pose": height_pose,
         },
         "observation": {"dim": start, "terms": obs_layout, "joint_names": obs_joint_names},
+        "gait": None if gait is None else gait.to_dict(),
+        # body-pose command (pelvis height, waist yaw, roll, pitch) and random arm and hand
+        # motion (stage 1, step 2); None for tasks without them
+        "body_pose": body_pose,
+        "upper_body": upper_body,
+        # PD targets of joints the policy does not drive, as held during training
+        "hold_targets": hold_targets,
         "commands": {
             "lin_vel_x": list(command_cfg.ranges.lin_vel_x),
             "lin_vel_y": list(command_cfg.ranges.lin_vel_y),
@@ -154,11 +202,12 @@ def main(argv: list[str] | None = None) -> None:
             data = collect(env.unwrapped)
         finally:
             env.close()
-    # The MuJoCo runner assumes joint observations use the action's joints in the action's order.
+    # Joint observations must name their joints so the MuJoCo runner can order them.
+    terms = [t["name"] for t in data["observation"]["terms"]]
+    for name in ("joint_pos", "joint_vel"):
+        if name in terms and name not in data["observation"]["joint_names"]:
+            raise SystemExit(f"[policy_io] {name} has no joint list")
     action_joints = data["action"]["joint_names"]
-    for name, obs_joints in data["observation"]["joint_names"].items():
-        if obs_joints != action_joints:
-            raise SystemExit(f"[policy_io] {name} joint order differs from the action's")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(data, indent=2) + "\n")
     print(

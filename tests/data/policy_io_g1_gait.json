@@ -1,0 +1,882 @@
+{
+  "task_cfg": "G1GaitEnvCfg",
+  "physics_dt": 0.005,
+  "decimation": 4,
+  "policy_dt": 0.02,
+  "solver": {
+    "num_substeps": 2,
+    "integrator": "implicitfast",
+    "iterations": 100,
+    "ls_iterations": 50,
+    "impratio": 1.0,
+    "tolerance": 1e-06,
+    "use_mujoco_contacts": false,
+    "default_shape_mu": 1.0
+  },
+  "gravity": [
+    0.0,
+    0.0,
+    -9.81
+  ],
+  "joint_names": [
+    "left_hip_pitch_joint",
+    "left_hip_roll_joint",
+    "left_hip_yaw_joint",
+    "left_knee_joint",
+    "left_ankle_pitch_joint",
+    "left_ankle_roll_joint",
+    "right_hip_pitch_joint",
+    "right_hip_roll_joint",
+    "right_hip_yaw_joint",
+    "right_knee_joint",
+    "right_ankle_pitch_joint",
+    "right_ankle_roll_joint",
+    "waist_yaw_joint",
+    "waist_roll_joint",
+    "waist_pitch_joint",
+    "left_shoulder_pitch_joint",
+    "left_shoulder_roll_joint",
+    "left_shoulder_yaw_joint",
+    "left_elbow_joint",
+    "left_wrist_roll_joint",
+    "left_wrist_pitch_joint",
+    "left_wrist_yaw_joint",
+    "left_hand_index_0_joint",
+    "left_hand_index_1_joint",
+    "left_hand_middle_0_joint",
+    "left_hand_middle_1_joint",
+    "left_hand_thumb_0_joint",
+    "left_hand_thumb_1_joint",
+    "left_hand_thumb_2_joint",
+    "right_shoulder_pitch_joint",
+    "right_shoulder_roll_joint",
+    "right_shoulder_yaw_joint",
+    "right_elbow_joint",
+    "right_wrist_roll_joint",
+    "right_wrist_pitch_joint",
+    "right_wrist_yaw_joint",
+    "right_hand_index_0_joint",
+    "right_hand_index_1_joint",
+    "right_hand_middle_0_joint",
+    "right_hand_middle_1_joint",
+    "right_hand_thumb_0_joint",
+    "right_hand_thumb_1_joint",
+    "right_hand_thumb_2_joint"
+  ],
+  "body_names": [
+    "pelvis",
+    "left_hip_pitch_link",
+    "left_hip_roll_link",
+    "left_hip_yaw_link",
+    "left_knee_link",
+    "left_ankle_pitch_link",
+    "left_ankle_roll_link",
+    "right_hip_pitch_link",
+    "right_hip_roll_link",
+    "right_hip_yaw_link",
+    "right_knee_link",
+    "right_ankle_pitch_link",
+    "right_ankle_roll_link",
+    "waist_yaw_link",
+    "waist_roll_link",
+    "torso_link",
+    "left_shoulder_pitch_link",
+    "left_shoulder_roll_link",
+    "left_shoulder_yaw_link",
+    "left_elbow_link",
+    "left_wrist_roll_link",
+    "left_wrist_pitch_link",
+    "left_wrist_yaw_link",
+    "left_hand_palm_link",
+    "left_hand_index_0_link",
+    "left_hand_index_1_link",
+    "left_hand_middle_0_link",
+    "left_hand_middle_1_link",
+    "left_hand_thumb_0_link",
+    "left_hand_thumb_1_link",
+    "left_hand_thumb_2_link",
+    "right_shoulder_pitch_link",
+    "right_shoulder_roll_link",
+    "right_shoulder_yaw_link",
+    "right_elbow_link",
+    "right_wrist_roll_link",
+    "right_wrist_pitch_link",
+    "right_wrist_yaw_link",
+    "right_hand_palm_link",
+    "right_hand_index_0_link",
+    "right_hand_index_1_link",
+    "right_hand_middle_0_link",
+    "right_hand_middle_1_link",
+    "right_hand_thumb_0_link",
+    "right_hand_thumb_1_link",
+    "right_hand_thumb_2_link"
+  ],
+  "joints": {
+    "left_hip_pitch_joint": {
+      "default_pos": -0.10000000149011612,
+      "stiffness": 150.0,
+      "damping": 2.0,
+      "armature": 0.029999999329447746,
+      "friction": 0.0,
+      "effort_limit": 88.0,
+      "velocity_limit": 32.0,
+      "pos_limits": [
+        -2.5306997299194336,
+        2.8797998428344727
+      ]
+    },
+    "left_hip_roll_joint": {
+      "default_pos": 0.0,
+      "stiffness": 150.0,
+      "damping": 2.0,
+      "armature": 0.029999999329447746,
+      "friction": 0.0,
+      "effort_limit": 88.0,
+      "velocity_limit": 32.0,
+      "pos_limits": [
+        -0.5235999226570129,
+        2.967099666595459
+      ]
+    },
+    "left_hip_yaw_joint": {
+      "default_pos": 0.0,
+      "stiffness": 150.0,
+      "damping": 2.0,
+      "armature": 0.029999999329447746,
+      "friction": 0.0,
+      "effort_limit": 88.0,
+      "velocity_limit": 32.0,
+      "pos_limits": [
+        -2.7576000690460205,
+        2.7576000690460205
+      ]
+    },
+    "left_knee_joint": {
+      "default_pos": 0.30000001192092896,
+      "stiffness": 200.0,
+      "damping": 4.0,
+      "armature": 0.029999999329447746,
+      "friction": 0.0,
+      "effort_limit": 139.0,
+      "velocity_limit": 20.0,
+      "pos_limits": [
+        -0.08726699650287628,
+        2.8797998428344727
+      ]
+    },
+    "left_ankle_pitch_joint": {
+      "default_pos": -0.20000000298023224,
+      "stiffness": 40.0,
+      "damping": 2.0,
+      "armature": 0.029999999329447746,
+      "friction": 0.0,
+      "effort_limit": 50.0,
+      "velocity_limit": 37.0,
+      "pos_limits": [
+        -0.8726699352264404,
+        0.5235999226570129
+      ]
+    },
+    "left_ankle_roll_joint": {
+      "default_pos": 0.0,
+      "stiffness": 40.0,
+      "damping": 2.0,
+      "armature": 0.029999999329447746,
+      "friction": 0.0,
+      "effort_limit": 50.0,
+      "velocity_limit": 37.0,
+      "pos_limits": [
+        -0.26179996132850647,
+        0.26179996132850647
+      ]
+    },
+    "right_hip_pitch_joint": {
+      "default_pos": -0.10000000149011612,
+      "stiffness": 150.0,
+      "damping": 2.0,
+      "armature": 0.029999999329447746,
+      "friction": 0.0,
+      "effort_limit": 88.0,
+      "velocity_limit": 32.0,
+      "pos_limits": [
+        -2.5306997299194336,
+        2.8797998428344727
+      ]
+    },
+    "right_hip_roll_joint": {
+      "default_pos": 0.0,
+      "stiffness": 150.0,
+      "damping": 2.0,
+      "armature": 0.029999999329447746,
+      "friction": 0.0,
+      "effort_limit": 88.0,
+      "velocity_limit": 32.0,
+      "pos_limits": [
+        -2.967099666595459,
+        0.5235999226570129
+      ]
+    },
+    "right_hip_yaw_joint": {
+      "default_pos": 0.0,
+      "stiffness": 150.0,
+      "damping": 2.0,
+      "armature": 0.029999999329447746,
+      "friction": 0.0,
+      "effort_limit": 88.0,
+      "velocity_limit": 32.0,
+      "pos_limits": [
+        -2.7576000690460205,
+        2.7576000690460205
+      ]
+    },
+    "right_knee_joint": {
+      "default_pos": 0.30000001192092896,
+      "stiffness": 200.0,
+      "damping": 4.0,
+      "armature": 0.029999999329447746,
+      "friction": 0.0,
+      "effort_limit": 139.0,
+      "velocity_limit": 20.0,
+      "pos_limits": [
+        -0.08726699650287628,
+        2.8797998428344727
+      ]
+    },
+    "right_ankle_pitch_joint": {
+      "default_pos": -0.20000000298023224,
+      "stiffness": 40.0,
+      "damping": 2.0,
+      "armature": 0.029999999329447746,
+      "friction": 0.0,
+      "effort_limit": 50.0,
+      "velocity_limit": 37.0,
+      "pos_limits": [
+        -0.8726699352264404,
+        0.5235999226570129
+      ]
+    },
+    "right_ankle_roll_joint": {
+      "default_pos": 0.0,
+      "stiffness": 40.0,
+      "damping": 2.0,
+      "armature": 0.029999999329447746,
+      "friction": 0.0,
+      "effort_limit": 50.0,
+      "velocity_limit": 37.0,
+      "pos_limits": [
+        -0.26179996132850647,
+        0.26179996132850647
+      ]
+    },
+    "waist_yaw_joint": {
+      "default_pos": 0.0,
+      "stiffness": 250.0,
+      "damping": 5.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 88.0,
+      "velocity_limit": 32.0,
+      "pos_limits": [
+        -2.618000030517578,
+        2.618000030517578
+      ]
+    },
+    "waist_roll_joint": {
+      "default_pos": 0.0,
+      "stiffness": 250.0,
+      "damping": 5.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 50.0,
+      "velocity_limit": 37.0,
+      "pos_limits": [
+        -0.5199999213218689,
+        0.5199999213218689
+      ]
+    },
+    "waist_pitch_joint": {
+      "default_pos": 0.0,
+      "stiffness": 250.0,
+      "damping": 5.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 50.0,
+      "velocity_limit": 37.0,
+      "pos_limits": [
+        -0.5199999213218689,
+        0.5199999213218689
+      ]
+    },
+    "left_shoulder_pitch_joint": {
+      "default_pos": 0.20000000298023224,
+      "stiffness": 100.0,
+      "damping": 5.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 25.0,
+      "velocity_limit": 37.0,
+      "pos_limits": [
+        -3.0891997814178467,
+        2.6703999042510986
+      ]
+    },
+    "left_shoulder_roll_joint": {
+      "default_pos": 0.20000000298023224,
+      "stiffness": 100.0,
+      "damping": 5.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 25.0,
+      "velocity_limit": 37.0,
+      "pos_limits": [
+        -1.5881999731063843,
+        2.251499652862549
+      ]
+    },
+    "left_shoulder_yaw_joint": {
+      "default_pos": 0.0,
+      "stiffness": 40.0,
+      "damping": 2.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 25.0,
+      "velocity_limit": 37.0,
+      "pos_limits": [
+        -2.618000030517578,
+        2.618000030517578
+      ]
+    },
+    "left_elbow_joint": {
+      "default_pos": 1.2799999713897705,
+      "stiffness": 40.0,
+      "damping": 2.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 25.0,
+      "velocity_limit": 37.0,
+      "pos_limits": [
+        -1.0471998453140259,
+        2.0943996906280518
+      ]
+    },
+    "left_wrist_roll_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 25.0,
+      "velocity_limit": 22.0,
+      "pos_limits": [
+        -1.9722219705581665,
+        1.9722219705581665
+      ]
+    },
+    "left_wrist_pitch_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 22.0,
+      "pos_limits": [
+        -1.6144295930862427,
+        1.6144295930862427
+      ]
+    },
+    "left_wrist_yaw_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 22.0,
+      "pos_limits": [
+        -1.6144295930862427,
+        1.6144295930862427
+      ]
+    },
+    "left_hand_index_0_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.0010000000474974513,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 10.0,
+      "pos_limits": [
+        -1.5707963705062866,
+        0.0
+      ]
+    },
+    "left_hand_index_1_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.0010000000474974513,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 10.0,
+      "pos_limits": [
+        -1.7453291416168213,
+        0.0
+      ]
+    },
+    "left_hand_middle_0_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.0010000000474974513,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 10.0,
+      "pos_limits": [
+        -1.5707963705062866,
+        0.0
+      ]
+    },
+    "left_hand_middle_1_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.0010000000474974513,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 10.0,
+      "pos_limits": [
+        -1.7453291416168213,
+        0.0
+      ]
+    },
+    "left_hand_thumb_0_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.0010000000474974513,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 10.0,
+      "pos_limits": [
+        -1.0471975803375244,
+        1.0471975803375244
+      ]
+    },
+    "left_hand_thumb_1_joint": {
+      "default_pos": 1.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.0010000000474974513,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 10.0,
+      "pos_limits": [
+        -0.7243116497993469,
+        1.0471975803375244
+      ]
+    },
+    "left_hand_thumb_2_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.0010000000474974513,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 10.0,
+      "pos_limits": [
+        0.0,
+        1.7453291416168213
+      ]
+    },
+    "right_shoulder_pitch_joint": {
+      "default_pos": 0.20000000298023224,
+      "stiffness": 100.0,
+      "damping": 5.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 25.0,
+      "velocity_limit": 37.0,
+      "pos_limits": [
+        -3.0891997814178467,
+        2.6703999042510986
+      ]
+    },
+    "right_shoulder_roll_joint": {
+      "default_pos": -0.20000000298023224,
+      "stiffness": 100.0,
+      "damping": 5.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 25.0,
+      "velocity_limit": 37.0,
+      "pos_limits": [
+        -2.251499652862549,
+        1.5881999731063843
+      ]
+    },
+    "right_shoulder_yaw_joint": {
+      "default_pos": 0.0,
+      "stiffness": 40.0,
+      "damping": 2.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 25.0,
+      "velocity_limit": 37.0,
+      "pos_limits": [
+        -2.618000030517578,
+        2.618000030517578
+      ]
+    },
+    "right_elbow_joint": {
+      "default_pos": 1.2799999713897705,
+      "stiffness": 40.0,
+      "damping": 2.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 25.0,
+      "velocity_limit": 37.0,
+      "pos_limits": [
+        -1.0471998453140259,
+        2.0943996906280518
+      ]
+    },
+    "right_wrist_roll_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 25.0,
+      "velocity_limit": 22.0,
+      "pos_limits": [
+        -1.9722219705581665,
+        1.9722219705581665
+      ]
+    },
+    "right_wrist_pitch_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 22.0,
+      "pos_limits": [
+        -1.6144295930862427,
+        1.6144295930862427
+      ]
+    },
+    "right_wrist_yaw_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.009999999776482582,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 22.0,
+      "pos_limits": [
+        -1.6144295930862427,
+        1.6144295930862427
+      ]
+    },
+    "right_hand_index_0_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.0010000000474974513,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 10.0,
+      "pos_limits": [
+        0.0,
+        1.5707963705062866
+      ]
+    },
+    "right_hand_index_1_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.0010000000474974513,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 10.0,
+      "pos_limits": [
+        0.0,
+        1.7453291416168213
+      ]
+    },
+    "right_hand_middle_0_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.0010000000474974513,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 10.0,
+      "pos_limits": [
+        0.0,
+        1.5707963705062866
+      ]
+    },
+    "right_hand_middle_1_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.0010000000474974513,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 10.0,
+      "pos_limits": [
+        0.0,
+        1.7453291416168213
+      ]
+    },
+    "right_hand_thumb_0_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.0010000000474974513,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 10.0,
+      "pos_limits": [
+        -1.0471975803375244,
+        1.0471975803375244
+      ]
+    },
+    "right_hand_thumb_1_joint": {
+      "default_pos": -1.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.0010000000474974513,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 10.0,
+      "pos_limits": [
+        -1.0471975803375244,
+        0.7243116497993469
+      ]
+    },
+    "right_hand_thumb_2_joint": {
+      "default_pos": 0.0,
+      "stiffness": 20.0,
+      "damping": 2.0,
+      "armature": 0.0010000000474974513,
+      "friction": 0.0,
+      "effort_limit": 5.0,
+      "velocity_limit": 10.0,
+      "pos_limits": [
+        -1.7453291416168213,
+        0.0
+      ]
+    }
+  },
+  "action": {
+    "joint_names": [
+      "left_hip_pitch_joint",
+      "left_hip_roll_joint",
+      "left_hip_yaw_joint",
+      "left_knee_joint",
+      "left_ankle_pitch_joint",
+      "left_ankle_roll_joint",
+      "right_hip_pitch_joint",
+      "right_hip_roll_joint",
+      "right_hip_yaw_joint",
+      "right_knee_joint",
+      "right_ankle_pitch_joint",
+      "right_ankle_roll_joint",
+      "waist_yaw_joint",
+      "waist_roll_joint",
+      "waist_pitch_joint"
+    ],
+    "scale": 0.25,
+    "offset_is_default_pos": true,
+    "clip": null
+  },
+  "observation": {
+    "dim": 87,
+    "terms": [
+      {
+        "name": "base_lin_vel",
+        "start": 0,
+        "size": 3
+      },
+      {
+        "name": "base_ang_vel",
+        "start": 3,
+        "size": 3
+      },
+      {
+        "name": "projected_gravity",
+        "start": 6,
+        "size": 3
+      },
+      {
+        "name": "velocity_commands",
+        "start": 9,
+        "size": 3
+      },
+      {
+        "name": "joint_pos",
+        "start": 12,
+        "size": 29
+      },
+      {
+        "name": "joint_vel",
+        "start": 41,
+        "size": 29
+      },
+      {
+        "name": "actions",
+        "start": 70,
+        "size": 15
+      },
+      {
+        "name": "gait_clock",
+        "start": 85,
+        "size": 2
+      }
+    ],
+    "joint_names": {
+      "joint_pos": [
+        "left_hip_pitch_joint",
+        "left_hip_roll_joint",
+        "left_hip_yaw_joint",
+        "left_knee_joint",
+        "left_ankle_pitch_joint",
+        "left_ankle_roll_joint",
+        "right_hip_pitch_joint",
+        "right_hip_roll_joint",
+        "right_hip_yaw_joint",
+        "right_knee_joint",
+        "right_ankle_pitch_joint",
+        "right_ankle_roll_joint",
+        "waist_yaw_joint",
+        "waist_roll_joint",
+        "waist_pitch_joint",
+        "left_shoulder_pitch_joint",
+        "left_shoulder_roll_joint",
+        "left_shoulder_yaw_joint",
+        "left_elbow_joint",
+        "left_wrist_roll_joint",
+        "left_wrist_pitch_joint",
+        "left_wrist_yaw_joint",
+        "right_shoulder_pitch_joint",
+        "right_shoulder_roll_joint",
+        "right_shoulder_yaw_joint",
+        "right_elbow_joint",
+        "right_wrist_roll_joint",
+        "right_wrist_pitch_joint",
+        "right_wrist_yaw_joint"
+      ],
+      "joint_vel": [
+        "left_hip_pitch_joint",
+        "left_hip_roll_joint",
+        "left_hip_yaw_joint",
+        "left_knee_joint",
+        "left_ankle_pitch_joint",
+        "left_ankle_roll_joint",
+        "right_hip_pitch_joint",
+        "right_hip_roll_joint",
+        "right_hip_yaw_joint",
+        "right_knee_joint",
+        "right_ankle_pitch_joint",
+        "right_ankle_roll_joint",
+        "waist_yaw_joint",
+        "waist_roll_joint",
+        "waist_pitch_joint",
+        "left_shoulder_pitch_joint",
+        "left_shoulder_roll_joint",
+        "left_shoulder_yaw_joint",
+        "left_elbow_joint",
+        "left_wrist_roll_joint",
+        "left_wrist_pitch_joint",
+        "left_wrist_yaw_joint",
+        "right_shoulder_pitch_joint",
+        "right_shoulder_roll_joint",
+        "right_shoulder_yaw_joint",
+        "right_elbow_joint",
+        "right_wrist_roll_joint",
+        "right_wrist_pitch_joint",
+        "right_wrist_yaw_joint"
+      ]
+    }
+  },
+  "gait": {
+    "period": 0.8,
+    "offset": 0.5,
+    "stance_fraction": 0.55,
+    "stand_threshold": 0.1,
+    "swing_height": 0.08,
+    "base_height": 0.78,
+    "clock_off_when_standing": true
+  },
+  "hold_targets": {
+    "left_shoulder_pitch_joint": 0.20000000298023224,
+    "left_shoulder_roll_joint": 0.20000000298023224,
+    "left_shoulder_yaw_joint": 0.0,
+    "left_elbow_joint": 1.2799999713897705,
+    "left_wrist_roll_joint": 0.0,
+    "left_wrist_pitch_joint": 0.0,
+    "left_wrist_yaw_joint": 0.0,
+    "left_hand_index_0_joint": 0.0,
+    "left_hand_index_1_joint": 0.0,
+    "left_hand_middle_0_joint": 0.0,
+    "left_hand_middle_1_joint": 0.0,
+    "left_hand_thumb_0_joint": 0.0,
+    "left_hand_thumb_1_joint": 1.0,
+    "left_hand_thumb_2_joint": 0.0,
+    "right_shoulder_pitch_joint": 0.20000000298023224,
+    "right_shoulder_roll_joint": -0.20000000298023224,
+    "right_shoulder_yaw_joint": 0.0,
+    "right_elbow_joint": 1.2799999713897705,
+    "right_wrist_roll_joint": 0.0,
+    "right_wrist_pitch_joint": 0.0,
+    "right_wrist_yaw_joint": 0.0,
+    "right_hand_index_0_joint": 0.0,
+    "right_hand_index_1_joint": 0.0,
+    "right_hand_middle_0_joint": 0.0,
+    "right_hand_middle_1_joint": 0.0,
+    "right_hand_thumb_0_joint": 0.0,
+    "right_hand_thumb_1_joint": -1.0,
+    "right_hand_thumb_2_joint": 0.0
+  },
+  "commands": {
+    "lin_vel_x": [
+      -0.5,
+      1.0
+    ],
+    "lin_vel_y": [
+      -0.5,
+      0.5
+    ],
+    "ang_vel_z": [
+      -1.0,
+      1.0
+    ]
+  },
+  "friction": {
+    "static": [
+      0.8,
+      0.8
+    ],
+    "dynamic": [
+      0.6,
+      0.6
+    ]
+  },
+  "root_init": {
+    "pos": [
+      0.0,
+      0.0,
+      0.8
+    ],
+    "rot_xyzw": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  }
+}
