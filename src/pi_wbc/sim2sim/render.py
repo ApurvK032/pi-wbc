@@ -12,13 +12,14 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
+from pi_wbc.sim2sim.commands import CommandDriver, Scenario
 from pi_wbc.sim2sim.mujoco_g1 import G1MujocoSim
 
 
 def record_gif(
     sim: G1MujocoSim,
     policy: Callable[[np.ndarray], np.ndarray],
-    command: Sequence[float],
+    scenario: Scenario | Sequence[float],
     path: str | Path,
     duration_s: float = 6.0,
     seed: int = 0,
@@ -26,11 +27,17 @@ def record_gif(
     size: tuple[int, int] = (400, 264),
     colors: int = 64,
 ) -> Path:
-    """Run one episode from the default pose and save every frame at `fps` as a GIF."""
+    """Run one episode from the default pose and save every frame at `fps` as a GIF.
+
+    `scenario` is a bench scenario or a plain (vx, vy, yaw rate) command.
+    """
     from PIL import Image
 
+    if not isinstance(scenario, Scenario):
+        scenario = Scenario(tuple(scenario))
     rng = np.random.default_rng(seed)
     sim.reset(joint_offsets=rng.uniform(-0.05, 0.05, len(sim.policy_ids)))
+    driver = CommandDriver(sim, scenario, seed)
     width, height = size
     renderer = mujoco.Renderer(sim.model, height=height, width=width)
     camera = mujoco.MjvCamera()
@@ -42,7 +49,8 @@ def record_gif(
     frames = []
     next_frame_t = 0.0  # capture on exact 1/fps marks so playback runs at real time
     for k in range(round(duration_s / policy_dt)):
-        sim.step(policy(sim.observation(command)))
+        driver.before_step()
+        sim.step(policy(sim.observation(scenario.velocity)))
         if (k + 1) * policy_dt >= next_frame_t - 1e-9:
             renderer.update_scene(sim.data, camera=camera)
             frames.append(Image.fromarray(renderer.render()))

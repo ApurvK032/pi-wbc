@@ -101,6 +101,27 @@ def collect(env: Any) -> dict[str, Any]:
     command_cfg = env.cfg.commands.base_velocity
     friction = env.cfg.events.physics_material.params
     gait = getattr(env.cfg, "gait", None)
+    commands = env.command_manager.active_terms
+    body_pose = upper_body = None
+    if "body_pose" in commands:
+        term = env.command_manager.get_term("body_pose")
+        body_pose = {
+            "order": ["height", "waist_yaw", "waist_roll", "waist_pitch"],
+            "waist_joint_names": list(term.cfg.waist_joint_names),
+            "nominal": _plain(term.nominal),
+            "low": _plain(term.lo),
+            "high": _plain(term.hi),
+            "max_rates": _plain(term.max_rate),
+            "resampling_time_range": list(term.cfg.resampling_time_range),
+        }
+    if "upper_body" in commands:
+        term = env.command_manager.get_term("upper_body")
+        upper_body = {
+            "joint_names": list(term.joint_names),
+            "low": _plain(term.lo),  # target range at curriculum level 1
+            "high": _plain(term.hi),
+            "resampling_time_range": list(term.cfg.resampling_time_range),
+        }
     return {
         "task_cfg": type(env.cfg).__name__,
         "physics_dt": env.physics_dt,
@@ -119,6 +140,10 @@ def collect(env: Any) -> dict[str, Any]:
         },
         "observation": {"dim": start, "terms": obs_layout, "joint_names": obs_joint_names},
         "gait": None if gait is None else gait.to_dict(),
+        # body-pose command (pelvis height, waist yaw, roll, pitch) and random arm and hand
+        # motion (stage 1, step 2); None for tasks without them
+        "body_pose": body_pose,
+        "upper_body": upper_body,
         # PD targets of joints the policy does not drive, as held during training
         "hold_targets": hold_targets,
         "commands": {

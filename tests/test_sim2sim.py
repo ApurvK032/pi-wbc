@@ -5,6 +5,7 @@ G1 model skip when MuJoCo Menagerie has not been fetched (scripts/fetch_menageri
 """
 
 import dataclasses
+import json
 from pathlib import Path
 
 import mujoco
@@ -12,6 +13,15 @@ import numpy as np
 import pytest
 
 from pi_wbc.sim2sim import compare, evaluate
+from pi_wbc.sim2sim.commands import (
+    ALL_SCENARIOS,
+    BODY_SCENARIOS,
+    SCENARIOS,
+    CommandDriver,
+    Scenario,
+    UpperBodyMotion,
+    scenarios_for,
+)
 from pi_wbc.sim2sim.gait import METRICS, GaitRecorder, gait_metrics
 from pi_wbc.sim2sim.mujoco_g1 import (
     G1MujocoSim,
@@ -24,6 +34,7 @@ from pi_wbc.sim2sim.mujoco_g1 import (
 
 ROOT = Path(__file__).resolve().parents[1]
 IO_PATH = ROOT / "tests" / "data" / "policy_io_g1_stage0.json"
+BODY_IO_PATH = ROOT / "tests" / "data" / "policy_io_g1_body.json"  # PiWbc-G1-Body (step 2)
 SCENE = ROOT / "third_party" / "mujoco_menagerie" / "unitree_g1" / "scene_with_hands.xml"
 needs_model = pytest.mark.skipif(not SCENE.exists(), reason="run scripts/fetch_menagerie.sh")
 
@@ -192,9 +203,10 @@ def test_action_sets_joint_targets_around_the_default_pose(sim: G1MujocoSim) -> 
 
 @needs_model
 def test_episode_runs_with_a_zero_policy(sim: G1MujocoSim) -> None:
-    fell, t_fall, _, _, gait, drift = evaluate.run_episode(
+    fell, t_fall, _, _, gait, drift, body = evaluate.run_episode(
         sim, lambda obs: np.zeros(29), (0.0, 0.0, 0.0), seed=0, duration_s=1.0
     )
+    assert body is None  # the stage 0 policy has no body-pose command
     assert isinstance(fell, bool)
     assert t_fall is None or 0 < t_fall <= 1.0
     assert gait is None or set(gait) == set(METRICS)
@@ -410,3 +422,113 @@ def test_gait_clock_reads_zero_when_told_to_stand() -> None:
     assert _obs_term(sim, sim.observation((0.0, 0.0, 0.0)), "gait_clock") == pytest.approx([0, 0])
     assert _obs_term(sim, sim.observation((0.0, 0.0, 0.8)), "gait_clock") == pytest.approx([0, 1])
     assert _obs_term(sim, sim.observation((0.5, 0.0, 0.0)), "gait_clock") == pytest.approx([0, 1])
+
+
+# -- body-pose commands and arm motion (stage 1, step 2) -----------------------------------------
+
+
+@pytest.fixture(scope="module")
+def body_io() -> PolicyIO:
+    return PolicyIO.load(BODY_IO_PATH)
+
+
+@pytest.fixture
+def body_sim(body_io: PolicyIO) -> G1MujocoSim:
+    if not SCENE.exists():
+        pytest.skip("run scripts/fetch_menagerie.sh")
+    s = G1MujocoSim(build_model(SCENE, body_io), body_io)
+    s.reset()
+    return s
+
+
+def _upper_default(io: PolicyIO) -> np.ndarray:
+    return np.array([io.default_pos[n] for n in io.upper_body["joint_names"]])
+
+
+def test_body_policy_io_layout(body_io: PolicyIO) -> None:
+    assert body_io.obs_terms[-1] == ("body_pose_command", 4)
+    assert body_io.obs_dim == 91
+    assert body_io.body_pose["waist_joint_names"] == [
+        "waist_yaw_joint",
+        "waist_roll_joint",
+        "waist_pitch_joint",
+    ]
+    upper = body_io.upper_body["joint_names"]
+    assert len(upper) == 28  # 14 arm joints, 14 hand joints
+    assert not set(upper) & set(body_io.action_joint_names)  # never joints the policy drives
+    raw = json.loads(BODY_IO_PATH.read_text())
+    low, high = np.array(body_io.upper_body["low"]), np.array(body_io.upper_body["high"])
+    limits = np.array([raw["joints"][n]["pos_limits"] for n in upper])
+    default = _upper_default(body_io)
+    assert (low >= limits[:, 0] - 1e-6).all() and (high <= limits[:, 1] + 1e-6).all()
+    assert (low <= default + 1e-6).all() and (default <= high + 1e-6).all()
+
+
+@needs_model
+def test_observation_ends_with_the_body_command(body_sim: G1MujocoSim) -> None:
+    nominal = body_sim.io.body_pose["nominal"]
+    assert body_sim.observation((0, 0, 0))[-4:] == pytest.approx(nominal, abs=1e-6)
+    body_sim.body_command = np.array([0.6, 0.1, -0.1, 0.3])
+    assert body_sim.observation((0, 0, 0))[-4:] == pytest.approx([0.6, 0.1, -0.1, 0.3], abs=1e-6)
+    body_sim.reset()
+    assert body_sim.body_command == pytest.approx(nominal)
+
+
+def test_upper_body_motion_stays_in_range_and_moves_smoothly(body_io: PolicyIO) -> None:
+    default = _upper_default(body_io)
+    low, high = np.array(body_io.upper_body["low"]), np.array(body_io.upper_body["high"])
+    motion = UpperBodyMotion(body_io.upper_body, default, np.random.default_rng(0))
+    dt = 0.02
+    targets = np.array([motion.update(dt).copy() for _ in range(1000)])  # 20 s
+    assert (targets >= low - 1e-9).all() and (targets <= high + 1e-9).all()
+    # straight-line moves of at least 1 s each: no joint crosses its range faster than 1/s
+    steps = np.abs(np.diff(np.vstack([default, targets]), axis=0))
+    assert (steps <= (high - low) * dt + 1e-9).all()
+    # a new goal every 1-3 s: the targets keep moving
+    assert (np.abs(targets[-1] - targets[-51]) > 0).any()
+
+
+@needs_model
+def test_driver_ramps_the_body_command_at_the_training_rate(body_sim: G1MujocoSim) -> None:
+    driver = CommandDriver(body_sim, Scenario((0, 0, 0), body=(0.6, 0.0, 0.0, 0.4)), seed=0)
+    commands = []
+    for _ in range(60):
+        driver.before_step()
+        commands.append(body_sim.body_command.copy())
+    commands = np.array(commands)
+    assert np.diff(commands[:, 0]).min() >= -0.25 * 0.02 - 1e-9  # 0.25 m/s at most
+    assert commands[19, 3] == pytest.approx(0.4)  # 1 rad/s: 0.4 rad in 20 steps
+    assert commands[36, 0] == pytest.approx(0.6)  # 0.18 m at 0.25 m/s: 36 steps
+    assert commands[-1] == pytest.approx([0.6, 0.0, 0.0, 0.4])
+
+
+@needs_model
+def test_driver_moves_only_arm_and_hand_targets(body_sim: G1MujocoSim) -> None:
+    driver = CommandDriver(body_sim, ALL_SCENARIOS["arms_walk"], seed=0)
+    before = body_sim.base_target.copy()
+    for _ in range(10):
+        driver.before_step()
+    moved = body_sim.base_target != before
+    assert moved[body_sim.upper_ids].any()
+    assert not moved[body_sim.policy_ids].any()
+    body_sim.reset()
+    assert body_sim.base_target == pytest.approx(before)
+
+
+@needs_model
+def test_body_scenarios_need_a_body_policy(sim: G1MujocoSim) -> None:
+    assert scenarios_for(sim.io) == list(SCENARIOS)
+    with pytest.raises(ValueError):
+        CommandDriver(sim, BODY_SCENARIOS["crouch_0.6"], seed=0)
+
+
+@needs_model
+def test_body_episode_reports_body_errors(body_sim: G1MujocoSim) -> None:
+    fell, _, _, _, _, _, body = evaluate.run_episode(
+        body_sim, lambda obs: np.zeros(15), ALL_SCENARIOS["arms_stand"], seed=0, duration_s=2.5
+    )
+    if fell:
+        assert body is None
+    else:
+        assert set(body) == {"height_m", "waist_rad", "arm_rad"}
+        assert body["arm_rad"] is not None
