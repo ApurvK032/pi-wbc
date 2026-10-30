@@ -273,15 +273,22 @@ which is what a robot that never moves would score under the training commands (
   speed error falls slowly but steadily to 0.21 by 3000 iterations, and in MuJoCo it walks in
   real steps (32 cm at 2.4 per second), crouches to 0.60 m within 0.6 cm and keeps its balance
   with the arms moving, with no falls in 220 episodes. 1400 iterations was simply too short.
-- Turning in place is still v7's weak spot (0.22 rad/s off); v8 at 3000 iterations, with the
-  turning fix, is the next run.
+- Turning in place is still v7's weak spot (0.22 rad/s off).
+- **v8's turning change does not survive full-length training.** v8 at 3000 iterations
+  (workstation) never learned to walk: training speed error 0.38 at 1000 and 2000 iterations
+  and 0.35 at 3000, the standing-still level; in MuJoCo it shuffles at 1 m/s (0.56 m/s off,
+  10 cm steps at 4.5 per second) and turns worse than v7 (0.32 against 0.22 rad/s), with no
+  falls. Doubling the turning reward and the share of turn-in-place commands held turning over
+  1400 iterations but kept the policy from learning to walk, so the task is back to v7's
+  turning settings (one run each, on different machines, but the gap is large throughout).
 
 Cluster runs: jobs 5204130 and 5204131, commit `810d67f`, one A40 each, about 1 h 16 min for
 3000 iterations; evaluated on the workstation at `a633152`.
 
 ### Next
 
-- v8 at 3000 iterations; then the teacher and student at full length.
+- The teacher and student at full length with v7's settings; then better turning without
+  costing walking.
 - Longer training: step 1 needed 3000 iterations to walk well, and here the curriculum takes
   the second half of a 1400-iteration run. Then 3 seeds, as in step 1.
 - The stand-still penalty costs about 0.35 per second in training, mostly from the exploration

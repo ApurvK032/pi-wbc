@@ -150,10 +150,10 @@ class G1BodyEnvCfg(G1GaitEnvCfg):
             },
         )
 
-        # v8: turning in place was given up whenever the upper body moved (v3-v7 and probes
-        # A-C, each without one ingredient); double its reward and its share of commands
-        rewards.track_ang_vel_z_exp.weight = 2.0
-        self.commands.base_velocity.rel_turning_envs = 0.2
+        # Turning keeps the gait task's weight (1.0) and share of turn-in-place commands (10%).
+        # v8 doubled both: turning held through a 1400-iteration run, but at 3000 iterations it
+        # never learned to walk (training speed error 0.35, at the standing-still level) and
+        # turned worse than v7 (0.32 against 0.22 rad/s in MuJoCo), so it was reverted.
 
         # curriculum: widen body-pose and arm ranges while walking stays good
         self.curriculum.upper_body_level = CurrTerm(
