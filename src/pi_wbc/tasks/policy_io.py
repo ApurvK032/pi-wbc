@@ -86,6 +86,14 @@ def collect(env: Any) -> dict[str, Any]:
         obs_layout.append({"name": name, "start": start, "size": size})
         start += size
 
+    # Uniform observation noise per term, as configured for training (recorded even when the
+    # export itself runs without noise, e.g. after make_nominal).
+    obs_noise: dict[str, list[float]] = {}
+    for name, term_cfg in zip(terms, obs_mgr._group_obs_term_cfgs["policy"], strict=True):
+        noise = term_cfg.noise
+        if noise is not None and hasattr(noise, "n_min"):
+            obs_noise[name] = [float(noise.n_min), float(noise.n_max)]
+
     # Joint order of each joint observation, from its resolved asset config.
     obs_joint_names: dict[str, list[str]] = {}
     for name, term_cfg in zip(terms, obs_mgr._group_obs_term_cfgs["policy"], strict=True):
@@ -149,7 +157,12 @@ def collect(env: Any) -> dict[str, Any]:
             "clip": action_term.cfg.clip,
             "height_pose": height_pose,
         },
-        "observation": {"dim": start, "terms": obs_layout, "joint_names": obs_joint_names},
+        "observation": {
+            "dim": start,
+            "terms": obs_layout,
+            "joint_names": obs_joint_names,
+            "noise": obs_noise,
+        },
         "gait": None if gait is None else gait.to_dict(),
         # body-pose command (pelvis height, waist yaw, roll, pitch) and random arm and hand
         # motion (stage 1, step 2); None for tasks without them
