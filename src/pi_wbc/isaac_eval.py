@@ -136,7 +136,8 @@ def main(argv: list[str] | None = None) -> None:
         settle = round(SETTLE_S / dt)
         alive = torch.ones(n, dtype=torch.bool, device=device)
         fall_step = torch.full((n,), -1, device=device)
-        sums = {k: torch.zeros(n, device=device) for k in ("lin", "ang", "height", "waist", "arm")}
+        keys = ("lin", "ang", "vx", "vy", "wz", "height", "waist", "arm")
+        sums = {k: torch.zeros(n, device=device) for k in keys}
         count = torch.zeros(n, device=device)
         with torch.inference_mode():
             for k in range(steps):
@@ -152,6 +153,9 @@ def main(argv: list[str] | None = None) -> None:
                 wz = robot.data.root_ang_vel_w.torch[:, 2]
                 sums["lin"] += torch.linalg.norm(velocity[:, :2] - v, dim=-1) * alive
                 sums["ang"] += (velocity[:, 2] - wz).abs() * alive
+                sums["vx"] += v[:, 0] * alive
+                sums["vy"] += v[:, 1] * alive
+                sums["wz"] += wz * alive
                 if body_term is not None:
                     cmd = body_term.command
                     height = robot.data.root_pos_w.torch[:, 2]
@@ -209,6 +213,8 @@ def summarize(names, seeds, fall_step, sums, count, has_body, wilson_interval) -
             "fall_rate_ci95": [lo, hi],
             "lin_err_mean": _mean_over(sums, count, idx, up, "lin"),
             "ang_err_mean": _mean_over(sums, count, idx, up, "ang"),
+            # achieved velocity in the heading frame (m/s, m/s, rad/s)
+            "velocity_mean": [_mean_over(sums, count, idx, up, k) for k in ("vx", "vy", "wz")],
         }
         if has_body:
             for key in ("height", "waist", "arm"):
@@ -222,15 +228,16 @@ def print_table(rows: list[dict]) -> None:
         return "—" if value is None else fmt.format(scale * value)
 
     print(
-        "| Command | Falls | Speed error | Turn-rate error | Height error | Waist error "
-        "| Arm error |"
+        "| Command | Falls | Speed error | Turn-rate error | Achieved vx, vy, yaw rate "
+        "| Height error | Waist error | Arm error |"
     )
-    print("|---|---:|---:|---:|---:|---:|---:|")
+    print("|---|---:|---:|---:|---|---:|---:|---:|")
     for r in rows:
         print(
             f"| {r['scenario']} | {r['falls']}/{r['episodes']} "
             f"| {cell(r['lin_err_mean'], '{:.2f} m/s')} "
             f"| {cell(r['ang_err_mean'], '{:.2f} rad/s')} "
+            f"| {', '.join(cell(v, '{:+.2f}') for v in r['velocity_mean'])} "
             f"| {cell(r.get('height_err_mean'), '{:.1f} cm', 100.0)} "
             f"| {cell(r.get('waist_err_mean'), '{:.3f} rad')} "
             f"| {cell(r.get('arm_err_mean'), '{:.3f} rad')} |"
