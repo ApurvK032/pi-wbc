@@ -253,9 +253,35 @@ the second half, while step 1 needed 3000 iterations to walk well; whether full-
 recovers walking is the next question (v7 at 3000 iterations on the cluster, v8 at 3000 on the
 workstation).
 
+### Full-length training brings walking back
+
+Every run above stops at 1400 iterations. Their training speed error stayed at 0.35-0.39 m/s,
+which is what a robot that never moves would score under the training commands (0.38 m/s;
+0.33 m/s with v8's command mix), while step 1's gait reached 0.14. Four runs pinned down why:
+
+| Run | Where | Training speed error at 450 / 1000 / 1500 / 3000 iterations | MuJoCo, 1 m/s: speed error, steps | Turn in place | Falls (all 11 commands, both models) |
+|---|---|---|---|---:|---|
+| step 1 gait | workstation | 0.34 / 0.19 / 0.16 / 0.14 | 0.07 m/s, 2.4/s of 38 cm | 0.08 rad/s | 0/120 (6 commands) |
+| control: v7 with every upper-body command held still | cluster | 0.32 / 0.21 / 0.17 / 0.17 | 0.15 m/s, 2.4/s of 35 cm | 0.09 rad/s | 80/220, all in the crouch and arm commands it never trained for |
+| **v7, 3000 iterations** | cluster | 0.37 / 0.33 / 0.31 / 0.21 | **0.25 m/s, 2.4/s of 32 cm** | 0.22 rad/s | **0/220** |
+| probe P: v8 without the payload | workstation | 0.43 at 450, 0.36 at 700 | 0.65 m/s | 0.13 rad/s | — |
+
+- **The task itself walks.** With the upper-body commands held still, the body task (payload,
+  new rewards and all) learns to walk almost as well as step 1. The payload is not the cause
+  either (probe P walks as badly as v8 at 700 iterations).
+- **The moving upper body slows learning, and time fixes it.** With the full curriculum, v7's
+  speed error falls slowly but steadily to 0.21 by 3000 iterations, and in MuJoCo it walks in
+  real steps (32 cm at 2.4 per second), crouches to 0.60 m within 0.6 cm and keeps its balance
+  with the arms moving, with no falls in 220 episodes. 1400 iterations was simply too short.
+- Turning in place is still v7's weak spot (0.22 rad/s off); v8 at 3000 iterations, with the
+  turning fix, is the next run.
+
+Cluster runs: jobs 5204130 and 5204131, commit `810d67f`, one A40 each, about 1 h 16 min for
+3000 iterations; evaluated on the workstation at `a633152`.
+
 ### Next
 
-- Full-length runs (3000 iterations) of v7 and v8.
+- v8 at 3000 iterations; then the teacher and student at full length.
 - Longer training: step 1 needed 3000 iterations to walk well, and here the curriculum takes
   the second half of a 1400-iteration run. Then 3 seeds, as in step 1.
 - The stand-still penalty costs about 0.35 per second in training, mostly from the exploration
