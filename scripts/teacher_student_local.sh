@@ -49,10 +49,16 @@ for SEED in "$@"; do
     fi
     T_DIR=$(ls -d logs/rsl_rl/*/"${T_RUN}")
     T_CKPT=$(ls "${T_DIR}"/model_*.pt | sort -V | tail -1)
-    echo "[$(date +%H:%M)] seed ${SEED}: student, ${S_ITERS} iterations from ${T_CKPT} (${S_RUN})"
+    # the student starts where the teacher's curriculum ended (it restarts at 0 otherwise)
+    LEVEL=$(tr '\r' '\n' < "logs/train_${T_RUN}.log" | sed 's/\x1b\[[0-9;]*m//g' \
+        | awk '/Curriculum\/upper_body_level/{v=$2} END{print (v == "" ? 0 : v)}')
+    echo "[$(date +%H:%M)] seed ${SEED}: student, ${S_ITERS} iterations from ${T_CKPT}," \
+        "curriculum level ${LEVEL} (${S_RUN})"
     if ! run isaaclab train --rl_library rsl_rl --task PiWbc-G1-Student --num_envs 4096 \
         --max_iterations "${S_ITERS}" --seed "${SEED}" --run_timestamp "${S_RUN}" \
         --checkpoint "${T_CKPT}" physics=newton_mjwarp "${EXTRA[@]}" \
+        "env.commands.body_pose.initial_level=${LEVEL}" \
+        "env.commands.upper_body.initial_level=${LEVEL}" \
         > "logs/train_${S_RUN}.log" 2>&1; then
         echo "[$(date +%H:%M)] seed ${SEED}: student training failed, see logs/train_${S_RUN}.log"
         continue
