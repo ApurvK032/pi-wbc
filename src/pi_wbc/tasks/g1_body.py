@@ -93,6 +93,17 @@ class G1BodyEnvCfg(G1GaitEnvCfg):
             weight=-10.0,
             params={"command_name": "body_pose", "asset_cfg": SceneEntityCfg("robot")},
         )
+        # v4: the squared penalty alone left crouching untried (the robot stood at the nominal
+        # height whatever the command); the waist, rewarded this way, was tracked
+        rewards.height_tracking = RewTerm(
+            func=pi_mdp.base_height_command_exp,
+            weight=1.0,
+            params={
+                "command_name": "body_pose",
+                "std": 0.1,
+                "asset_cfg": SceneEntityCfg("robot"),
+            },
+        )
         rewards.waist_deviation = None
         rewards.waist_tracking = RewTerm(
             func=pi_mdp.waist_command_exp,

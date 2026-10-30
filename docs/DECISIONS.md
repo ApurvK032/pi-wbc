@@ -250,6 +250,41 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   the ankle's velocity (including its vertical part), so it discourages rolling as well as
   sliding; whether that shapes the gait badly is open for the later reward work.
 
+## D-017: How step 2 carries out the body and arm commands (2026-10-30)
+
+- **What:** `PiWbc-G1-Body` (`src/pi_wbc/tasks/g1_body.py`) adds to the gait task:
+  - a body-pose command of pelvis height (0.50-0.78 m) and the three waist angles (yaw ±0.6,
+    roll ±0.2, pitch 0-0.45 rad), moving at most 0.25 m/s and 1 rad/s towards a new goal every
+    4-8 s;
+  - random arm and hand motion written straight to those joints' PD targets: a new pose every
+    1-3 s, reached in a straight line;
+  - 0-1 kg added to each palm, drawn once per robot at startup;
+  - height rewarded like velocity: exp(-error² / 0.1²), weight 1, on top of the squared
+    penalty (weight -10) that step 1 used for its fixed height;
+  - a curriculum that widens both from nothing to the full ranges, in steps of 5%, judged
+    over 20-iteration windows (raise when under 10% of ended episodes fell and velocity
+    tracking is over 60% of its reward; lower when over 25% fell).
+- **Why, where it departs from the design:**
+  - The torso command is the waist joint angles: the G1's waist turns in the order yaw, roll,
+    pitch, so these angles are the torso's orientation relative to the pelvis.
+  - Waist pitch stops at 0.45 rad, not 0.6: the joint's limit is 0.52 rad, and the joint-limit
+    penalty starts at 90% of it.
+  - "Stand still" penalizes leg joint speed instead of the offset from the default pose,
+    which would have penalized crouching on command.
+  - Arm ranges keep the arms beside and in front of the body. Training has no self-collisions
+    (Isaac Lab's G1 asset turns them off, on PhysX and Newton); MuJoCo Menagerie's model has
+    them.
+  - Payload once per robot: changing masses at every reset made Newton training 2.3 times
+    slower (2.7 instead of 1.2 s per iteration on the workstation).
+  - Curriculum windows: the first version judged each step's few resetting robots on their
+    own, so the level moved in fits and started late (iteration 750 of 1000).
+  - Height bonus: with the squared penalty alone, a 1400-iteration run never crouched (its
+    training height error, 10 cm, was what standing still gives), while the waist, rewarded
+    with the exp form, was tracked.
+- **Cost:** a robot keeps its payload for the whole run (variety comes from 4096 robots, not
+  from episodes). The torso command must be converted if a VLA sends torso roll, pitch and yaw
+  in another convention (stage 3).
+
 ## Open items
 
 - The stage 1 design ([STAGE1_DESIGN.md](STAGE1_DESIGN.md)) was accepted on 2026-10-29

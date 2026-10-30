@@ -515,6 +515,15 @@ def base_height_command_l2(env: ManagerBasedRLEnv, command_name: str, asset_cfg)
     return torch.square(asset.data.root_pos_w.torch[:, 2] - target)
 
 
+def base_height_command_exp(
+    env: ManagerBasedRLEnv, command_name: str, std: float, asset_cfg
+) -> torch.Tensor:
+    """exp(-(pelvis height - commanded height)² / std²), like the velocity tracking rewards."""
+    asset = env.scene[asset_cfg.name]
+    target = env.command_manager.get_command(command_name)[:, 0]
+    return torch.exp(-torch.square(asset.data.root_pos_w.torch[:, 2] - target) / std**2)
+
+
 def waist_command_exp(
     env: ManagerBasedRLEnv, command_name: str, std: float, asset_cfg
 ) -> torch.Tensor:
