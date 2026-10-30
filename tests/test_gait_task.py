@@ -127,3 +127,26 @@ def test_interp_table_is_linear_between_rows_and_clamped_outside() -> None:
 def test_curriculum_holds_while_turning_is_poor() -> None:
     env, _ = _curriculum_env([False] * 4, [0.8] * 4, step=480, turn_per_s=[0.2] * 4)
     assert mdp.upper_body_level(env, slice(None), **CURRICULUM).item() == pytest.approx(0.5)
+
+
+def test_delayed_targets_hold_the_previous_action_for_the_delay() -> None:
+    previous, current = torch.zeros(3, 2), torch.ones(3, 2)
+    delay = torch.tensor([0, 2, 4])
+    rows = [mdp.delayed_targets(previous, current, k, delay)[:, 0].tolist() for k in range(4)]
+    # env 0: no delay; env 1: 2 physics steps; env 2: the whole 4-step policy period
+    assert rows == [[1, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 0]]
+
+
+def test_curriculum_raises_the_push_speed_with_the_level() -> None:
+    from types import SimpleNamespace
+
+    env, _ = _curriculum_env([False] * 4, [0.8] * 4, step=480)
+    push = SimpleNamespace(params={"velocity_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5)}})
+    env.event_manager = SimpleNamespace(
+        active_terms={"interval": ["push_robot"]}, get_term_cfg=lambda name: push
+    )
+    level = mdp.upper_body_level(
+        env, slice(None), **CURRICULUM, push_event="push_robot", push_speeds=(0.5, 1.5)
+    ).item()
+    assert level == pytest.approx(0.55)
+    assert push.params["velocity_range"]["x"] == pytest.approx((-1.05, 1.05))

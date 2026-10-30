@@ -39,3 +39,14 @@ gym.register(
         "default_agent": "rsl_rl",
     },
 )
+
+gym.register(
+    id="PiWbc-G1-Robust",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.g1_robust:G1RobustEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{__name__}.g1_robust:G1RobustPPORunnerCfg",
+        "default_agent": "rsl_rl",
+    },
+)

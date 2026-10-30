@@ -193,6 +193,8 @@ def main(argv: list[str] | None = None) -> None:
 
     env_cfg, _ = resolve_task_config(args.task, "rsl_rl_cfg_entry_point", overrides=overrides)
     env_cfg.scene.num_envs = 1
+    if hasattr(env_cfg, "make_nominal"):  # nominal gains and masses, no noise or delay
+        env_cfg.make_nominal()
     if args.save_mjcf is not None:
         args.save_mjcf.parent.mkdir(parents=True, exist_ok=True)
         env_cfg.sim.physics.solver_cfg.save_to_mjcf = str(args.save_mjcf.resolve())
