@@ -26,10 +26,14 @@ def record_gif(
     fps: int = 20,
     size: tuple[int, int] = (400, 264),
     colors: int = 64,
+    push_speed: float = 0.0,
+    push_times: Sequence[float] = (),
 ) -> Path:
     """Run one episode from the default pose and save every frame at `fps` as a GIF.
 
-    `scenario` is a bench scenario or a plain (vx, vy, yaw rate) command.
+    `scenario` is a bench scenario or a plain (vx, vy, yaw rate) command. With `push_speed`,
+    the pelvis is kicked at `push_times` (s) as in the bench's push conditions: that much
+    horizontal speed added, in a direction drawn from the seed.
     """
     from PIL import Image
 
@@ -46,10 +50,16 @@ def record_gif(
     camera.distance, camera.elevation, camera.azimuth = 2.8, -12.0, 140.0
 
     policy_dt = sim.io.physics_dt * sim.io.decimation
+    push_rng = np.random.default_rng([seed, 3])
+    push_steps = {round(t / policy_dt) for t in push_times} if push_speed else set()
     frames = []
     next_frame_t = 0.0  # capture on exact 1/fps marks so playback runs at real time
     for k in range(round(duration_s / policy_dt)):
         driver.before_step()
+        if k in push_steps:
+            angle = push_rng.uniform(0.0, 2.0 * np.pi)
+            v = sim.root_qvel_adr
+            sim.data.qvel[v : v + 2] += push_speed * np.array([np.cos(angle), np.sin(angle)])
         sim.step(policy(sim.observation(scenario.velocity)))
         if (k + 1) * policy_dt >= next_frame_t - 1e-9:
             renderer.update_scene(sim.data, camera=camera)

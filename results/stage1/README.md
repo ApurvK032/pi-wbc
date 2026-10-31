@@ -462,6 +462,13 @@ each (the first sweep, on development seeds 0-19 with 20 starts each, for compar
 | 2.5 m/s | 462/2000 | 21.3%-25.0% | 94.8% | 38/200, 95.9% |
 | 3.0 m/s | 1492/2000 | 72.6%-76.5% | 74.6% | 141/200, 78.2% |
 
+<p align="center">
+  <img src="student_s1_kicks_walk_1.0.gif" alt="Student kicked at 2 m/s while walking" width="390">
+  <img src="student_s1_kicks_arms_stand.gif" alt="Student kicked at 2 m/s while moving its arms" width="390"><br>
+  <em>2 m/s kicks at 3, 7 and 11 s in plain MuJoCo (Menagerie's G1, seed 1 student, GIF seed 0,
+  the first rendered): walking at 1 m/s, and standing with the arms moving.</em>
+</p>
+
 The largest kick it survives 95% of the time is just under 2.5 m/s (94.8% at 2.5, 99.1% at
 2.0); whole episodes of five kicks come through at 2.0 m/s 96% of the time and at 1.5 m/s 99%.
 Training pushed it to 1.35 m/s at most (the curriculum reached 85% of the 1.5 m/s top). At
