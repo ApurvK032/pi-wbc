@@ -377,7 +377,10 @@ Teacher 3000 iterations, then student 1000 iterations starting at the teacher's 
 (0.85), with v7's turning settings; workstation, commit `e9b92f0`, 2026-10-30
 (`scripts/teacher_student_local.sh 3000 1000 results/stage1/student_dev ts-full 1`). The first
 attempt carried v8's turning settings and was stopped after a minute when v8's full-length run
-showed that setting stops walking.
+showed that setting stops walking. This student was distilled with the curriculum still
+running (the first protocol, D-019): its level dipped from 0.85 to 0.45 while it was learning
+and ended at 0.95, so it trained every command. A student held at the teacher's level is being
+trained for comparison (step 6, "full").
 
 **The student in MuJoCo** (both models, 11 commands × 10 starts; Menagerie model for the
 tracking numbers):
@@ -497,46 +500,41 @@ evaluation protocol (the same commands and seeds in Isaac Lab) is still to do.
 
 ## Step 6: ablation (in progress)
 
-`scripts/ablation_queue.sh 1` on the workstation, from commit `2f36a7c`: for each configuration
-a teacher (3000 iterations) and a student (1000), exactly as the full student, with one
-randomization group switched off (`g1_robust.ABLATION_OVERRIDES`), or all six. Then the MuJoCo
-bench on development seeds 0-9: both models, 11 commands, 220 episodes per condition, the same
-starts and kicks for every configuration. Training seed 1 only so far; the design asks for 3
-per configuration, so only large differences count here (D-011). The test seeds follow for
-every configuration (`scripts/test_seeds.sh`).
+`scripts/ablation_queue.sh 1` on the workstation: for each configuration a teacher (3000
+iterations) and a student (1000), as the full student, with one randomization group switched
+off (`g1_robust.ABLATION_OVERRIDES`), all six, or none ("full", which reuses the full-length
+run's teacher). Then the MuJoCo bench on development seeds 0-9 (both models, 11 commands, 220
+episodes per condition, the same starts and kicks for every configuration) and on the test
+seeds 1000-1199 (4400 episodes per condition). Training seed 1 only so far; the design asks
+for 3 per configuration, so only large differences count here (D-011).
 
-Falls out of 220, and tracking on the nominal robot (Menagerie model):
+**Protocol change (D-019).** The first two runs (all groups off, then pushes off) distilled
+their students with the curriculum still running. A student starts as an untrained network
+and falls in nearly every episode, so the curriculum lowered the command ranges; the student
+trained without pushes learned too slowly to bring them back, ended at level 0 and never
+learned a crouch or a moving arm. It fell in every crouch, low-walk and arm-motion episode in
+Isaac Lab and in both MuJoCo models, while its teacher did them all
+([`ablation/isaac/`](ablation/isaac/)). Students now train at their teacher's last level,
+held fixed. Every configuration, the full one included, is redone this way from its teacher
+(teachers unchanged); the first protocol's results are kept in
+[`ablation/first_protocol/`](ablation/first_protocol/) and
+[`ablation_test/first_protocol/`](ablation_test/first_protocol/).
 
-| Trained without | Nominal | Friction 0.4 | 1 kg per hand | 20 ms delay | Noise | 1 m/s kicks | 2 m/s kicks | Speed error, 1 m/s | Turn in place | Crouch 0.60 m |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| nothing (the full student) | 0 | 0 | 0 | 0 | 0 | 2 | 1 | 0.20 m/s | 0.19 rad/s | 3.6 cm |
-| all six groups | 0 | 0 | 1 | 0 | 33 | 81 | 196 | 0.11 m/s | 0.12 rad/s | 0.2 cm |
-
-- **Without randomization the student falls to noise and kicks:** 33 of 220 under sensor
-  noise (17 of them leaning the torso forward) and 81 under 1 m/s kicks, against 0 and 2.
-- **Randomization costs precision on the nominal robot:** without it the student walks at
-  1 m/s with half the speed error, turns better and crouches to within 0.2 cm, against
-  3.6 cm. The single-group runs should show which group costs the crouch accuracy.
-- **Friction 0.4, 1 kg per hand and 20 ms delay hardly separate the two:** this robot handles
-  them even untrained, so as tests they are mild (see the test seeds below).
-- Its curriculum reached full ranges (level 1) at about iteration 1200, the full student's
-  0.85 by 3000. The run took 1 h 32 min (teacher 61 min, student 18, MuJoCo 13).
-
-Raw data: [`ablation/`](ablation/) (`abl-<configuration>-s1-<condition>.json`); the full
-student's 2 m/s row is `student_dev/ts-full-s1-push_2.0.json`.
-
-**On the test seeds** (1000-1199: 200 starts per command, 4400 episodes per condition; same
-commit for the bench code), falls with 95% intervals:
+**First-protocol result, all six groups off** (its student recovered full ranges by
+iteration 300, so it learned every command). Falls out of 4400 on the test seeds, with 95%
+intervals, against the full student (also first protocol):
 
 | Trained without | Nominal | Friction 0.4 | 1 kg per hand | 20 ms delay | Noise | 1 m/s kicks | 2 m/s kicks |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | nothing (the full student) | 0 (0.0%-0.1%) | 0 (0.0%-0.1%) | 6 (0.1%-0.3%) | 4 (0.0%-0.2%) | 3 (0.0%-0.2%) | 23 (0.3%-0.8%) | 113 (2.1%-3.1%) |
 | all six groups | 4 (0.0%-0.2%) | 4 (0.0%-0.2%) | 13 (0.2%-0.5%) | 15 (0.2%-0.6%) | 789 (16.8%-19.1%) | 1650 (36.1%-38.9%) | 4100 (92.4%-93.9%) |
 
-Sensor noise and kicks are where randomization matters: falls drop from 18% to 0.07% under
-noise and from 37.5% to 0.5% under 1 m/s kicks. Under payload and delay the student trained
-without randomization falls 2 to 4 times as often, but still in under 0.5% of episodes. One
-training seed per configuration, so these are not yet separated from training-run variation.
-
-Raw data: [`ablation_test/`](ablation_test/) (gzip-compressed JSON), from
-`scripts/test_seeds.sh abl-none-s1 <run>/exported results/stage1/ablation_test`.
+- **Without randomization the student falls to noise and kicks:** 18% of episodes under
+  sensor noise and 37.5% under 1 m/s kicks, against 0.07% and 0.5%. Under payload and delay
+  it falls 2 to 4 times as often, but still in under 0.5% of episodes: as tests these are mild.
+- **Randomization costs precision on the nominal robot** (development seeds, Menagerie model):
+  without it the student walks at 1 m/s with about half the speed error (0.11 against
+  0.20 m/s), turns in place better (0.12 against 0.19 rad/s) and crouches to within 0.2 cm,
+  against 3.6 cm. The single-group runs should show which group costs the crouch accuracy.
+- The run took 1 h 32 min (teacher 61 min, student 18, MuJoCo 13); its teacher reached full
+  ranges at about iteration 1200, the full teacher 0.85 by 3000.
