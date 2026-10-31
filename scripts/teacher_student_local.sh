@@ -11,7 +11,9 @@
 # nominal and the five step 5 conditions), development seeds 0-9. Results:
 # OUT_DIR/<LABEL>-s<seed>-<condition>.json.
 #
-# The student trains at the teacher's last curriculum level, held fixed (D-019). A teacher whose
+# The student's curriculum level rises from 0 to the teacher's last level over its first
+# RAMP_STEPS environment steps (default 7200, 300 iterations), then stays there (D-021); set
+# RAMP_STEPS=0 to hold it at the teacher's level from the start (D-019). A teacher whose
 # last checkpoint is already there is not trained again; set TEACHER_LABEL to use the teacher of
 # another label (pc-<TEACHER_LABEL>-teacher-s<seed>-<TEACHER_ITERS>it).
 # Set OVERRIDES for Isaac Lab (Hydra) overrides to both trainings and the export. Set ABLATION
@@ -33,11 +35,15 @@ LABEL=${4:?}
 shift 4
 MENAGERIE=third_party/mujoco_menagerie/unitree_g1/scene_with_hands.xml
 CONDITIONS=${CONDITIONS:-nominal friction_0.4 payload_1kg delay_20ms noise push_1.0}
-# D-019: the student keeps its starting level (never raised, never lowered)
-FIXED_LEVEL=(
+# the student's level is never raised or lowered by its own falls (D-019); with RAMP_STEPS > 0
+# it follows the warm-up schedule instead of starting at the teacher's level (D-021)
+RAMP_STEPS=${RAMP_STEPS:-7200}
+STUDENT_LEVEL=(
     "env.curriculum.upper_body_level.params.raise_below=-1.0"
     "env.curriculum.upper_body_level.params.lower_above=2.0"
+    "env.curriculum.upper_body_level.params.ramp_steps=${RAMP_STEPS}"
 )
+if [ "${RAMP_STEPS}" -gt 0 ]; then RECIPE=ramp; else RECIPE=fixed; fi
 export PATH=$HOME/.local/bin:$PATH
 run() { nice -n 19 taskset -c 0-15 uv run --frozen "$@"; }
 read -r -a EXTRA <<< "${OVERRIDES:-}"
@@ -79,7 +85,7 @@ for SEED in "$@"; do
     else
         S_TASK=PiWbc-G1-Student
         T_RUN=pc-${TEACHER_LABEL:-${LABEL}}-teacher-s${SEED}-${T_ITERS}it
-        S_RUN=pc-${LABEL}-student-fixed-s${SEED}-${S_ITERS}it
+        S_RUN=pc-${LABEL}-student-${RECIPE}-s${SEED}-${S_ITERS}it
         T_LAST=logs/rsl_rl/pi_wbc_g1_teacher/${T_RUN}/model_$((T_ITERS - 1)).pt
         if [ -f "${T_LAST}" ] && [ -f "logs/train_${T_RUN}.log" ]; then
             echo "[$(date +%H:%M)] seed ${SEED}: teacher already trained, ${T_LAST}"
@@ -94,16 +100,16 @@ for SEED in "$@"; do
         fi
         T_DIR=$(ls -d logs/rsl_rl/*/"${T_RUN}")
         T_CKPT=$(ls "${T_DIR}"/model_*.pt | sort -V | tail -1)
-        # the student trains at the teacher's last level (it would restart at 0 otherwise)
+        # the student works up to the teacher's last level (it would restart at 0 otherwise)
         LEVEL=$(tr '\r' '\n' < "logs/train_${T_RUN}.log" | sed 's/\x1b\[[0-9;]*m//g' \
             | awk '/Curriculum\/upper_body_level/{v=$2} END{print (v == "" ? 0 : v)}')
         echo "[$(date +%H:%M)] seed ${SEED}: student, ${S_ITERS} iterations from ${T_CKPT}," \
-            "curriculum level ${LEVEL}, held (${S_RUN})"
+            "curriculum level ${LEVEL} (${RECIPE}, ramp_steps ${RAMP_STEPS}) (${S_RUN})"
         if ! run isaaclab train --rl_library rsl_rl --task PiWbc-G1-Student --num_envs 4096 \
             --max_iterations "${S_ITERS}" --seed "${SEED}" --run_timestamp "${S_RUN}" \
             --checkpoint "${T_CKPT}" physics=newton_mjwarp "${EXTRA[@]}" \
             "env.commands.body_pose.initial_level=${LEVEL}" \
-            "env.commands.upper_body.initial_level=${LEVEL}" "${FIXED_LEVEL[@]}" \
+            "env.commands.upper_body.initial_level=${LEVEL}" "${STUDENT_LEVEL[@]}" \
             > "logs/train_${S_RUN}.log" 2>&1; then
             echo "[$(date +%H:%M)] seed ${SEED}: student training failed, see logs/train_${S_RUN}.log"
             continue

@@ -14,7 +14,8 @@
 #   overrides       Isaac Lab (Hydra) overrides for both trainings and the export, e.g. an
 #                   ablation's from pi_wbc.tasks.g1_robust.ABLATION_OVERRIDES
 #
-# The student trains at the teacher's last curriculum level, held fixed (D-019). Output:
+# The student's curriculum level rises from 0 to the teacher's last level over its first 7200
+# environment steps (300 iterations), then stays there (D-021). Output:
 # logs/rsl_rl/pi_wbc_g1_teacher/slurm-<jobid>-<tag>/ and logs/rsl_rl/pi_wbc_g1_student/
 # slurm-<jobid>-<tag>/ (checkpoints, params/, the student's exported/), job log
 # logs/slurm/piwbc-ts-<jobid>.out. Runs from a copy of PIWBC_COMMIT made under
@@ -67,6 +68,7 @@ run isaaclab train --rl_library rsl_rl --task PiWbc-G1-Student --num_envs 4096 -
     "env.commands.body_pose.initial_level=${LEVEL}" "env.commands.upper_body.initial_level=${LEVEL}" \
     env.curriculum.upper_body_level.params.raise_below=-1.0 \
     env.curriculum.upper_body_level.params.lower_above=2.0 \
+    env.curriculum.upper_body_level.params.ramp_steps=7200 \
     > "logs/slurm/piwbc-ts-${SLURM_JOB_ID}-student.log" 2>&1
 S_DIR=logs/rsl_rl/pi_wbc_g1_student/${RUN}
 S_CKPT=$(ls "${S_DIR}"/model_*.pt | sort -V | tail -1)

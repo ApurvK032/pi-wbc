@@ -1,7 +1,8 @@
 #!/bin/bash
 # Stage 1 ablation on the cluster: for each configuration in turn, train a teacher with that
-# randomization group switched off, distill a student from it at the teacher's last curriculum
-# level, held fixed (D-019), and export the student; all in one job.
+# randomization group switched off, distill a student from it (its curriculum level rising from
+# 0 to the teacher's last level over the first 300 iterations, then held: D-021; held from the
+# start for "curriculum") and export the student; all in one job.
 #
 # Submit from the repository root; account and partition stay on the command line so they
 # never enter the repository:
@@ -95,13 +96,17 @@ print(" ".join(o for g in groups for o in {**A, **T}[g]))
     T_CKPT=$(ls logs/rsl_rl/pi_wbc_g1_teacher/"${RUN}"/model_*.pt | sort -V | tail -1)
     LEVEL=$(tr '\r' '\n' < "${LOG}-teacher.log" | sed 's/\x1b\[[0-9;]*m//g' \
         | awk '/Curriculum\/upper_body_level/{v=$2} END{print (v == "" ? 0 : v)}')
-    echo "$(date +%H:%M) ${CONFIG}: student from ${T_CKPT}, curriculum level ${LEVEL}, held"
+    RAMP=7200
+    [ "${CONFIG}" = curriculum ] && RAMP=0  # no curriculum: no warm-up either
+    echo "$(date +%H:%M) ${CONFIG}: student from ${T_CKPT}, curriculum level ${LEVEL}," \
+        "ramp_steps ${RAMP}"
     if ! run isaaclab train --rl_library rsl_rl --task PiWbc-G1-Student --num_envs 4096 \
         --seed "${SEED}" --max_iterations 1000 --run_timestamp "${RUN}" --checkpoint "${T_CKPT}" \
         physics=newton_mjwarp "${OVERRIDES[@]}" \
         "env.commands.body_pose.initial_level=${LEVEL}" "env.commands.upper_body.initial_level=${LEVEL}" \
         env.curriculum.upper_body_level.params.raise_below=-1.0 \
         env.curriculum.upper_body_level.params.lower_above=2.0 \
+        "env.curriculum.upper_body_level.params.ramp_steps=${RAMP}" \
         > "${LOG}-student.log" 2>&1; then
         echo "$(date +%H:%M) ${CONFIG}: student failed, see ${LOG}-student.log"
         continue

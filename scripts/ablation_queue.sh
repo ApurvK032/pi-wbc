@@ -7,12 +7,13 @@
 #
 # CONFIG is "full" (every group on), "none" (every group off), a group of
 # g1_robust.ABLATION_OVERRIDES (friction, mass, actuators, latency, sensor_noise, pushes),
-# "curriculum" (no curriculum: full ranges from the start, g1_robust.TRAINING_ABLATIONS) or
-# "teacher" (no teacher: the student trained by PPO alone for 4000 iterations, the budget of
-# teacher and student together). The default is all ten, "full" first. Each runs
-# scripts/teacher_student_local.sh at 3000 + 1000 iterations with that change; "full" reuses the
-# teacher of the full-length run (pc-ts-full-teacher-s<seed>-3000it), and a teacher already
-# trained is reused. Results:
+# "curriculum" (no curriculum: full ranges from the start, g1_robust.TRAINING_ABLATIONS, and no
+# warm-up for the student either, RAMP_STEPS=0) or "teacher" (no teacher: the student trained by
+# PPO alone for 4000 iterations, the budget of teacher and student together). The default is all
+# ten, "full" first. Each runs scripts/teacher_student_local.sh at 3000 + 1000 iterations with
+# that change, the student with the warm-up (D-021); "full" reuses the teacher of the
+# full-length run (pc-ts-full-teacher-s<seed>-3000it), and a teacher already trained is reused.
+# Results:
 # results/stage1/ablation/abl-<config>-s<seed>-<condition>.json (development seeds 0-9) and
 # results/stage1/ablation_test/abl-<config>-s<seed>-<condition>.json.gz (test seeds 1000-1199).
 # A configuration whose development results are all there is skipped, so the queue can simply
@@ -46,6 +47,9 @@ for CONFIG in "${CONFIGS[@]}"; do
     echo "[$(date +%H:%M)] ${CONFIG}: start (${LABEL})"
     if [ "${CONFIG}" = teacher ]; then
         ABLATION=full PPO_STUDENT_ITERS=4000 \
+            scripts/teacher_student_local.sh 3000 1000 "${OUT}" "${LABEL}" "${SEED}"
+    elif [ "${CONFIG}" = curriculum ]; then
+        ABLATION=${CONFIG} TEACHER_LABEL=${TEACHER_LABEL} RAMP_STEPS=0 \
             scripts/teacher_student_local.sh 3000 1000 "${OUT}" "${LABEL}" "${SEED}"
     else
         ABLATION=${CONFIG} TEACHER_LABEL=${TEACHER_LABEL} \
