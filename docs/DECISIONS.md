@@ -338,6 +338,29 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 - **Cost:** a robot keeps its masses and gains for the whole run. Latency and noise are not
   yet in the MuJoCo bench (step 5's test conditions).
 
+## D-019: The student trains at its teacher's curriculum level, held fixed (2026-10-31)
+
+- **What:** distillation (`PiWbc-G1-Student`) starts at the teacher's last curriculum level, as
+  before, and now keeps it: the upper-body curriculum's thresholds are set out of reach
+  (`raise_below=-1`, `lower_above=2`), so the body-pose and arm ranges and the push speed stay
+  at the teacher's. `scripts/teacher_student_local.sh` and `msi/jobs/teacher_student.sbatch`
+  pass both overrides to the student. The local script also reuses a teacher whose last
+  checkpoint is already there.
+- **Why:** a distilled student starts as an untrained network, so in its first iterations
+  nearly every episode ends in a fall, and the curriculum, built for the teacher, lowered the
+  ranges in response. Whether they came back depended on how fast distillation went. The full
+  student (0.85 at the start) and the one trained without randomization (1.0) recovered by
+  iteration 200. The one trained without pushes (1.0) learned more slowly, its level reached 0
+  at iteration 500 and stayed there with 17-24% falls, and it never trained a crouch or a
+  moving arm: in Isaac Lab and in both MuJoCo models it fell in every crouch, low-walk and
+  arm-motion episode, while its teacher did them (`results/stage1/ablation/isaac/`). An
+  ablation needs every configuration's student to learn the same commands, and the usual
+  teacher-student setup trains the student on the teacher's command distribution.
+- **Cost:** students trained before this (the seed 1 full student, the MSI seeds 2 and 3, the
+  first two ablation runs) are redone from their teachers: about 35 min each on the
+  workstation, teachers unchanged. Results from the first protocol are kept in
+  `results/stage1/ablation/first_protocol/`.
+
 ## Open items
 
 - The stage 1 design ([STAGE1_DESIGN.md](STAGE1_DESIGN.md)) was accepted on 2026-10-29
