@@ -586,14 +586,35 @@ and 4400 per kick size. Speed errors are the mean of both models:
 - Falls without kicks are nearly all seed 2's arm commands (arms still or moving, mostly on
   Newton at friction 0.4 and with 1 kg in the hands) under the first protocol and the
   warm-up; the held student of seed 2 has none.
-- The ablation keeps the warm-up, so its configurations stay comparable to each other. A
-  warm-up of the commands only, with the kicks at the teacher's size from the start, is the
-  candidate fix (not run). The finish-line table above stays the first protocol's until this is
-  settled.
+- The ablation keeps the warm-up, so its configurations stay comparable to each other. The
+  finish-line table above stays the first protocol's until the recipe is settled.
+
+**Kicks at full size from the start, seed 1.** To test the likely cause above, seed 1's
+student was distilled again from the same teacher: the command ranges warm up as before, but
+the kicks are at the teacher's size (1.35 m/s) from the first step
+(`upper_body_level(..., ramp_pushes=False)`). Test seeds, as in the table above; falls are out
+of 22000 episodes without kicks and 4400 per kick size, with 95% intervals:
+
+| Student recipe, seed 1 | Speed error, 1 m/s | 0.5 m/s | Turn 0.8 rad/s | Falls without kicks | Falls, 1 m/s kicks | Falls, 2 m/s kicks |
+|---|---:|---:|---:|---:|---:|---:|
+| held level (D-019) | 0.26 | 0.15 | 0.18 | 7 | 16 (0.2%-0.6%) | 94 (1.7%-2.6%) |
+| warm-up (D-021) | 0.17 | 0.10 | 0.20 | 7 | 84 (1.5%-2.4%) | 254 (5.1%-6.5%) |
+| warm-up, full-size kicks | 0.35 | 0.19 | 0.33 | 3 | 42 (0.7%-1.3%) | 147 (2.8%-3.9%) |
+
+- The full-size kicks halve the warm-up's kick falls, but the held level still falls least: the
+  kick ramp explains part of the gap, not all of it. The intervals cover the episodes of one
+  trained student, not the spread between training seeds.
+- It walks worst of the four recipes on seed 1: 0.35 m/s off at 1 m/s, with shorter steps
+  (26 cm against the warm-up's 35), and 0.33 rad/s off turning. Training ended at the same
+  level (0.85) and about the same distillation loss (0.083 against 0.086), so the difference
+  comes from the first 300 iterations. The held recipe's seed 2 was as far off (0.35), so one
+  seed doesn't show that this variant walks worse in general; but nothing here argues for it.
+  It is not adopted and was not run on seeds 2 and 3.
 
 Raw data: [`student_ramp/`](student_ramp/) and [`student_test_ramp/`](student_test_ramp/)
 (warm-up), [`student_fixed/`](student_fixed/) and [`student_test_fixed/`](student_test_fixed/)
-(held level).
+(held level), [`student_ramp_kick/`](student_ramp_kick/) and
+[`student_test_ramp_kick/`](student_test_ramp_kick/) (warm-up with full-size kicks).
 
 ## Step 5: test conditions in the MuJoCo bench (in progress)
 
@@ -640,8 +661,11 @@ and [`ablation_test/fixed_level/`](ablation_test/fixed_level/).
 
 **Warm-up result so far, seed 1, development seeds** (220 episodes per condition, both models;
 errors on the nominal robot, mean of both models). "Nothing" is the step 4 warm-up student of
-seed 1. The run without a teacher (PPO alone) stopped at iteration 3497 of 4000 when the
-simulation returned NaN observations; its last checkpoint is iteration 3400:
+seed 1. The run without a teacher (PPO alone on the student's inputs for 4000 iterations, its
+critic seeing the teacher's privileged inputs) stopped at iteration 3497 when the simulation
+returned NaN observations. It was resumed from its iteration 3400 checkpoint (networks and
+optimizer) at the level it had then, 0.50, since checkpoints don't hold the level, and
+finished at 0.65; that level is its own, not a teacher's:
 
 | Trained without | Teacher's last level | Falls: nominal, friction, payload, delay (of 880) | Noise | 1 m/s kicks | 2 m/s kicks | Speed error, 1 m/s | 0.5 m/s | Sideways | Turn | Crouch 0.60 m, cm |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -654,6 +678,7 @@ simulation returned NaN observations; its last checkpoint is iteration 3400:
 | actuators | 0.80 | 0 | 0 | 2 | 20 | 0.21 | 0.14 | 0.16 | 0.16 | 2.8 |
 | sensor noise | 0.75 | 0 | 0 | 2 | 6 | 0.16 | 0.09 | 0.13 | 0.22 | 1.7 |
 | curriculum (full ranges from the start) | 1.0 | 0 | 0 | 17 | 10 | 0.51 | 0.19 | 0.16 | 0.49 | 0.4 |
+| teacher (PPO alone) | 0.65 | 0 | 0 | 0 | 11 | 0.23 | 0.14 | 0.13 | 0.44 | 1.3 |
 
 - **Pushes are what keep the student up when kicked:** without them it falls in 208 of 220
   episodes with 1 m/s kicks, against 1. Without any randomization it also falls to sensor
@@ -670,7 +695,15 @@ simulation returned NaN observations; its last checkpoint is iteration 3400:
   the start, it crouches to within 0.4 cm. It pays in walking: 0.51 m/s off at 1 m/s, 0.49 rad/s
   off turning, 20 cm steps. So the curriculum buys the walking, and the last part of the range
   that the full teacher never reaches costs the crouch accuracy. Why it matters for a height
-  inside the range is not known.
+  inside the range is not known. The run without a teacher doesn't fit this: at level 0.65 it
+  crouches to within 1.3 cm. It learns the crouch from the reward instead of copying a teacher,
+  so the distilled students may inherit their teachers' crouch error (not checked).
+- **Without a teacher**, PPO climbs the curriculum more slowly: level 0.65 after 4000
+  iterations, where the full teacher reached 0.85 in 3000. It turns worst of all (0.44 rad/s
+  off) and takes 20 cm steps at 1 m/s. Under kicks it is mixed. On the test seeds it falls 9
+  times in 4400 with 1 m/s kicks, the fewest of any seed 1 student (the full student 84). With
+  2 m/s kicks it falls 231 times (the full student 254), having trained with kicks of at most
+  1.15 m/s. Without kicks it falls 8 times in 22000, all with 1 kg in the hands.
 - **Without sensor noise in training** the student does not fall more under noise (0 of 220).
   Noise reaches only the student's inputs, so this configuration's teacher is the full teacher
   trained again; it ended at level 0.75 against 0.85, a measure of how much teachers vary.

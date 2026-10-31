@@ -411,8 +411,19 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   iteration 300 and trains 700 iterations at them instead of 1000. Without kicks the recipes
   fall 60, 14 and 65 times in 66000 episodes, nearly all on seed 2's arm commands under the
   first protocol and the warm-up. The ablation keeps the warm-up, so its configurations stay
-  comparable to each other. The candidate fix, a warm-up of the commands only with the kicks at
-  the teacher's size from the start, has not been run.
+  comparable to each other.
+- **Kicks at full size from the start (tried the same day, seed 1, not adopted):**
+  `upper_body_level(..., ramp_pushes=False)` warms up the command ranges only and sets the kicks
+  to the teacher's size from the first step (off by default). Seed 1's student, distilled again
+  from the same teacher, on the test seeds: falls with 1 m/s kicks 42 (warm-up 84, held 16), with
+  2 m/s kicks 147 (254, 94), without kicks 3 of 22000. So the kick ramp explains part of the
+  warm-up's kick weakness, not all of it. It walked worst of the four recipes on seed 1: 0.35 m/s
+  off at 1 m/s (warm-up 0.17, held 0.26), 0.19 at 0.5 m/s, 0.33 rad/s turning (0.20, 0.18), with
+  the same final level and distillation loss as the warm-up student. One seed can't show that it
+  walks worse in general (the held recipe's seed 2 was as far off), but it gives no reason to
+  redo the students; the warm-up stays. Cost: 21 min of training and 1.5 h of MuJoCo tests on
+  the workstation. Results: `results/stage1/student_ramp_kick/`,
+  `results/stage1/student_test_ramp_kick/`.
 - **Cost:** the ablation students trained with the held level (no pushes and no randomization
   on the workstation; friction, mass, actuators and sensor noise on MSI) are redone from their
   teachers, about 35 min each on the workstation; their held-level results are kept in
