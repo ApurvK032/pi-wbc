@@ -211,3 +211,27 @@ def test_curriculum_ramp_climbs_to_the_starting_level_on_schedule_then_holds() -
     assert terms["arms"].level == pytest.approx(0.25)
     env.common_step_counter = 5000  # all falling, poor rewards: still held at the target
     assert mdp.upper_body_level(env, slice(None), **ramp).item() == pytest.approx(0.5)
+
+
+@pytest.mark.parametrize(("ramp_pushes", "top_speed"), [(True, 0.75), (False, 1.0)])
+def test_curriculum_ramp_ramps_the_pushes_unless_told_not_to(
+    ramp_pushes: bool, top_speed: float
+) -> None:
+    from types import SimpleNamespace
+
+    env, _ = _curriculum_env([False] * 4, [0.8] * 4, step=240)  # halfway up a ramp to 0.5
+    push = SimpleNamespace(params={"velocity_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5)}})
+    env.event_manager = SimpleNamespace(
+        active_terms={"interval": ["push_robot"]}, get_term_cfg=lambda name: push
+    )
+    level = mdp.upper_body_level(
+        env,
+        slice(None),
+        **CURRICULUM,
+        push_event="push_robot",
+        push_speeds=(0.5, 1.5),
+        ramp_steps=480,
+        ramp_pushes=ramp_pushes,
+    ).item()
+    assert level == pytest.approx(0.25)  # the command ranges warm up either way
+    assert push.params["velocity_range"]["x"] == pytest.approx((-top_speed, top_speed))

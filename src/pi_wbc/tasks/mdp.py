@@ -470,6 +470,7 @@ def upper_body_level(
     push_event: str | None = None,
     push_speeds: tuple[float, float] = (0.5, 1.5),
     ramp_steps: int = 0,
+    ramp_pushes: bool = True,
 ) -> torch.Tensor:
     """Curriculum: widen the body-pose and arm-motion ranges while the robot walks well.
 
@@ -486,7 +487,9 @@ def upper_body_level(
 
     With `ramp_steps` > 0 the level follows a fixed schedule instead, for a student distilled
     from a teacher (D-019): from 0 up to the starting level in a straight line over that many
-    policy steps, then held, whatever the falls and rewards.
+    policy steps, then held, whatever the falls and rewards. The pushes follow the ramp too,
+    unless `ramp_pushes` is False: then they stay at the starting level's size from the first
+    step, and only the command ranges warm up.
     """
     terms = [env.command_manager.get_term(n) for n in command_names]
     lead = terms[0]
@@ -503,7 +506,8 @@ def upper_body_level(
         level = lead.ramp_target * min(1.0, env.common_step_counter / ramp_steps)
         for term in terms:
             term.level = level
-        _set_push_speed(env, push_event, push_speeds, level)
+        push_level = level if ramp_pushes else lead.ramp_target
+        _set_push_speed(env, push_event, push_speeds, push_level)
         return torch.tensor(level)
     for name in reward_thresholds:
         sums = env.reward_manager._episode_sums[name][env_ids]  # env_ids may be a slice
