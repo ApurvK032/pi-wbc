@@ -11,6 +11,8 @@
 # nominal and the five step 5 conditions). Results: OUT_DIR/<LABEL>-s<seed>-<condition>.json.
 # Set OVERRIDES for Isaac Lab (Hydra) overrides to both trainings and the export (e.g. an
 # ablation's from g1_robust.ABLATION_OVERRIDES).
+# Set ABLATION to switch randomization groups off by name ("none" for all of them), from
+# that module of the commit being run. Set PIWBC_COMMIT to run a given commit instead of HEAD.
 #
 # Like train_eval_local.sh: every step runs the code of the starting commit from a temporary
 # copy, at the lowest CPU priority on 16 of the 24 CPU threads, and a failed seed is skipped.
@@ -28,11 +30,23 @@ run() { nice -n 19 taskset -c 0-15 uv run --frozen "$@"; }
 read -r -a EXTRA <<< "${OVERRIDES:-}"
 mkdir -p "${OUT}" logs
 
-COMMIT=$(git rev-parse HEAD)
+COMMIT=${PIWBC_COMMIT:-$(git rev-parse HEAD)}
 SNAP=$(mktemp -d)/pi-wbc-${COMMIT:0:7}
 git worktree add --detach --quiet "${SNAP}" "${COMMIT}" || exit 1
 trap 'git worktree remove --force "${SNAP}"' EXIT
 export PYTHONPATH="${SNAP}/src${PYTHONPATH:+:${PYTHONPATH}}"
+if [ -n "${ABLATION:-}" ]; then
+    # shellcheck disable=SC2086  # group names are separate arguments
+    ABL=$(uv run --frozen python -c '
+import sys
+from pi_wbc.tasks.g1_robust import ABLATION_OVERRIDES as A
+groups = list(A) if sys.argv[1:] == ["none"] else sys.argv[1:]
+print(" ".join(o for g in groups for o in A[g]))
+' ${ABLATION}) || exit 1
+    read -r -a ABL_ARGS <<< "${ABL}"
+    EXTRA+=("${ABL_ARGS[@]}")
+    OVERRIDES="${OVERRIDES:-} ${ABL}"
+fi
 echo "[$(date +%H:%M)] commit ${COMMIT:0:7}, run from a copy at ${SNAP}" \
     "(uncommitted changes, not used: $(git status --porcelain -- src | wc -l) in src/)"
 echo "[$(date +%H:%M)] overrides: ${OVERRIDES:-none}; conditions: ${CONDITIONS}"
