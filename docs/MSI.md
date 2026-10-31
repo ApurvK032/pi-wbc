@@ -64,7 +64,10 @@ A40. The L40S trains about twice as fast: the stage 0 task ran at 144,000 simula
 second on one (one run) against 75,000-79,000 on the A40 (12 runs). So a teacher-student job of
 about 2 h on an A40 should take about 1 h, which beats an A40 now unless the L40S queue wait is
 over an hour. Add `--gres=gpu:l40s:1` to `sbatch` (`sinfo -o "%P %G"` lists the GPU types of
-each partition); the command line overrides the script's `#SBATCH` line.
+each partition); the command line overrides the script's `#SBATCH` line. Check first that one
+is free or soon will be: `sinfo -p <partition> -N -O "NodeList:10,Gres:28,GresUsed:44"` shows
+the GPUs in use per node, and `squeue -t R -w <L40S nodes> -o "%.10i %.7N %.12L %b"` the time
+left of the jobs on them. When every L40S is taken for hours, ask for any GPU instead.
 
 Some partitions allow only one running job per user: further jobs wait with reason
 `AssocMaxJobsLimit` and start, one by one, as earlier ones end. `sacctmgr -n show assoc
