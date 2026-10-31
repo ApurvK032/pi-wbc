@@ -421,26 +421,61 @@ running.
   0.60 m, and walking at 0.5 m/s while its arms move to random poses.</em>
 </p>
 
+Raw data: [`student_dev/`](student_dev/) (`ts-full-s1-*`, `isaac/ts-full-*`, `push/`,
+`push_more/`).
+
+### Final test, seed 1: test seeds 1000-1199
+
+The seed 1 student on the frozen test range, 200 starts per command instead of 10 (both models,
+11 commands: 4400 episodes per condition; Menagerie model for the tracking numbers). Evaluated
+2026-10-30 at commit `2f36a7c` (the files record `88dac1c`, the commit when they were written;
+only `docs/MSI.md` changed in between).
+
+| Condition | Falls (95% CI) | Speed error, 1 m/s | Speed error, 0.5 m/s | Turn in place | Crouch 0.60 m: height error | Arm joints, walking |
+|---|---|---:|---:|---:|---:|---:|
+| nominal | 0/4400 (0.0%-0.1%) | 0.20 m/s | 0.14 m/s | 0.19 rad/s | 3.6 cm | 0.039 rad |
+| floor friction 0.4 | 0/4400 (0.0%-0.1%) | 0.20 m/s | 0.14 m/s | 0.15 rad/s | 3.6 cm | 0.038 rad |
+| 1 kg in each hand | 6/4400 (0.1%-0.3%) | 0.18 m/s | 0.13 m/s | 0.19 rad/s | 3.5 cm | 0.059 rad |
+| 20 ms extra delay | 4/4400 (0.0%-0.2%) | 0.19 m/s | 0.12 m/s | 0.20 rad/s | 3.6 cm | 0.041 rad |
+| sensor noise | 3/4400 (0.0%-0.2%) | 0.25 m/s | 0.15 m/s | 0.24 rad/s | 3.7 cm | 0.039 rad |
+| 1 m/s kicks every 4 s | 23/4400 (0.3%-0.8%) | 0.33 m/s | 0.25 m/s | 0.26 rad/s | 3.7 cm | 0.039 rad |
+| 2 m/s kicks every 4 s | 113/4400 (2.1%-3.1%) | 0.55 m/s | 0.46 m/s | 0.46 rad/s | 4.0 cm | 0.039 rad |
+
+Every tracking number matches the development seeds above (to 0.01 m/s, 0.01 rad/s, 0.002 rad
+and 0.1 cm). With 20 times the starts the rare falls show: at most 6 in 4400 (0.14%) under
+low friction, payload, delay or noise, and 23 in 4400 (0.5%) under 1 m/s kicks.
+
 **Push recovery** (the design's "largest push survived 95% of the time"): kicks to the pelvis at
 3, 7, 11, 15 and 19 s, each in a random horizontal direction, while standing, walking at 0.5 and
-1 m/s, turning in place, and standing with the arms moving; both MuJoCo models, 20 starts each:
+1 m/s, turning in place, and standing with the arms moving; both MuJoCo models, 200 test starts
+each (the first sweep, on development seeds 0-19 with 20 starts each, for comparison):
 
-| Kick | Episodes that fell (5 kicks each) | 95% CI | Kicks survived |
-|---|---|---|---|
-| 0.5 m/s | 3/200 | 1%-4% | 99.7% |
-| 1.0 m/s | 3/200 | 1%-4% | 99.7% |
-| 1.5 m/s | 0/200 | 0%-2% | 100% |
-| 2.0 m/s | 1/200 | 0%-3% | 99.9% |
-| 2.5 m/s | 38/200 | 14%-25% | 95.9% |
-| 3.0 m/s | 141/200 | 64%-76% | 78.2% |
+| Kick | Episodes that fell (5 kicks each) | 95% CI | Kicks survived | First sweep: fell, kicks survived |
+|---|---|---|---|---|
+| 0.5 m/s | 9/2000 | 0.2%-0.9% | 99.9% | 3/200, 99.7% |
+| 1.0 m/s | 9/2000 | 0.2%-0.9% | 99.9% | 3/200, 99.7% |
+| 1.5 m/s | 18/2000 | 0.6%-1.4% | 99.8% | 0/200, 100% |
+| 2.0 m/s | 85/2000 | 3.5%-5.2% | 99.1% | 1/200, 99.9% |
+| 2.5 m/s | 462/2000 | 21.3%-25.0% | 94.8% | 38/200, 95.9% |
+| 3.0 m/s | 1492/2000 | 72.6%-76.5% | 74.6% | 141/200, 78.2% |
 
-The largest kick it survives 95% of the time is about 2.5 m/s per kick; whole episodes of five
-kicks come through at 2.0 m/s in 199 of 200. Training pushed it to 1.35 m/s at most (the
-curriculum reached 85% of the 1.5 m/s top). Up to 2.0 m/s the few falls don't grow with the
-kick, so they are not about the pushes; at 2.5 m/s most falls are while standing still (16 of
-40) or with the arms moving (14 of 40), where the robot has to start stepping from rest.
+The largest kick it survives 95% of the time is just under 2.5 m/s (94.8% at 2.5, 99.1% at
+2.0); whole episodes of five kicks come through at 2.0 m/s 96% of the time and at 1.5 m/s 99%.
+Training pushed it to 1.35 m/s at most (the curriculum reached 85% of the 1.5 m/s top). At
+2.5 m/s, 85% of the falls are while standing, with or without the arms moving, where the robot
+has to start stepping from rest.
 
-Raw data: [`student_dev/`](student_dev/) (`ts-full-s1-*`, `isaac/ts-full-*`, `push/`).
+**The first sweep was lucky at 2.0 m/s.** Its 1 fall in 200 (and a page that said "199 of 200")
+was not reproduced: the 120 episodes of seeds 0-19 standing, walking at 1 m/s and standing with
+arms moving had 1 fall; the test seeds' blocks of 20 had 5 to 13 each, and the rest of the
+development range (seeds 20-99, `student_dev/push_more/`) 39 in 480 (8%). Rerunning seeds 0-19
+gives the same episodes exactly, and the bench draws each seed's start and kicks through NumPy's
+seed sequence, which treats seed numbers alike, so it was the draw. 20 starts per command
+are too few for falls of a few percent.
+
+Raw data: [`student_test/`](student_test/) (`ts-full-s1-*`, `push/`), gzip-compressed JSON
+(`pi_wbc.provenance.load_json` or `zcat` reads them); rerun with
+`scripts/test_seeds.sh ts-full-s1 <run>/exported results/stage1/student_test`.
 
 ## Step 5: test conditions in the MuJoCo bench (in progress)
 
@@ -453,9 +488,39 @@ section 9 that the bench can apply:
 | `payload_1kg` | 1 kg added to each hand (Menagerie's model: to the wrist link that holds the palm) |
 | `delay_20ms` | the previous PD targets are kept for 4 physics steps (a whole policy period) |
 | `noise` | the training's observation noise, from the export |
-| `push_0.5` to `push_2.0` | horizontal kicks to the pelvis at 3, 7, 11, 15 and 19 s, random directions |
+| `push_0.5` to `push_3.0` | horizontal kicks to the pelvis at 3, 7, 11, 15 and 19 s, random directions |
 
 On the step 2 v7 policy (3 starts each, Menagerie model) every condition runs; 1 m/s kicks
 knock it down in 2 of 3 standing episodes, as expected of a policy trained with ±0.5 m/s
 pushes. The step 3-4 policies train with pushes growing to 1.5 m/s. The Isaac Lab side of the
 evaluation protocol (the same commands and seeds in Isaac Lab) is still to do.
+
+## Step 6: ablation (in progress)
+
+`scripts/ablation_queue.sh 1` on the workstation, from commit `2f36a7c`: for each configuration
+a teacher (3000 iterations) and a student (1000), exactly as the full student, with one
+randomization group switched off (`g1_robust.ABLATION_OVERRIDES`), or all six. Then the MuJoCo
+bench on development seeds 0-9: both models, 11 commands, 220 episodes per condition, the same
+starts and kicks for every configuration. Training seed 1 only so far; the design asks for 3
+per configuration, so only large differences count here (D-011). The test seeds follow for
+every configuration (`scripts/test_seeds.sh`).
+
+Falls out of 220, and tracking on the nominal robot (Menagerie model):
+
+| Trained without | Nominal | Friction 0.4 | 1 kg per hand | 20 ms delay | Noise | 1 m/s kicks | 2 m/s kicks | Speed error, 1 m/s | Turn in place | Crouch 0.60 m |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| nothing (the full student) | 0 | 0 | 0 | 0 | 0 | 2 | 1 | 0.20 m/s | 0.19 rad/s | 3.6 cm |
+| all six groups | 0 | 0 | 1 | 0 | 33 | 81 | 196 | 0.11 m/s | 0.12 rad/s | 0.2 cm |
+
+- **Without randomization the student falls to noise and kicks:** 33 of 220 under sensor
+  noise (17 of them leaning the torso forward) and 81 under 1 m/s kicks, against 0 and 2.
+- **Randomization costs precision on the nominal robot:** without it the student walks at
+  1 m/s with half the speed error, turns better and crouches to within 0.2 cm, against
+  3.6 cm. The single-group runs should show which group costs the crouch accuracy.
+- **Friction 0.4, 1 kg per hand and 20 ms delay don't separate the two:** this robot handles
+  them even untrained, so as tests they are too mild to show what their randomization buys.
+- Its curriculum reached full ranges (level 1) at about iteration 1200, the full student's
+  0.85 by 3000. The run took 1 h 32 min (teacher 61 min, student 18, MuJoCo 13).
+
+Raw data: [`ablation/`](ablation/) (`abl-<configuration>-s1-<condition>.json`); the full
+student's 2 m/s row is `student_dev/ts-full-s1-push_2.0.json`.

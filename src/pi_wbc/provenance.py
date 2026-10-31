@@ -6,6 +6,7 @@ traced back to the code and machine that produced it.
 
 from __future__ import annotations
 
+import gzip
 import json
 import platform
 import subprocess
@@ -131,11 +132,28 @@ def collect(repo: Path | None = None, packages: Iterable[str] = DEFAULT_PACKAGES
 
 
 def save_json(path: str | Path, data: dict[str, Any], repo: Path | None = None) -> Path:
-    """Write `data` plus a provenance record to a JSON file and return its path."""
+    """Write `data` plus a provenance record to a JSON file and return its path.
+
+    A path ending in `.gz` is written gzip-compressed (for large result files, such as those
+    with thousands of episodes), without a timestamp, so equal data gives equal bytes.
+    """
     if "provenance" in data:
         raise ValueError("data already has a 'provenance' key")
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {**data, "provenance": collect(repo)}
-    path.write_text(json.dumps(payload, indent=2) + "\n")
+    text = json.dumps(payload, indent=2) + "\n"
+    if path.suffix == ".gz":
+        path.write_bytes(gzip.compress(text.encode(), compresslevel=9, mtime=0))
+    else:
+        path.write_text(text)
     return path
+
+
+def load_json(path: str | Path) -> Any:
+    """Read a JSON file written by `save_json`, gzip-compressed (`.gz`) or not."""
+    path = Path(path)
+    raw = path.read_bytes()
+    if path.suffix == ".gz":
+        raw = gzip.decompress(raw)
+    return json.loads(raw)
