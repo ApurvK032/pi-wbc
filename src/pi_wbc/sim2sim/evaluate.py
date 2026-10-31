@@ -340,6 +340,8 @@ def main(argv: list[str] | None = None) -> None:
         default=[],
         help="also record a GIF, e.g. menagerie:walk_0.5=results/stage0/walk.gif (needs MUJOCO_GL)",
     )
+    parser.add_argument("--gif-duration-s", type=float, default=6.0, help="length of each GIF")
+    parser.add_argument("--gif-fps", type=int, default=20, help="frame rate of each GIF")
     args = parser.parse_args(argv)
 
     io = PolicyIO.load(args.policy_io)
@@ -373,7 +375,16 @@ def main(argv: list[str] | None = None) -> None:
             if gif_model == name:
                 from pi_wbc.sim2sim.render import record_gif
 
-                record_gif(sim, policy, ALL_SCENARIOS[scenario], gif_path)
+                record_gif(
+                    sim,
+                    policy,
+                    ALL_SCENARIOS[scenario],
+                    gif_path,
+                    duration_s=args.gif_duration_s,
+                    fps=args.gif_fps,
+                    push_speed=condition.push_speed,
+                    push_times=condition.push_times,
+                )
                 print(f"[sim2sim] wrote {gif_path}", flush=True)
         start = time.monotonic()
         for scenario in scenarios:
