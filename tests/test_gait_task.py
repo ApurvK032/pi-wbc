@@ -200,3 +200,14 @@ def test_ppo_student_trains_the_student_inputs_with_a_privileged_critic(monkeypa
     )
     assert agent_cfg.obs_groups == {"actor": ["policy"], "critic": ["teacher"]}
     assert agent_cfg.actor.hidden_dims == [512, 256, 128]  # the distilled student's network
+
+
+def test_curriculum_ramp_climbs_to_the_starting_level_on_schedule_then_holds() -> None:
+    ramp = {**CURRICULUM, "ramp_steps": 480}
+    env, terms = _curriculum_env([True] * 4, [0.0] * 4, step=0)  # starts at level 0.5
+    assert mdp.upper_body_level(env, slice(None), **ramp).item() == pytest.approx(0.0)
+    env.common_step_counter = 240
+    assert mdp.upper_body_level(env, slice(None), **ramp).item() == pytest.approx(0.25)
+    assert terms["arms"].level == pytest.approx(0.25)
+    env.common_step_counter = 5000  # all falling, poor rewards: still held at the target
+    assert mdp.upper_body_level(env, slice(None), **ramp).item() == pytest.approx(0.5)
