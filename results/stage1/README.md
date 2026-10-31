@@ -517,10 +517,26 @@ Falls out of 220, and tracking on the nominal robot (Menagerie model):
 - **Randomization costs precision on the nominal robot:** without it the student walks at
   1 m/s with half the speed error, turns better and crouches to within 0.2 cm, against
   3.6 cm. The single-group runs should show which group costs the crouch accuracy.
-- **Friction 0.4, 1 kg per hand and 20 ms delay don't separate the two:** this robot handles
-  them even untrained, so as tests they are too mild to show what their randomization buys.
+- **Friction 0.4, 1 kg per hand and 20 ms delay hardly separate the two:** this robot handles
+  them even untrained, so as tests they are mild (see the test seeds below).
 - Its curriculum reached full ranges (level 1) at about iteration 1200, the full student's
   0.85 by 3000. The run took 1 h 32 min (teacher 61 min, student 18, MuJoCo 13).
 
 Raw data: [`ablation/`](ablation/) (`abl-<configuration>-s1-<condition>.json`); the full
 student's 2 m/s row is `student_dev/ts-full-s1-push_2.0.json`.
+
+**On the test seeds** (1000-1199: 200 starts per command, 4400 episodes per condition; same
+commit for the bench code), falls with 95% intervals:
+
+| Trained without | Nominal | Friction 0.4 | 1 kg per hand | 20 ms delay | Noise | 1 m/s kicks | 2 m/s kicks |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| nothing (the full student) | 0 (0.0%-0.1%) | 0 (0.0%-0.1%) | 6 (0.1%-0.3%) | 4 (0.0%-0.2%) | 3 (0.0%-0.2%) | 23 (0.3%-0.8%) | 113 (2.1%-3.1%) |
+| all six groups | 4 (0.0%-0.2%) | 4 (0.0%-0.2%) | 13 (0.2%-0.5%) | 15 (0.2%-0.6%) | 789 (16.8%-19.1%) | 1650 (36.1%-38.9%) | 4100 (92.4%-93.9%) |
+
+Sensor noise and kicks are where randomization matters: falls drop from 18% to 0.07% under
+noise and from 37.5% to 0.5% under 1 m/s kicks. Under payload and delay the student trained
+without randomization falls 2 to 4 times as often, but still in under 0.5% of episodes. One
+training seed per configuration, so these are not yet separated from training-run variation.
+
+Raw data: [`ablation_test/`](ablation_test/) (gzip-compressed JSON), from
+`scripts/test_seeds.sh abl-none-s1 <run>/exported results/stage1/ablation_test`.
