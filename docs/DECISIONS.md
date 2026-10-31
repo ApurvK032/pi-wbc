@@ -378,6 +378,35 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 - **Cost:** a distillation iteration is cheaper than a PPO one, so the PPO student uses
   somewhat more compute than teacher plus student; reported with the results.
 
+## D-021: The student warms up to its teacher's level over 300 iterations (2026-10-31)
+
+- **What:** distillation starts at curriculum level 0 and raises it on a fixed schedule to the
+  teacher's last level over the first 7200 environment steps (300 of the 1000 iterations),
+  then holds it there (`mdp.upper_body_level(..., ramp_steps=7200)`; the push speed follows the
+  level). The thresholds stay out of reach as in D-019, so the student's own falls never move
+  the level. `scripts/teacher_student_local.sh` (`RAMP_STEPS`, default 7200; 0 gives D-019's
+  held level), `msi/jobs/teacher_student.sbatch` and `msi/jobs/ablation.sbatch` pass it. The
+  no-curriculum ablation keeps `ramp_steps=0`, since a warm-up is itself a curriculum.
+- **Why:** with the level held from the start (D-019), the students of the same teachers walked
+  worse than under the first protocol and varied more by seed. Speed error at 1 m/s on the
+  development seeds (mean of both MuJoCo models; training seeds 1, 2, 3): first protocol 0.24,
+  0.21, 0.18; held 0.27, 0.35, 0.15; warm-up 0.17, 0.23, 0.21. Turning: 0.20, 0.23, 0.18;
+  0.18, 0.32, 0.17; 0.20, 0.23, 0.22. The warm-up matches the first protocol on average (0.21
+  at 1 m/s; 0.12 against 0.14 at 0.5 m/s; 0.15 sideways for both) without its flaw: the level
+  no longer depends on how fast the student learns, which is what left the no-pushes student
+  at level 0. Falls are rare under all three (without kicks: first protocol 1, held 0,
+  warm-up 3 of 3300 episodes; 2 m/s kicks: 33, 30 and 35 of 660). Three seeds don't separate
+  the recipes statistically (held minus warm-up, per seed: +0.10, +0.12, -0.06 at 1 m/s); the
+  choice rests on the warm-up matching the first protocol, having no seed as bad as the held
+  recipe's seed 2, and being the same for every configuration. None of the three meets the
+  1 m/s target (0.15 or less), so the recipe does not fix the speed miss.
+- **Cost:** the ablation students trained with the held level (no pushes and no randomization
+  on the workstation; friction, mass, actuators and sensor noise on MSI) are redone from their
+  teachers, about 35 min each on the workstation; their held-level results are kept in
+  `results/stage1/ablation/fixed_level/`. The three-seed test on seeds 1000-1199 is run again
+  for the warm-up students. Results: `results/stage1/student_ramp/` (development seeds),
+  `results/stage1/student_fixed/` (held level).
+
 ## Open items
 
 - The stage 1 design ([STAGE1_DESIGN.md](STAGE1_DESIGN.md)) was accepted on 2026-10-29

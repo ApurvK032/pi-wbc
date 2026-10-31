@@ -542,6 +542,36 @@ the curriculum level: 1.30-1.35 m/s for the teachers, 1.40-1.45 m/s for the stud
 Raw data: [`student_test/`](student_test/) (`ts-full-s{1,2,3}-*`, `push/ts-full-s{1,2,3}-*`)
 and [`student_dev/`](student_dev/) (`ts-full-s{2,3}-*`, development seeds 0-9).
 
+### Student recipe: held level or warm-up (D-021)
+
+Holding each student at its teacher's level from the first step (D-019) fixed the ablation's
+problem but cost walking. A warm-up walks as well as the first protocol did, from the same
+teachers: the level rises from 0 to the teacher's over the first 300 of the 1000 iterations,
+then stays there, and it is the same for every configuration. Development seeds 0-9, nominal
+robot, mean of the Menagerie and Newton models; each cell is training seeds 1 / 2 / 3 (mean):
+
+| Student recipe | Speed error, 1 m/s | 0.5 m/s | Sideways 0.3 m/s | Turn 0.8 rad/s | Crouch error, cm | Falls without kicks | Falls, 2 m/s kicks |
+|---|---|---|---|---|---|---|---|
+| first protocol (level free) | 0.24 / 0.21 / 0.18 (0.21) | 0.14 / 0.15 / 0.13 (0.14) | 0.11 / 0.18 / 0.17 (0.15) | 0.20 / 0.23 / 0.18 (0.20) | 3.7 / 2.6 / 3.3 (3.2) | 0 / 1 / 0 (1/3300) | 1 / 12 / 20 (33/660) |
+| held level (D-019) | 0.27 / 0.35 / 0.15 (0.26) | 0.15 / 0.20 / 0.11 (0.16) | 0.18 / 0.17 / 0.10 (0.15) | 0.18 / 0.32 / 0.17 (0.22) | 4.1 / 2.4 / 3.5 (3.3) | 0 / 0 / 0 (0/3300) | 4 / 11 / 15 (30/660) |
+| warm-up (D-021) | 0.17 / 0.23 / 0.21 (0.21) | 0.10 / 0.16 / 0.09 (0.12) | 0.12 / 0.19 / 0.15 (0.15) | 0.20 / 0.23 / 0.22 (0.22) | 3.8 / 2.7 / 3.8 (3.4) | 0 / 2 / 1 (3/3300) | 14 / 11 / 10 (35/660) |
+
+- The held level gives the worst seed: seed 2 is 0.35 m/s off at 1 m/s and 0.32 rad/s off
+  turning. Its seed 3 is the best of all at 1 m/s (0.15), with long, slow strides (46 cm).
+  The warm-up stays within 0.17-0.23.
+- Three seeds don't rank the recipes (D-011): held minus warm-up is +0.10, +0.12 and
+  -0.06 m/s at 1 m/s. The warm-up was chosen because it matches the first protocol and its
+  level cannot depend on how fast a student learns.
+- No recipe reaches the 1 m/s target, so the recipe is not what causes the speed miss.
+- The warm-up's 3 falls without kicks are all arm-motion commands: arms moving while walking
+  (seed 2, Menagerie, nominal) and while standing (seeds 2 and 3, Newton, friction 0.4, after
+  15 s). The test seeds will show whether that is more than chance.
+
+The test-seed run (1000-1199) of the three warm-up students is next; the finish-line table above
+is the first protocol's until then. Raw data: [`student_ramp/`](student_ramp/) (warm-up),
+[`student_fixed/`](student_fixed/) (held level) and [`student_test_fixed/`](student_test_fixed/)
+(held level, test seeds).
+
 ## Step 5: test conditions in the MuJoCo bench (in progress)
 
 `pi-wbc-sim2sim --condition` (`src/pi_wbc/sim2sim/commands.py`), the conditions of design
@@ -576,11 +606,14 @@ and falls in nearly every episode, so the curriculum lowered the command ranges;
 trained without pushes learned too slowly to bring them back, ended at level 0 and never
 learned a crouch or a moving arm. It fell in every crouch, low-walk and arm-motion episode in
 Isaac Lab and in both MuJoCo models, while its teacher did them all
-([`ablation/isaac/`](ablation/isaac/)). Students now train at their teacher's last level,
-held fixed. Every configuration, the full one included, is redone this way from its teacher
-(teachers unchanged); the first protocol's results are kept in
+([`ablation/isaac/`](ablation/isaac/)). Students then trained at their teacher's last level,
+held fixed; held from the first step, they walked worse (step 4, D-021), so they now warm up
+to it over their first 300 iterations. Every configuration, the full one included, is redone
+this way from its teacher (teachers unchanged); the first protocol's results are kept in
 [`ablation/first_protocol/`](ablation/first_protocol/) and
-[`ablation_test/first_protocol/`](ablation_test/first_protocol/).
+[`ablation_test/first_protocol/`](ablation_test/first_protocol/), the held level's (no pushes,
+and no randomization on development seeds only) in [`ablation/fixed_level/`](ablation/fixed_level/)
+and [`ablation_test/fixed_level/`](ablation_test/fixed_level/).
 
 **First-protocol result, all six groups off** (its student recovered full ranges by
 iteration 300, so it learned every command). Falls out of 4400 on the test seeds, with 95%
