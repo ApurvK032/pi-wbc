@@ -469,6 +469,7 @@ def upper_body_level(
     min_episodes: int = 100,
     push_event: str | None = None,
     push_speeds: tuple[float, float] = (0.5, 1.5),
+    ramp_steps: int = 0,
 ) -> torch.Tensor:
     """Curriculum: widen the body-pose and arm-motion ranges while the robot walks well.
 
@@ -482,6 +483,10 @@ def upper_body_level(
     keeps the ranges from widening while turning is being unlearned. With `push_event`, the
     pushes' top speed also follows the level, from `push_speeds[0]` at 0 to `push_speeds[1]`
     at 1 (m/s, both horizontal directions). Returns the level, which Isaac Lab logs.
+
+    With `ramp_steps` > 0 the level follows a fixed schedule instead, for a student distilled
+    from a teacher (D-019): from 0 up to the starting level in a straight line over that many
+    policy steps, then held, whatever the falls and rewards.
     """
     terms = [env.command_manager.get_term(n) for n in command_names]
     lead = terms[0]
@@ -492,6 +497,14 @@ def upper_body_level(
         # a run may start above level 0 (a student distilled at its teacher's level): the
         # pushes follow the starting level from the first step
         _set_push_speed(env, push_event, push_speeds, lead.level)
+    if ramp_steps > 0:
+        if not hasattr(lead, "ramp_target"):
+            lead.ramp_target = lead.level
+        level = lead.ramp_target * min(1.0, env.common_step_counter / ramp_steps)
+        for term in terms:
+            term.level = level
+        _set_push_speed(env, push_event, push_speeds, level)
+        return torch.tensor(level)
     for name in reward_thresholds:
         sums = env.reward_manager._episode_sums[name][env_ids]  # env_ids may be a slice
         lead.tally_rewards[name] += sums.sum() / env.max_episode_length_s
