@@ -150,3 +150,53 @@ def test_curriculum_raises_the_push_speed_with_the_level() -> None:
     ).item()
     assert level == pytest.approx(0.55)
     assert push.params["velocity_range"]["x"] == pytest.approx((-1.05, 1.05))
+
+
+def test_curriculum_holds_its_level_with_out_of_reach_thresholds() -> None:
+    # D-019: a student keeps its teacher's level, all falling or none falling
+    held = {**CURRICULUM, "raise_below": -1.0, "lower_above": 2.0}
+    for falls in ([True] * 4, [False] * 4):
+        env, _ = _curriculum_env(falls, [0.8] * 4, step=480)
+        assert mdp.upper_body_level(env, slice(None), **held).item() == pytest.approx(0.5)
+
+
+@pytest.mark.parametrize("config", ["none", "full", "curriculum", "friction", "pushes"])
+def test_ablation_overrides_resolve_on_the_student_task(config: str, monkeypatch) -> None:
+    import sys
+
+    from isaaclab_tasks.utils import resolve_task_config
+
+    monkeypatch.setattr(sys, "argv", ["test"])  # Isaac Lab reads these when overrides are empty
+
+    import pi_wbc.tasks  # noqa: F401
+    from pi_wbc.tasks.g1_robust import ABLATION_OVERRIDES, TRAINING_ABLATIONS
+
+    assert not set(ABLATION_OVERRIDES) & set(TRAINING_ABLATIONS)
+    groups = {"none": list(ABLATION_OVERRIDES), "full": []}.get(config, [config])
+    table = {**ABLATION_OVERRIDES, **TRAINING_ABLATIONS}
+    overrides = [o for g in groups for o in table[g]]
+    env_cfg, _ = resolve_task_config(
+        "PiWbc-G1-Student", "rsl_rl_cfg_entry_point", overrides=overrides
+    )
+    if config in ("none", "pushes"):
+        assert env_cfg.events.push_robot is None
+    if config == "curriculum":
+        assert env_cfg.commands.body_pose.initial_level == 1.0
+        assert env_cfg.curriculum.upper_body_level.params["lower_above"] == 2.0
+    if config == "full":
+        assert env_cfg.events.push_robot is not None
+
+
+def test_ppo_student_trains_the_student_inputs_with_a_privileged_critic(monkeypatch) -> None:
+    import sys
+
+    from isaaclab_tasks.utils import resolve_task_config
+
+    import pi_wbc.tasks  # noqa: F401
+
+    monkeypatch.setattr(sys, "argv", ["test"])
+    _, agent_cfg = resolve_task_config(
+        "PiWbc-G1-Student-PPO", "rsl_rl_cfg_entry_point", overrides=[]
+    )
+    assert agent_cfg.obs_groups == {"actor": ["policy"], "critic": ["teacher"]}
+    assert agent_cfg.actor.hidden_dims == [512, 256, 128]  # the distilled student's network

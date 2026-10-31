@@ -19,7 +19,8 @@ once per robot at startup: changing masses at every reset slowed Newton training
 `ABLATION_OVERRIDES` lists, per group, the config overrides that switch it off. They work on
 the finished config (Isaac Lab applies overrides after `__post_init__`), so each removes event
 terms or sets values the simulation reads at run time. `make_nominal` switches every group off,
-for exporting a policy with nominal gains and masses.
+for exporting a policy with nominal gains and masses. `TRAINING_ABLATIONS` does the same for
+the training choices of the design's ablation that are not randomization (section 9).
 """
 
 from isaaclab.managers import EventTermCfg as EventTerm
@@ -49,6 +50,17 @@ ABLATION_OVERRIDES: dict[str, list[str]] = {
     "latency": ["env.actions.joint_pos.max_delay_steps=0"],
     "sensor_noise": ["env.observations.policy.enable_corruption=false"],
     "pushes": ["env.events.push_robot=null"],
+}
+
+# Training choices switched off by the same mechanism; not part of "every group off".
+TRAINING_ABLATIONS: dict[str, list[str]] = {
+    # no curriculum: full body-pose and arm ranges, and the full push speed, from the start
+    "curriculum": [
+        "env.commands.body_pose.initial_level=1.0",
+        "env.commands.upper_body.initial_level=1.0",
+        "env.curriculum.upper_body_level.params.raise_below=-1.0",
+        "env.curriculum.upper_body_level.params.lower_above=2.0",
+    ],
 }
 
 

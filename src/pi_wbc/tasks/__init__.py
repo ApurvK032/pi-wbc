@@ -72,3 +72,14 @@ gym.register(
         "default_agent": "rsl_rl",
     },
 )
+
+gym.register(
+    id="PiWbc-G1-Student-PPO",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.g1_student:G1TeacherStudentEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{__name__}.g1_student:G1StudentPPORunnerCfg",
+        "default_agent": "rsl_rl",
+    },
+)

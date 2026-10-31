@@ -361,6 +361,23 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   workstation, teachers unchanged. Results from the first protocol are kept in
   `results/stage1/ablation/first_protocol/`.
 
+## D-020: The two ablation configurations that are not randomization (2026-10-31)
+
+- **What:** "no curriculum" (`g1_robust.TRAINING_ABLATIONS["curriculum"]`) trains the teacher
+  at full body-pose and arm ranges and the full 1.5 m/s push speed from the first step, with
+  the curriculum held there (the D-019 mechanism); its student follows as usual. "No teacher"
+  (`PiWbc-G1-Student-PPO`) trains the student's network ([512, 256, 128]) on the student's
+  inputs with PPO for 4000 iterations, with the curriculum as the teacher has it, and a critic
+  that sees the teacher group.
+- **Why:** level 1 from the start is what the curriculum would otherwise reach, so the
+  comparison isolates the ordering. 4000 iterations is the teacher's 3000 plus the student's
+  1000, the same number of training iterations. The privileged critic (an asymmetric
+  actor-critic) is the strongest common way to train a policy on limited inputs without a
+  teacher, so "teacher-student is worth it" has to beat it, not a plain PPO that also limits
+  the critic.
+- **Cost:** a distillation iteration is cheaper than a PPO one, so the PPO student uses
+  somewhat more compute than teacher plus student; reported with the results.
+
 ## Open items
 
 - The stage 1 design ([STAGE1_DESIGN.md](STAGE1_DESIGN.md)) was accepted on 2026-10-29
