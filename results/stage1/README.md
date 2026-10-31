@@ -480,6 +480,57 @@ Raw data: [`student_test/`](student_test/) (`ts-full-s1-*`, `push/`), gzip-compr
 (`pi_wbc.provenance.load_json` or `zcat` reads them); rerun with
 `scripts/test_seeds.sh ts-full-s1 <run>/exported results/stage1/student_test`.
 
+### Three training seeds: the stage 1 finish line
+
+Seeds 2 and 3 trained on the cluster (`msi/jobs/teacher_student.sbatch`, commit `66ce51f`,
+whose training code is seed 1's: A40 for seed 2, 1 h 53 min; L40S for seed 3, 1 h 05 min).
+All three students were distilled with the first protocol (D-019) and all three trained every
+command: their levels ended at 0.95, 0.90 and 0.90, above their teachers' 0.85, 0.80 and 0.80.
+Test seeds 1000-1199, 4400 episodes per seed and condition (both models, 11 commands).
+
+Falls per seed, and pooled over the three (13200 episodes) with 95% intervals:
+
+| Condition | Seed 1 | Seed 2 | Seed 3 | Pooled |
+|---|---:|---:|---:|---|
+| nominal | 0 | 9 | 0 | 9 (0.04%-0.13%) |
+| floor friction 0.4 | 0 | 11 | 0 | 11 (0.05%-0.15%) |
+| 1 kg in each hand | 6 | 5 | 1 | 12 (0.05%-0.16%) |
+| 20 ms extra delay | 4 | 14 | 0 | 18 (0.09%-0.22%) |
+| sensor noise | 3 | 6 | 1 | 10 (0.04%-0.14%) |
+| 1 m/s kicks every 4 s | 23 | 53 | 78 | 154 (1.0%-1.4%) |
+| 2 m/s kicks every 4 s | 113 | 255 | 288 | 656 (4.6%-5.4%) |
+
+Seed 2's falls without kicks are nearly all one command: walking with the arms moving on the
+Menagerie model (8 of its 200 episodes nominal, 7 at friction 0.4, 14 with delay); seeds 1 and
+3 have none there. Not looked into yet; one candidate is Menagerie's self-collisions, which
+training does not have.
+
+**Against the finish line** (design, section 1), test seeds, nominal robot; each cell is
+Menagerie / Newton model:
+
+| Measure | Target | Seed 1 | Seed 2 | Seed 3 | Met |
+|---|---|---|---|---|---|
+| Falls, all commands, both models | upper 95% bound below 5% | 0/4400 | 9/4400 | 0/4400 | yes: 0.13% pooled |
+| Speed error, walking 1 m/s | at most 0.15 m/s | 0.20 / 0.28 | 0.20 / 0.22 | 0.19 / 0.17 | **no** |
+| Speed error, walking 0.5 m/s | at most 0.15 m/s | 0.14 / 0.13 | 0.15 / 0.15 | 0.13 / 0.13 | yes, seed 2 at the limit |
+| Speed error, sideways 0.3 m/s | at most 0.15 m/s | 0.11 / 0.12 | 0.17 / 0.18 | 0.16 / 0.18 | **no** for seeds 2 and 3 |
+| Turn-rate error, 0.8 rad/s in place | at most 0.2 rad/s | 0.19 / 0.20 | 0.22 / 0.23 | 0.18 / 0.19 | seeds 1 and 3; seed 2 **no** |
+| Step rate at 1 m/s | 1.5-3 steps/s | 2.5 / 2.5 | 2.5 / 2.5 | 2.4 / 2.5 | yes |
+| Step length at 1 m/s | at least 0.3 m | 32 / 30 cm | 35 / 34 cm | 34 / 35 cm | yes (seed 1 on Newton: 29.7 cm) |
+| Foot lift | at least 5 cm | 5.7 / 5.1 cm | 5.9 / 5.8 cm | 6.5 / 6.3 cm | yes |
+| Slip at the sole (D-016) | at most 0.1 m/s | 0.06 / 0.02 | 0.06 / 0.03 | 0.09 / 0.01 | yes |
+| Arm joint error, walking | report | 0.039 / 0.033 rad | 0.039 / 0.033 rad | 0.039 / 0.033 rad | — |
+| Push recovery | report the largest kick survived 95% of the time | just under 2.5 m/s | sweep running | sweep running | — |
+
+The gait, falls and arm targets hold for every seed. Speed tracking does not: asked for 1 m/s,
+the students walk at 0.73-0.87 m/s (step rate times step length), on every seed and both
+models, while the gait-only policy of step 1 was 0.06 m/s off, so the robot can do better. The student trained without randomization was
+also closer (0.11 m/s, step 6), so one or more randomization groups cost it; the ablation
+should say which.
+
+Raw data: [`student_test/`](student_test/) (`ts-full-s{1,2,3}-*`) and
+[`student_dev/`](student_dev/) (`ts-full-s{2,3}-*`, development seeds 0-9).
+
 ## Step 5: test conditions in the MuJoCo bench (in progress)
 
 `pi-wbc-sim2sim --condition` (`src/pi_wbc/sim2sim/commands.py`), the conditions of design
