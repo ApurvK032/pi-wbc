@@ -536,8 +536,8 @@ also closer (0.11 m/s, step 6), so one or more randomization groups cost it; the
 should say which.
 
 The kick sweep (as for seed 1 above: 5 commands, both models, 2000 episodes per kick size and
-seed) puts every seed's 95% point between 2.0 and 2.5 m/s, about 1.5 to 1.9 times the 1.3 m/s
-it was pushed with in training.
+seed) puts every seed's 95% point between 2.0 and 2.5 m/s. The top kick in training followed
+the curriculum level: 1.30-1.35 m/s for the teachers, 1.40-1.45 m/s for the students.
 
 Raw data: [`student_test/`](student_test/) (`ts-full-s{1,2,3}-*`, `push/ts-full-s{1,2,3}-*`)
 and [`student_dev/`](student_dev/) (`ts-full-s{2,3}-*`, development seeds 0-9).
