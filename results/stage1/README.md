@@ -639,8 +639,9 @@ and no randomization on development seeds only) in [`ablation/fixed_level/`](abl
 and [`ablation_test/fixed_level/`](ablation_test/fixed_level/).
 
 **Warm-up result so far, seed 1, development seeds** (220 episodes per condition, both models;
-errors on the nominal robot, mean of both models). Actuators, sensor noise, no curriculum and
-no teacher are still running; "nothing" is the step 4 warm-up student of seed 1:
+errors on the nominal robot, mean of both models). "Nothing" is the step 4 warm-up student of
+seed 1. The run without a teacher (PPO alone) stopped at iteration 3497 of 4000 when the
+simulation returned NaN observations; its last checkpoint is iteration 3400:
 
 | Trained without | Teacher's last level | Falls: nominal, friction, payload, delay (of 880) | Noise | 1 m/s kicks | 2 m/s kicks | Speed error, 1 m/s | 0.5 m/s | Sideways | Turn | Crouch 0.60 m, cm |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -650,6 +651,9 @@ no teacher are still running; "nothing" is the step 4 warm-up student of seed 1:
 | latency | 0.80 | 1 | 0 | 6 | 18 | 0.16 | 0.09 | 0.08 | 0.20 | 2.4 |
 | friction | 1.0 | 12 | 3 | 18 | 33 | 0.13 | 0.09 | 0.24 | 0.31 | 0.1 |
 | mass | 0.90 | 0 | 0 | 2 | 28 | 0.21 | 0.13 | 0.08 | 0.19 | 3.1 |
+| actuators | 0.80 | 0 | 0 | 2 | 20 | 0.21 | 0.14 | 0.16 | 0.16 | 2.8 |
+| sensor noise | 0.75 | 0 | 0 | 2 | 6 | 0.16 | 0.09 | 0.13 | 0.22 | 1.7 |
+| curriculum (full ranges from the start) | 1.0 | 0 | 0 | 17 | 10 | 0.51 | 0.19 | 0.16 | 0.49 | 0.4 |
 
 - **Pushes are what keep the student up when kicked:** without them it falls in 208 of 220
   episodes with 1 m/s kicks, against 1. Without any randomization it also falls to sensor
@@ -657,14 +661,19 @@ no teacher are still running; "nothing" is the step 4 warm-up student of seed 1:
 - **Without friction randomization** it turns and walks sideways worse (0.31 rad/s, 0.24 m/s)
   and falls more, with and without kicks. Without latency or mass randomization it is close to
   the full student.
-- **Crouch accuracy follows the teacher's last curriculum level, so this ablation can't pin it
-  on one group.** The three configurations whose teachers reached full ranges (level 1.0)
-  crouch to within 0.1-0.2 cm; the others, at 0.80-0.90, are 2.4-3.8 cm off, like the first
-  protocol's full students at 0.90-0.95 (2.6-3.7 cm), although 0.60 m is inside every one's
-  trained range (its low end is 0.54-0.56 m at 0.80-0.90). Switching a group off makes the
-  teacher's task easier, so its level rises. The run without a curriculum (every group on,
-  full ranges from the start) will show which of the two matters. Why level 1.0 would make the
-  difference is not known.
+- **Crouch accuracy comes from training at full ranges, not from any randomization group.** The
+  configurations whose teachers reached full ranges (level 1.0) crouch to within 0.1-0.2 cm;
+  the others, at 0.75-0.90, are 1.7-3.8 cm off, like the first protocol's full students at
+  0.90-0.95 (2.6-3.7 cm), although 0.60 m is inside every one's trained range (its low end is
+  0.54-0.57 m at 0.75-0.90). Switching a group off makes the teacher's task easier, so its
+  level rises. The run without a curriculum settles it: every group on and full ranges from
+  the start, it crouches to within 0.4 cm. It pays in walking: 0.51 m/s off at 1 m/s, 0.49 rad/s
+  off turning, 20 cm steps. So the curriculum buys the walking, and the last part of the range
+  that the full teacher never reaches costs the crouch accuracy. Why it matters for a height
+  inside the range is not known.
+- **Without sensor noise in training** the student does not fall more under noise (0 of 220).
+  Noise reaches only the student's inputs, so this configuration's teacher is the full teacher
+  trained again; it ended at level 0.75 against 0.85, a measure of how much teachers vary.
 - One training seed: seeds 2 and 3 run on the cluster.
 
 **First-protocol result, all six groups off** (its student recovered full ranges by
