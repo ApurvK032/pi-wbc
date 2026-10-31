@@ -14,6 +14,8 @@ One environment, the robust task, with two observation groups:
 `PiWbc-G1-Student` distills the student from a trained teacher with rsl_rl's `Distillation`:
 the student drives the robot and the teacher labels what it should have done (DAgger), so the
 student learns to recover from its own mistakes. Train it with `--checkpoint <teacher model>`.
+`PiWbc-G1-Student-PPO`, for the ablation, trains the student's network on the student's inputs
+with PPO and no teacher; its critic sees the teacher group (an asymmetric actor-critic).
 """
 
 import copy
@@ -91,6 +93,16 @@ class G1TeacherPPORunnerCfg(G1RobustPPORunnerCfg):
         super().__post_init__()
         self.experiment_name = "pi_wbc_g1_teacher"
         self.obs_groups = {"actor": ["teacher"], "critic": ["teacher"]}
+
+
+@configclass
+class G1StudentPPORunnerCfg(G1RobustPPORunnerCfg):
+    """Ablation: the student trained by PPO alone, its critic on the privileged inputs."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.experiment_name = "pi_wbc_g1_student_ppo"
+        self.obs_groups = {"actor": ["policy"], "critic": ["teacher"]}
 
 
 @configclass

@@ -11,12 +11,15 @@
 #       msi/jobs/ablation.sbatch <seed> <config>...
 #
 #   seed      training seed
-#   config    "none" (every group off) or a group of g1_robust.ABLATION_OVERRIDES: friction,
-#             mass, actuators, latency, sensor_noise or pushes
+#   config    "none" (every group off), a group of g1_robust.ABLATION_OVERRIDES (friction,
+#             mass, actuators, latency, sensor_noise, pushes), "curriculum" (no curriculum,
+#             g1_robust.TRAINING_ABLATIONS) or "teacher" (no teacher: the student trained by PPO
+#             alone for 4000 iterations, PiWbc-G1-Student-PPO)
 #
 # Each configuration is a teacher (3000 iterations) and a student (1000), as
 # scripts/teacher_student_local.sh does on the workstation; about 65 min on an L40S. Output per
 # configuration: logs/rsl_rl/pi_wbc_g1_teacher/slurm-<jobid>-abl-<config>/ (checkpoints),
+# (for "teacher": logs/rsl_rl/pi_wbc_g1_student_ppo/slurm-<jobid>-abl-teacher/ instead of both)
 # logs/rsl_rl/pi_wbc_g1_student/slurm-<jobid>-abl-<config>/ (checkpoints, the exported/ student),
 # training logs logs/slurm/piwbc-abl-<jobid>-<config>-{teacher,student}.log, job log
 # logs/slurm/piwbc-abl-<jobid>.out. A configuration that fails is reported and skipped. Runs
@@ -56,15 +59,32 @@ for CONFIG in "${CONFIGS[@]}"; do
     # shellcheck disable=SC2086  # the overrides are separate arguments
     if ! ABL=$(run python -c '
 import sys
-from pi_wbc.tasks.g1_robust import ABLATION_OVERRIDES as A
+from pi_wbc.tasks.g1_robust import ABLATION_OVERRIDES as A, TRAINING_ABLATIONS as T
 names = sys.argv[1:]
-groups = list(A) if names == ["none"] else names
-print(" ".join(o for g in groups for o in A[g]))
+groups = list(A) if names == ["none"] else [] if names == ["teacher"] else names
+print(" ".join(o for g in groups for o in {**A, **T}[g]))
 ' "${CONFIG}"); then
         echo "$(date +%H:%M) ${CONFIG}: unknown configuration, skipped"
         continue
     fi
     read -r -a OVERRIDES <<< "${ABL}"
+    if [ "${CONFIG}" = teacher ]; then
+        echo "$(date +%H:%M) ${CONFIG}: PPO student, no teacher, 4000 iterations"
+        if ! run isaaclab train --rl_library rsl_rl --task PiWbc-G1-Student-PPO --num_envs 4096 \
+            --seed "${SEED}" --max_iterations 4000 --run_timestamp "${RUN}" physics=newton_mjwarp \
+            > "${LOG}-student.log" 2>&1; then
+            echo "$(date +%H:%M) ${CONFIG}: PPO student failed, see ${LOG}-student.log"
+            continue
+        fi
+        S_CKPT=$(ls logs/rsl_rl/pi_wbc_g1_student_ppo/"${RUN}"/model_*.pt | sort -V | tail -1)
+        if ! run pi-wbc-export --task PiWbc-G1-Student-PPO --checkpoint "${S_CKPT}" \
+            physics=newton_mjwarp > "${LOG}-export.log" 2>&1; then
+            echo "$(date +%H:%M) ${CONFIG}: export failed, see ${LOG}-export.log"
+            continue
+        fi
+        echo "$(date +%H:%M) ${CONFIG}: done, logs/rsl_rl/pi_wbc_g1_student_ppo/${RUN}"
+        continue
+    fi
     echo "$(date +%H:%M) ${CONFIG}: teacher, overrides: ${ABL}"
     if ! run isaaclab train --rl_library rsl_rl --task PiWbc-G1-Teacher --num_envs 4096 \
         --seed "${SEED}" --max_iterations 3000 --run_timestamp "${RUN}" physics=newton_mjwarp \
