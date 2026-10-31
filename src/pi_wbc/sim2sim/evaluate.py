@@ -320,6 +320,12 @@ def main(argv: list[str] | None = None) -> None:
         "--model", action="append", required=True, help="NAME=path/to/scene.xml (repeatable)"
     )
     parser.add_argument("--seeds", type=int, default=10, help="episodes per command and model")
+    parser.add_argument(
+        "--seed-start",
+        type=int,
+        default=0,
+        help="first seed: 0-99 are for development, 1000-1199 for the final test",
+    )
     parser.add_argument("--duration-s", type=float, default=20.0)
     parser.add_argument("--scenario", action="append", choices=list(ALL_SCENARIOS), default=None)
     parser.add_argument("--out", type=Path, required=True)
@@ -371,7 +377,7 @@ def main(argv: list[str] | None = None) -> None:
                 print(f"[sim2sim] wrote {gif_path}", flush=True)
         start = time.monotonic()
         for scenario in scenarios:
-            for seed in range(args.seeds):
+            for seed in range(args.seed_start, args.seed_start + args.seeds):
                 fell, t_fall, lin, ang, gait, drift, body_err = run_episode(
                     sim, policy, ALL_SCENARIOS[scenario], seed, args.duration_s, condition
                 )
@@ -414,6 +420,7 @@ def main(argv: list[str] | None = None) -> None:
             "policy": str(args.policy),
             "policy_io": str(args.policy_io),
             "seeds": args.seeds,
+            "seed_start": args.seed_start,
             "duration_s": args.duration_s,
             "fall_height_m": FALL_HEIGHT,
             "settle_s": SETTLE_S,
