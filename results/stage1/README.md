@@ -527,7 +527,7 @@ Menagerie / Newton model:
 | Foot lift | at least 5 cm | 5.7 / 5.1 cm | 5.9 / 5.8 cm | 6.5 / 6.3 cm | yes |
 | Slip at the sole (D-016) | at most 0.1 m/s | 0.06 / 0.02 | 0.06 / 0.03 | 0.09 / 0.01 | yes |
 | Arm joint error, walking | report | 0.039 / 0.033 rad | 0.039 / 0.033 rad | 0.039 / 0.033 rad | — |
-| Push recovery | report the largest kick survived 95% of the time | just under 2.5 m/s | sweep running | sweep running | — |
+| Push recovery: kicks survived at 2.0 / 2.5 m/s | report the largest kick survived 95% of the time | 99.1% / 94.8% | 99.2% / 94.7% | 98.6% / 92.2% | 2.0-2.5 m/s on every seed |
 
 The gait, falls and arm targets hold for every seed. Speed tracking does not: asked for 1 m/s,
 the students walk at 0.73-0.87 m/s (step rate times step length), on every seed and both
@@ -535,8 +535,12 @@ models, while the gait-only policy of step 1 was 0.06 m/s off, so the robot can 
 also closer (0.11 m/s, step 6), so one or more randomization groups cost it; the ablation
 should say which.
 
-Raw data: [`student_test/`](student_test/) (`ts-full-s{1,2,3}-*`) and
-[`student_dev/`](student_dev/) (`ts-full-s{2,3}-*`, development seeds 0-9).
+The kick sweep (as for seed 1 above: 5 commands, both models, 2000 episodes per kick size and
+seed) puts every seed's 95% point between 2.0 and 2.5 m/s, about 1.5 to 1.9 times the 1.3 m/s
+it was pushed with in training.
+
+Raw data: [`student_test/`](student_test/) (`ts-full-s{1,2,3}-*`, `push/ts-full-s{1,2,3}-*`)
+and [`student_dev/`](student_dev/) (`ts-full-s{2,3}-*`, development seeds 0-9).
 
 ## Step 5: test conditions in the MuJoCo bench (in progress)
 
