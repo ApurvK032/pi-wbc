@@ -400,6 +400,19 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   choice rests on the warm-up matching the first protocol, having no seed as bad as the held
   recipe's seed 2, and being the same for every configuration. None of the three meets the
   1 m/s target (0.15 or less), so the recipe does not fix the speed miss.
+- **Test seeds (added the same day):** on test seeds 1000-1199 (4400 episodes per seed and
+  condition) every recipe's walking repeats its development seeds within 0.01, but the warm-up
+  students fall more to kicks on two of the three seeds. Falls with 1 m/s kicks, seeds 1 / 2 /
+  3: first protocol 23 / 53 / 78, held 16 / 30 / 85, warm-up 84 / 106 / 66; with 2 m/s kicks:
+  113 / 255 / 288, 94 / 181 / 258, 254 / 298 / 241 (pooled: 1.2%, 1.0% and 1.9% of episodes at
+  1 m/s; 5.0%, 4.0% and 6.0% at 2 m/s). Seed 3's warm-up student falls least of its three, so
+  three seeds don't settle this either. A likely cause, not checked: the kicks' top speed follows
+  the level, so the warm-up student meets its teacher's full kicks (1.30-1.35 m/s) only from
+  iteration 300 and trains 700 iterations at them instead of 1000. Without kicks the recipes
+  fall 60, 14 and 65 times in 66000 episodes, nearly all on seed 2's arm commands under the
+  first protocol and the warm-up. The ablation keeps the warm-up, so its configurations stay
+  comparable to each other. The candidate fix, a warm-up of the commands only with the kicks at
+  the teacher's size from the start, has not been run.
 - **Cost:** the ablation students trained with the held level (no pushes and no randomization
   on the workstation; friction, mass, actuators and sensor noise on MSI) are redone from their
   teachers, about 35 min each on the workstation; their held-level results are kept in

@@ -567,10 +567,33 @@ robot, mean of the Menagerie and Newton models; each cell is training seeds 1 / 
   (seed 2, Menagerie, nominal) and while standing (seeds 2 and 3, Newton, friction 0.4, after
   15 s). The test seeds will show whether that is more than chance.
 
-The test-seed run (1000-1199) of the three warm-up students is next; the finish-line table above
-is the first protocol's until then. Raw data: [`student_ramp/`](student_ramp/) (warm-up),
-[`student_fixed/`](student_fixed/) (held level) and [`student_test_fixed/`](student_test_fixed/)
-(held level, test seeds).
+Test seeds 1000-1199, the same three recipes; 4400 episodes per seed and condition, so 22000
+per seed without kicks (nominal, friction 0.4, 1 kg in each hand, 20 ms delay, sensor noise)
+and 4400 per kick size. Speed errors are the mean of both models:
+
+| Student recipe | Speed error, 1 m/s | 0.5 m/s | Falls without kicks | Falls, 1 m/s kicks | Falls, 2 m/s kicks |
+|---|---|---|---|---|---|
+| first protocol (level free) | 0.24 / 0.21 / 0.17 (0.21) | 0.14 / 0.15 / 0.13 (0.14) | 13 / 45 / 2 (60) | 23 / 53 / 78 (1.2%) | 113 / 255 / 288 (5.0%) |
+| held level (D-019) | 0.26 / 0.35 / 0.15 (0.25) | 0.15 / 0.21 / 0.11 (0.16) | 7 / 0 / 7 (14) | 16 / 30 / 85 (1.0%) | 94 / 181 / 258 (4.0%) |
+| warm-up (D-021) | 0.17 / 0.23 / 0.21 (0.21) | 0.10 / 0.16 / 0.09 (0.12) | 7 / 50 / 8 (65) | 84 / 106 / 66 (1.9%) | 254 / 298 / 241 (6.0%) |
+
+- Walking repeats the development seeds within 0.01 m/s for every recipe and seed.
+- The warm-up students fall more to kicks on seeds 1 and 2: 2-4 times as often as the other
+  recipes at 1 m/s on seed 1. On seed 3 the warm-up falls least of the three. The spread
+  between seeds is larger than the pooled intervals, so three seeds don't settle it (D-011).
+  A likely cause, not checked: the kicks' top speed follows the level, so during the warm-up
+  they grow from 0.5 m/s and reach the teacher's 1.30-1.35 m/s only at iteration 300.
+- Falls without kicks are nearly all seed 2's arm commands (arms still or moving, mostly on
+  Newton at friction 0.4 and with 1 kg in the hands) under the first protocol and the
+  warm-up; the held student of seed 2 has none.
+- The ablation keeps the warm-up, so its configurations stay comparable to each other. A
+  warm-up of the commands only, with the kicks at the teacher's size from the start, is the
+  candidate fix (not run). The finish-line table above stays the first protocol's until this is
+  settled.
+
+Raw data: [`student_ramp/`](student_ramp/) and [`student_test_ramp/`](student_test_ramp/)
+(warm-up), [`student_fixed/`](student_fixed/) and [`student_test_fixed/`](student_test_fixed/)
+(held level).
 
 ## Step 5: test conditions in the MuJoCo bench (in progress)
 
@@ -615,6 +638,35 @@ this way from its teacher (teachers unchanged); the first protocol's results are
 and no randomization on development seeds only) in [`ablation/fixed_level/`](ablation/fixed_level/)
 and [`ablation_test/fixed_level/`](ablation_test/fixed_level/).
 
+**Warm-up result so far, seed 1, development seeds** (220 episodes per condition, both models;
+errors on the nominal robot, mean of both models). Actuators, sensor noise, no curriculum and
+no teacher are still running; "nothing" is the step 4 warm-up student of seed 1:
+
+| Trained without | Teacher's last level | Falls: nominal, friction, payload, delay (of 880) | Noise | 1 m/s kicks | 2 m/s kicks | Speed error, 1 m/s | 0.5 m/s | Sideways | Turn | Crouch 0.60 m, cm |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| nothing | 0.85 | 0 | 0 | 1 | 14 | 0.17 | 0.10 | 0.12 | 0.20 | 3.8 |
+| pushes | 1.0 | 10 | 1 | 208 | 220 | 0.29 | 0.18 | 0.17 | 0.16 | 0.2 |
+| all six groups | 1.0 | 8 | 32 | 80 | 204 | 0.13 | 0.11 | 0.09 | 0.13 | 0.1 |
+| latency | 0.80 | 1 | 0 | 6 | 18 | 0.16 | 0.09 | 0.08 | 0.20 | 2.4 |
+| friction | 1.0 | 12 | 3 | 18 | 33 | 0.13 | 0.09 | 0.24 | 0.31 | 0.1 |
+| mass | 0.90 | 0 | 0 | 2 | 28 | 0.21 | 0.13 | 0.08 | 0.19 | 3.1 |
+
+- **Pushes are what keep the student up when kicked:** without them it falls in 208 of 220
+  episodes with 1 m/s kicks, against 1. Without any randomization it also falls to sensor
+  noise (32 of 220), as in the first protocol.
+- **Without friction randomization** it turns and walks sideways worse (0.31 rad/s, 0.24 m/s)
+  and falls more, with and without kicks. Without latency or mass randomization it is close to
+  the full student.
+- **Crouch accuracy follows the teacher's last curriculum level, so this ablation can't pin it
+  on one group.** The three configurations whose teachers reached full ranges (level 1.0)
+  crouch to within 0.1-0.2 cm; the others, at 0.80-0.90, are 2.4-3.8 cm off, like the first
+  protocol's full students at 0.90-0.95 (2.6-3.7 cm), although 0.60 m is inside every one's
+  trained range (its low end is 0.54-0.56 m at 0.80-0.90). Switching a group off makes the
+  teacher's task easier, so its level rises. The run without a curriculum (every group on,
+  full ranges from the start) will show which of the two matters. Why level 1.0 would make the
+  difference is not known.
+- One training seed: seeds 2 and 3 run on the cluster.
+
 **First-protocol result, all six groups off** (its student recovered full ranges by
 iteration 300, so it learned every command). Falls out of 4400 on the test seeds, with 95%
 intervals, against the full student (also first protocol):
@@ -630,6 +682,7 @@ intervals, against the full student (also first protocol):
 - **Randomization costs precision on the nominal robot** (development seeds, Menagerie model):
   without it the student walks at 1 m/s with about half the speed error (0.11 against
   0.20 m/s), turns in place better (0.12 against 0.19 rad/s) and crouches to within 0.2 cm,
-  against 3.6 cm. The single-group runs should show which group costs the crouch accuracy.
+  against 3.6 cm. Its teacher and student reached level 1.0; the warm-up result above shows
+  crouch accuracy following that level.
 - The run took 1 h 32 min (teacher 61 min, student 18, MuJoCo 13); its teacher reached full
   ranges at about iteration 1200, the full teacher 0.85 by 3000.
