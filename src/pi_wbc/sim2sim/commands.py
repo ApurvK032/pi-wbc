@@ -152,5 +152,5 @@ CONDITIONS: dict[str, Condition] = {
     "payload_1kg": Condition(hand_payload_kg=1.0),
     "delay_20ms": Condition(delay_steps=4),
     "noise": Condition(noise=True),
-    **{f"push_{v}": Condition(push_speed=v) for v in (0.5, 1.0, 1.5, 2.0)},
+    **{f"push_{v}": Condition(push_speed=v) for v in (0.5, 1.0, 1.5, 2.0, 2.5, 3.0)},
 }

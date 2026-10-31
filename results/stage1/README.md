@@ -413,7 +413,34 @@ is standing still while the arms swing, where it drifts more. Isaac Lab reads a 
 MuJoCo at 1 m/s (0.73 against about 0.80 m/s achieved). One seed so far; seeds 2 and 3 are
 running.
 
-Raw data: [`student_dev/`](student_dev/) (`ts-full-s1-*`, `isaac/ts-full-*`).
+<p align="center">
+  <img src="student_s1_walk_1.0.gif" alt="Student walking at 1 m/s" width="260">
+  <img src="student_s1_crouch_0.6.gif" alt="Student crouching to 0.60 m" width="260">
+  <img src="student_s1_arms_walk.gif" alt="Student walking with its arms moving" width="260"><br>
+  <em>The seed 1 student in plain MuJoCo (Menagerie's G1): walking at 1 m/s, crouching to
+  0.60 m, and walking at 0.5 m/s while its arms move to random poses.</em>
+</p>
+
+**Push recovery** (the design's "largest push survived 95% of the time"): kicks to the pelvis at
+3, 7, 11, 15 and 19 s, each in a random horizontal direction, while standing, walking at 0.5 and
+1 m/s, turning in place, and standing with the arms moving; both MuJoCo models, 20 starts each:
+
+| Kick | Episodes that fell (5 kicks each) | 95% CI | Kicks survived |
+|---|---|---|---|
+| 0.5 m/s | 3/200 | 1%-4% | 99.7% |
+| 1.0 m/s | 3/200 | 1%-4% | 99.7% |
+| 1.5 m/s | 0/200 | 0%-2% | 100% |
+| 2.0 m/s | 1/200 | 0%-3% | 99.9% |
+| 2.5 m/s | 38/200 | 14%-25% | 95.9% |
+| 3.0 m/s | 141/200 | 64%-76% | 78.2% |
+
+The largest kick it survives 95% of the time is about 2.5 m/s per kick; whole episodes of five
+kicks come through at 2.0 m/s in 199 of 200. Training pushed it to 1.35 m/s at most (the
+curriculum reached 85% of the 1.5 m/s top). Up to 2.0 m/s the few falls don't grow with the
+kick, so they are not about the pushes; at 2.5 m/s most falls are while standing still (16 of
+40) or with the arms moving (14 of 40), where the robot has to start stepping from rest.
+
+Raw data: [`student_dev/`](student_dev/) (`ts-full-s1-*`, `isaac/ts-full-*`, `push/`).
 
 ## Step 5: test conditions in the MuJoCo bench (in progress)
 
