@@ -50,6 +50,13 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--duration-s", type=float, default=20.0)
     parser.add_argument("--randomized", action="store_true", help="keep randomization and pushes")
     parser.add_argument(
+        "--arm-level",
+        type=float,
+        default=1.0,
+        help="arm-motion range as a curriculum level (1: full joint ranges; training stops at "
+        "its teacher's level)",
+    )
+    parser.add_argument(
         "--push-speed",
         type=float,
         default=0.0,
@@ -164,7 +171,8 @@ def main(argv: list[str] | None = None) -> None:
             moving_arms = torch.tensor([scenarios[s].arm_motion for s in names], device=device)[
                 scenario_of
             ]
-            body_term.level = arm_term.level = 1.0
+            body_term.level = 1.0
+            arm_term.level = args.arm_level
 
         def hold_commands() -> None:
             vel_term.vel_command_b[:] = velocity
@@ -243,6 +251,7 @@ def main(argv: list[str] | None = None) -> None:
                 "settle_s": SETTLE_S,
                 "randomized": args.randomized,
                 "push_speed": args.push_speed,
+                "arm_level": args.arm_level,
                 "overrides": overrides,
                 "scenarios": {s: asdict(scenarios[s]) for s in names},
                 "summary": rows,

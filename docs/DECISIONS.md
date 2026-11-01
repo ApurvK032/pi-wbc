@@ -488,9 +488,13 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   episodes of that command on the Newton model (15%; warm-up: none), seed 3 more with 1 kg in the
   hands (14 against 1), seed 2 mixed (2 against 21 at friction 0.4). Pooled, nominal falls are
   46 of 13200 (0.26%-0.46%), within the target, but stage 3 is standing at a table and moving the
-  arms, so this is checked before stage 3. Cause not known; a guess, not tested: under a stand
-  command the narrow term pays for zero speed much more sharply, which may discourage corrective
-  steps. Results: `results/stage1/speed_fix_test/`.
+  arms, so this was checked (same day): the falls come from arm motions wider than training
+  covered. The tests move the arms over the full joint ranges (curriculum level 1); B2's
+  teachers stopped at levels 0.70, 0.80 and 0.75. With the arm range set to its training level,
+  seed 1 falls in 0 of 300 episodes of that command (Isaac Lab, Newton), against 36 of 300 at the
+  full range; seeds 2 and 3 fall 1 and 0 of 50 at the full range. The warm-up students (levels
+  0.85, 0.80, 0.80) don't fall there at either range. Results: `results/stage1/speed_fix_test/`,
+  `results/stage1/arm_level/`.
 - **Not redone:** the ablation (step 6) keeps its students, trained without the narrow term;
   its configurations compare with each other, not with B2.
 

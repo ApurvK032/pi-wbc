@@ -714,13 +714,33 @@ and pooled with 95% intervals (4400 episodes per seed and condition):
   on Menagerie in 6; the warm-up student of seed 1 never fell there. With 1 kg in the hands,
   seed 3 also falls more there (14 against 1). Seed 2 is mixed (fewer falls at friction 0.4: 2
   against 21). The pooled rate stays far under the 5% target, but standing at a table and moving
-  the arms is what stage 3 asks for, so this is looked into before stage 3. Not explained yet;
-  one guess, not checked: under a stand command the narrow reward pays for zero speed much more
-  sharply than the wide one, which may discourage the small corrective steps that keep the robot
-  up while its arms swing.
+  the arms is what stage 3 asks for, so it was looked into (below).
 
 Raw data: [`speed_fix_test/`](speed_fix_test/) (`speed-fine05-s{1,2,3}-*`, and the kick sweep
 in `push/`).
+
+**Why B2 falls with the arms moving: the arm range it trained on.** The upper-body command draws
+each arm pose from the joint ranges shrunk towards the default pose by the curriculum level; the
+tests use level 1 (the full ranges), and training stops at the teacher's last level. B2's
+teachers stopped at 0.70, 0.80 and 0.75 (the warm-up's at 0.85, 0.80 and 0.80). Isaac Lab on
+Newton, nominal robot, falls while standing with the arms moving (`pi-wbc-isaac-eval
+--arm-level`):
+
+| Student (its training level) | Arms at 0.6 | 0.7 | 0.75-0.8 | 0.85 | 1.0 (the tests') |
+|---|---|---|---|---|---|
+| B2, seed 1 (0.70) | 0/50 | 0/300 (0%-1.3%) | | 3/50 | 36/300 (8.8%-16.2%) |
+| B2, seed 2 (0.80) | | | 0/50 | | 1/50 |
+| B2, seed 3 (0.75) | | | 0/50 | | 0/50 |
+| warm-up, seeds 1-3 (0.85, 0.80, 0.80) | | 0/50 (seed 1) | 0/50 (seeds 2, 3) | | 0/50 each |
+
+- Within the range it trained on, seed 1 does not fall; beyond it, falls grow with the swing.
+  The warm-up students, trained a little further, cope with the full range; B2's seed 1 does not.
+- So the speed reward matters through the curriculum: its teachers widened the ranges more
+  slowly (the level waits for the turning reward, D-021).
+- The first guess, that B2 avoids corrective steps, does not hold: seed 1 steps more while its
+  arms move than the warm-up student does.
+
+Raw data: [`arm_level/`](arm_level/).
 
 ## Step 5: test conditions in the MuJoCo bench (in progress)
 
