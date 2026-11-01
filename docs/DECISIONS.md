@@ -431,6 +431,73 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   for the warm-up students. Results: `results/stage1/student_ramp/` (development seeds),
   `results/stage1/student_fixed/` (held level).
 
+## D-022: A narrow speed-tracking reward at weight 0.5 fixes the speed miss (2026-11-01)
+
+- **What:** the final controller adds a second speed-tracking term, `track_lin_vel_xy_fine`:
+  the same function as `track_lin_vel_xy_exp` (exp of minus the squared error over std²) with
+  std 0.25 m/s instead of 0.5, at weight 0.5. The term is in the code at weight 0 by default and
+  switched on with `env.rewards.track_lin_vel_xy_fine.weight=0.5`, so every earlier run is
+  unchanged. Teacher (3000 iterations) and student (1000, warm-up of D-021) are both trained
+  with it. Called B2 below.
+- **Why:** every student so far walked at about 86% of the commanded speed (0.86 m/s when asked
+  for 1.0, 1.1-1.16 when asked for 1.4; MuJoCo, nominal robot), so the 1 m/s target (error 0.15
+  or less) was missed on every seed. The robot is not at a limit: the gait-only policy of step 1
+  reached about 93%. The wide kernel pays 92% of its reward at 0.14 m/s off, too little against
+  the effort and smoothness penalties to close the gap; the narrow one pays 73% there. A
+  one-day timebox on training seed 1 tried three candidates, each judged on the development
+  seeds against the warm-up student of the same seed (mean of both MuJoCo models):
+
+  | Candidate | 1 m/s | 0.5 m/s | Sideways | Turn | Steps/s at 1 m/s | Falls without kicks | Falls, 1 / 2 m/s kicks |
+  |---|---|---|---|---|---|---|---|
+  | warm-up student (D-021) | 0.175 | 0.100 | 0.119 | 0.205 | 2.48 | 0 / 1100 | 1 / 14 of 220 |
+  | A: wide term at weight 2.0 | 0.185 | 0.074 | 0.047 | 0.295 | 3.02 | 22 / 1100 | 8 / 19 |
+  | B: narrow term at weight 1.0 | 0.083 | 0.046 | 0.074 | 0.239 | 2.66 | 2 / 1100 | 6 / 66 |
+  | B2: narrow term at weight 0.5 | 0.107 | 0.043 | 0.128 | 0.167 | 2.47 | 2 / 1100 | 1 / 11 |
+
+  A did not reach the speed, turned worse and fell without kicks (its teacher's level reached
+  only 0.60). B reached the speed (1.04-1.07 m/s when asked for 1.0) but fell five times as often
+  to 2 m/s kicks, which its level (0.70, the same as B2's) does not explain. B2 met every
+  finish-line target on seed 1 and was then trained on seeds 2 (workstation) and 3 (MSI, L40S).
+- **Three seeds, B2 against the warm-up students** (development seeds 0-9, mean of both models;
+  seeds 1 / 2 / 3 (mean)):
+
+  | Student | 1 m/s | 0.5 m/s | Sideways | Turn | Crouch, cm | Falls without kicks | Falls, 2 m/s kicks |
+  |---|---|---|---|---|---|---|---|
+  | warm-up (D-021) | 0.17 / 0.23 / 0.21 (0.21) | 0.10 / 0.16 / 0.09 (0.12) | 0.12 / 0.19 / 0.15 (0.15) | 0.20 / 0.23 / 0.22 (0.22) | 3.8 / 2.7 / 3.8 (3.4) | 3 / 3300 | 35 / 660 |
+  | B2 | 0.11 / 0.08 / 0.13 (0.10) | 0.04 / 0.04 / 0.07 (0.05) | 0.13 / 0.07 / 0.09 (0.10) | 0.17 / 0.24 / 0.23 (0.21) | 2.4 / 1.7 / 2.9 (2.3) | 2 / 3300 | 26 / 660 |
+
+  Lower on all three seeds: speed error at 1 m/s and at 0.5 m/s, and crouch error. Turning moves
+  in no consistent direction (better on seed 1, slightly worse on 2 and 3) and still misses its
+  target (0.2 or less) on seeds 2 and 3, as before. Kick falls are no higher overall. The
+  teachers' last levels were 0.70, 0.80 and 0.75, against 0.85, 0.80 and 0.80 for the warm-up's
+  teachers, so the lower crouch error is not a higher level.
+- **Caveat, seed 2:** at 1 m/s seed 2's student steps faster than the gait clock (3.17 steps/s
+  on the Menagerie model, 2.85 on Newton; the clock gives 2.5 and the target allows 1.5-3) and
+  its soles slide 0.18 m/s on Menagerie (target 0.1 or less), in every episode. Seeds 1 and 3
+  stay on the clock (2.5 steps/s, 36-37 cm steps, slip 0.06 m/s or less). At 0.5 m/s all three
+  are on the clock. Candidate A went faster the same way. The clock's fixed 0.8 s period asks
+  for 40 cm steps at 1 m/s; a period that shortens with the commanded speed would remove the
+  conflict. It was not tried: one seed in three can't show that it fixes anything (D-011), and
+  stage 3's walking is mostly at 0.5 m/s or less. Asked for 1.0 m/s, seeds 1 and 3 walk at
+  0.89-0.93 m/s, inside the target, and seed 2 at 1.01-1.04.
+- **Test seeds (added the same day):** on seeds 1000-1199 (4400 episodes per seed and
+  condition) walking repeats the development seeds within 0.01 m/s, and all three seeds meet the
+  speed targets at 1 and 0.5 m/s and sideways. Kick falls are lower than the warm-up students' on
+  every seed (1 m/s: 142 against 256 pooled; 2 m/s: 654 against 793). Falls without kicks are
+  higher, nearly all while standing with the arms moving: seed 1 falls in 30 of 200 nominal
+  episodes of that command on the Newton model (15%; warm-up: none), seed 3 more with 1 kg in the
+  hands (14 against 1), seed 2 mixed (2 against 21 at friction 0.4). Pooled, nominal falls are
+  46 of 13200 (0.26%-0.46%), within the target, but stage 3 is standing at a table and moving the
+  arms, so this is checked before stage 3. Cause not known; a guess, not tested: under a stand
+  command the narrow term pays for zero speed much more sharply, which may discourage corrective
+  steps. Results: `results/stage1/speed_fix_test/`.
+- **Not redone:** the ablation (step 6) keeps its students, trained without the narrow term;
+  its configurations compare with each other, not with B2.
+- **Cost:** five teacher-student runs of 3000 + 1000 iterations (A, B and B2 seeds 1-2 on the
+  workstation, about 1 h 45 min each; B2 seed 3 on MSI, 1 h 05 min) and MuJoCo tests. Results:
+  `results/stage1/speed_fix/` (development seeds; labels `speed-w2`, `speed-fine`,
+  `speed-fine05`).
+
 ## Open items
 
 - The stage 1 design ([STAGE1_DESIGN.md](STAGE1_DESIGN.md)) was accepted on 2026-10-29
