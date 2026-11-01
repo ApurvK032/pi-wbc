@@ -202,6 +202,22 @@ def test_ppo_student_trains_the_student_inputs_with_a_privileged_critic(monkeypa
     assert agent_cfg.actor.hidden_dims == [512, 256, 128]  # the distilled student's network
 
 
+def test_fine_speed_reward_is_off_unless_switched_on(monkeypatch) -> None:
+    import sys
+
+    from isaaclab_tasks.utils import resolve_task_config
+
+    import pi_wbc.tasks  # noqa: F401
+
+    monkeypatch.setattr(sys, "argv", ["test"])
+    env_cfg, _ = resolve_task_config("PiWbc-G1-Teacher", "rsl_rl_cfg_entry_point", overrides=[])
+    fine = env_cfg.rewards.track_lin_vel_xy_fine
+    assert fine.weight == 0.0 and fine.params["std"] == 0.25
+    on = ["env.rewards.track_lin_vel_xy_fine.weight=1.0"]
+    env_cfg, _ = resolve_task_config("PiWbc-G1-Teacher", "rsl_rl_cfg_entry_point", overrides=on)
+    assert env_cfg.rewards.track_lin_vel_xy_fine.weight == 1.0
+
+
 def test_curriculum_ramp_climbs_to_the_starting_level_on_schedule_then_holds() -> None:
     ramp = {**CURRICULUM, "ramp_steps": 480}
     env, terms = _curriculum_env([True] * 4, [0.0] * 4, step=0)  # starts at level 0.5
