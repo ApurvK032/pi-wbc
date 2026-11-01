@@ -493,6 +493,47 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   steps. Results: `results/stage1/speed_fix_test/`.
 - **Not redone:** the ablation (step 6) keeps its students, trained without the narrow term;
   its configurations compare with each other, not with B2.
+
+## D-023: Test the controller on Isaac Sim's PhysX as a second physics engine (2026-11-01)
+
+- **What:** the trained students are run, without retraining, on Isaac Sim 6.2's PhysX through
+  the same Isaac Lab task (`pi-wbc-isaac-eval ... physics=isaacsim_physx`), next to Newton and
+  the MuJoCo bench. Isaac Sim lives in a second environment, `.venv-isaacsim`
+  (`scripts/isaacsim_env.sh`: `isaaclab[isaacsim,ov]==3.0.0` with Isaac Lab's tested
+  overrides; about 9.5 GB to download, 27 GB on disk), so the training environment and
+  `uv.lock` don't change. Its Newton, Warp, MuJoCo, PyTorch and NumPy versions are the
+  training environment's. Apurv accepted the NVIDIA Omniverse License Agreement for these runs.
+- **Why:** Newton's solver is MuJoCo-Warp, so the Newton → MuJoCo check (D-002) is the easy
+  direction of transfer. PhysX has its own contact model and solver; with the Menagerie model
+  (another robot description in MuJoCo) the two checks cover both a new engine and a new model.
+  Isaac Sim 6.2 lists an RTX 4080 with 16 GB as its minimum; it runs on the workstation's
+  12 GB 4070 for this task (driver 595.99, newer than the 595.58 NVIDIA tested).
+- **What a fair test needed** (in `pi_wbc.isaac_eval`, only for engines other than Newton):
+  - *Joint order.* Isaac Lab lists joints in the engine's order: Newton walks each limb in turn,
+    PhysX goes level by level down the tree. Terms that pick joints by name keep that order, so
+    unchanged the policy's actions went to the wrong joints and every robot fell (110 of 110).
+    The action and the joint observations are now pinned, with `preserve_order`, to the lists
+    in the run's `exported/policy_io.json`, which match Newton's order exactly (checked).
+  - *Friction.* Training sets the ground to 0.05 and each robot to its draw (1.0 when nominal)
+    through Newton, which uses the larger of two touching frictions. PhysX would multiply them.
+    The Newton-only event is dropped and the ground gets 1.0 with PhysX's `max` rule: an
+    effective 1.0, as in training and in MuJoCo.
+  - *The teacher's friction input* reads Newton's model; it becomes a constant. The student
+    never reads it.
+  - *Saving results.* With Isaac Sim, closing the simulation ends the process, so the script
+    now writes its results before closing (before, nothing was saved and the exit code was 0).
+- **Kicks:** `--push-speed` adds the bench's kicks (same times, speed and random horizontal
+  direction) to the Isaac Lab evaluation, so both engines and the bench are compared alike.
+- **Result** (stage 1 README, step 7): speed and crouch errors on PhysX within 0.03 of Newton's
+  on every seed; turning slightly worse on every seed (0.26 against 0.22 rad/s); falls without
+  kicks 15 against 8 of 1650; with 2 m/s kicks 246 against 76 of 1650. Walking transfers; kick
+  recovery is about three times weaker on PhysX.
+- **Also checked, for stage 3:** a camera scene (G1 at a table with objects, head and side
+  cameras) renders on the workstation with all three Isaac Lab 3.0 renderers: Newton's Warp
+  renderer, OVRTX (RTX, with Newton physics) and Isaac Sim RTX (with PhysX)
+  (`scripts/render_test.py`). Which one records the demonstrations is decided before stage 3.
+- **Cost:** about 3 hours, the 27 GB environment, and no change to training. Results:
+  `results/stage1/physx/`.
 - **Cost:** five teacher-student runs of 3000 + 1000 iterations (A, B and B2 seeds 1-2 on the
   workstation, about 1 h 45 min each; B2 seed 3 on MSI, 1 h 05 min) and MuJoCo tests. Results:
   `results/stage1/speed_fix/` (development seeds; labels `speed-w2`, `speed-fine`,

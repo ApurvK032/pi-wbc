@@ -882,3 +882,57 @@ intervals, against the full student (also first protocol):
   crouch accuracy following that level.
 - The run took 1 h 32 min (teacher 61 min, student 18, MuJoCo 13); its teacher reached full
   ranges at about iteration 1200, the full teacher 0.85 by 3000.
+
+## Step 7: the controller in Isaac Sim's PhysX
+
+**In short:** the B2 students (D-022), trained on Newton, were run without retraining on Isaac
+Sim 6.2's PhysX, a different physics engine, through the same Isaac Lab task. Walking speed and
+crouch height match Newton and the MuJoCo bench within about 0.03; turning is slightly worse
+on every seed. Kick recovery is weaker: 2 m/s kicks make the robots fall three times as often as
+on Newton. All transfer here is sim-to-sim.
+
+<p align="center">
+  <img src="b2_s1_kicks_walk_0.5_rtx.gif" alt="G1 walking at 0.5 m/s and kicked sideways at 2 m/s" width="400"><br>
+  <em>B2 student, seed 1, walking at 0.5 m/s and kicked sideways at 2 m/s at 3, 6 and 9 s
+  (alternating sides), rendered with OVRTX on Newton physics (scripts/kick_video.py; reset seed
+  0, the first rendered; no fall).</em>
+</p>
+
+Setup (D-023): `pi-wbc-isaac-eval ... physics=isaacsim_physx` in a second environment with
+Isaac Sim (`scripts/isaacsim_env.sh`), 50 robots per command (550 per run), each command held
+for 20 s, nominal robot; the MuJoCo columns are the bench's development seeds (10 per command
+and model). Isaac Lab counts a fall when the task terminates (a body other than the feet touches
+the ground); the bench, when the pelvis drops below 0.35 m. Each cell is training seeds
+1 / 2 / 3 (mean):
+
+| Measure | Isaac Lab, Newton (training) | Isaac Sim, PhysX | MuJoCo, Menagerie | MuJoCo, Newton's model |
+|---|---|---|---|---|
+| Speed error, 0.5 m/s | 0.04 / 0.04 / 0.07 (0.05) | 0.04 / 0.05 / 0.07 (0.05) | 0.04 / 0.04 / 0.08 (0.05) | 0.04 / 0.04 / 0.07 (0.05) |
+| Speed error, 1 m/s | 0.11 / 0.08 / 0.12 (0.11) | 0.11 / 0.10 / 0.14 (0.12) | 0.09 / 0.07 / 0.13 (0.10) | 0.12 / 0.08 / 0.12 (0.11) |
+| Sideways error, 0.3 m/s | 0.14 / 0.08 / 0.10 (0.11) | 0.17 / 0.10 / 0.11 (0.12) | 0.11 / 0.07 / 0.09 (0.09) | 0.15 / 0.08 / 0.10 (0.11) |
+| Turn-rate error, 0.8 rad/s | 0.17 / 0.24 / 0.25 (0.22) | 0.22 / 0.28 / 0.27 (0.26) | 0.16 / 0.24 / 0.22 (0.21) | 0.17 / 0.23 / 0.24 (0.21) |
+| Crouch error, cm | 2.7 / 1.8 / 3.2 (2.6) | 2.7 / 1.8 / 3.1 (2.5) | 2.3 / 1.6 / 2.8 (2.2) | 2.5 / 1.8 / 3.0 (2.5) |
+| Falls | 7 / 1 / 0 of 550 | 14 / 1 / 0 of 550 | 0 / 0 / 0 of 110 | 1 / 0 / 0 of 110 |
+
+Kicks as in the bench (the speed added to the pelvis in a random horizontal direction at 3, 7,
+11, 15 and 19 s; all 11 commands, 550 robots per seed), falls per seed and pooled with 95%
+intervals:
+
+| Kicks | Isaac Lab, Newton | Isaac Sim, PhysX |
+|---|---|---|
+| 1 m/s | 4 / 9 / 7 (20: 0.8%-1.9%) | 14 / 30 / 10 (54: 2.5%-4.2%) |
+| 2 m/s | 31 / 35 / 10 (76: 3.7%-5.7%) | 64 / 95 / 87 (246: 13.3%-16.7%) |
+
+- **Walking transfers.** On every seed, PhysX's speed errors are within 0.03 m/s of Newton's
+  and its crouch error within 0.1 cm; the two MuJoCo models differ from each other by as much.
+- **Turning is the one consistent gap:** PhysX turns worse on all three seeds (0.26 against
+  0.22 rad/s; seed 1: 0.22 against 0.17), and seeds 2 and 3 miss the 0.2 target everywhere.
+- **Kick recovery does not transfer as well:** more falls on PhysX on every seed at both kick
+  sizes, three times as many at 2 m/s. Newton's 4.6% matches the MuJoCo test seeds' 5.0%, so
+  the gap is PhysX's, not a difference between the two test harnesses.
+- Without kicks every fall on both Isaac Lab engines is in the two arm-motion commands, most
+  while standing (seed 1 again; see D-022).
+- Not tested on PhysX: the other randomized conditions (friction, payload, delay, noise).
+
+Raw data: [`physx/`](physx/) (`b2-s{1,2,3}-{newton,isaacsim}-50.json`, `-push1.0`, `-push2.0`);
+tables from `scripts/compare_engines.py`.

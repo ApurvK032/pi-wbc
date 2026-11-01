@@ -11,8 +11,14 @@ at full range only in the arm scenarios. Starts are Isaac Lab's reset randomizat
 bench: planar velocity in the heading frame, yaw rate, pelvis height, waist angles, arm joints.
 
 By default the robots are nominal (`make_nominal`: no randomization, noise or delay) and are not
-pushed; `--randomized` keeps the task's randomization and pushes. This is the only test the
-teacher can take, since it needs privileged observations.
+pushed; `--randomized` keeps the task's randomization and pushes, and `--push-speed` kicks them
+as the bench does. This is the only test the teacher can take, since it needs privileged
+observations.
+
+On another physics engine than training's Newton (`physics=isaacsim_physx`, which needs Isaac
+Sim; D-023) the policy keeps the joint order it was trained with (read from the run's export),
+the feet get the same effective friction, and the teacher's Newton-only friction input becomes a
+constant (the student does not read it).
 """
 
 from __future__ import annotations
@@ -26,6 +32,13 @@ from typing import Any
 SETTLE_S = 2.0
 
 
+def _constant_obs(env, value: float):
+    """(num_envs, 1) filled with `value`."""
+    import torch
+
+    return torch.full((env.num_envs, 1), value, device=env.device)
+
+
 def main(argv: list[str] | None = None) -> None:
     from isaaclab.app import add_launcher_args, launch_simulation
 
@@ -36,6 +49,13 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--seed", type=int, default=0, help="seed of the reset randomization")
     parser.add_argument("--duration-s", type=float, default=20.0)
     parser.add_argument("--randomized", action="store_true", help="keep randomization and pushes")
+    parser.add_argument(
+        "--push-speed",
+        type=float,
+        default=0.0,
+        help="kicks as in the MuJoCo bench: this speed (m/s) added to the pelvis in a random "
+        "horizontal direction at 3, 7, 11, 15 and 19 s",
+    )
     parser.add_argument("--label", default=None)
     parser.add_argument("--out", type=Path, required=True)
     add_launcher_args(parser)
@@ -54,7 +74,7 @@ def main(argv: list[str] | None = None) -> None:
 
     import pi_wbc.tasks  # noqa: F401
     from pi_wbc import provenance
-    from pi_wbc.sim2sim.commands import BODY_SCENARIOS, SCENARIOS
+    from pi_wbc.sim2sim.commands import BODY_SCENARIOS, SCENARIOS, Condition
     from pi_wbc.stats import wilson_interval
 
     env_cfg, agent_cfg = resolve_task_config(
@@ -75,6 +95,40 @@ def main(argv: list[str] | None = None) -> None:
         for name in ("push_robot", "add_base_mass", "hand_payload"):
             if hasattr(env_cfg.events, name):
                 setattr(env_cfg.events, name, None)
+    if any(o.startswith("physics=") and "newton" not in o for o in overrides):
+        # Another engine than training's (e.g. physics=isaacsim_physx): the teacher's friction
+        # observation reads Newton's model. The student never sees teacher observations, so a
+        # constant of the same shape stands in for it. (The friction event is off when nominal.)
+        from isaaclab.managers import ObservationTermCfg
+
+        teacher = getattr(env_cfg.observations, "teacher", None)
+        if teacher is not None and getattr(teacher, "friction", None) is not None:
+            teacher.friction = ObservationTermCfg(func=_constant_obs, params={"value": 1.0})
+        # Friction: training sets the ground to 0.05 and each robot's shapes to its draw (1.0 when
+        # nominal) through Newton, which takes the larger of two touching frictions. Here the
+        # Newton-only event goes and the ground gets 1.0 with PhysX's "max" rule: the same 1.0.
+        if getattr(env_cfg.events, "physics_material", None) is not None:
+            env_cfg.events.physics_material = None
+        ground = env_cfg.scene.terrain.physics_material
+        ground.static_friction = ground.dynamic_friction = 1.0
+        ground.friction_combine_mode = "max"
+        # Joint order: Isaac Lab lists joints in the engine's order (Newton walks each limb in
+        # turn, PhysX goes level by level), and terms that select joints by name keep that order.
+        # Pin the policy's actions and joint observations to the order it was trained with, as
+        # recorded in its export (the run's exported/policy_io.json).
+        import json
+
+        from isaaclab.managers import SceneEntityCfg
+
+        io_path = args.checkpoint.resolve().parent / "exported" / "policy_io.json"
+        io = json.loads(io_path.read_text())
+        env_cfg.actions.joint_pos.joint_names = list(io["action"]["joint_names"])
+        env_cfg.actions.joint_pos.preserve_order = True
+        for name, joints in io["observation"]["joint_names"].items():
+            term = getattr(env_cfg.observations.policy, name)
+            term.params["asset_cfg"] = SceneEntityCfg(
+                "robot", joint_names=list(joints), preserve_order=True
+            )
     # fixed commands: no resampling, no curriculum
     env_cfg.commands.base_velocity.resampling_time_range = (1.0e6, 1.0e6)
     if has_body:
@@ -135,6 +189,9 @@ def main(argv: list[str] | None = None) -> None:
         steps = round(args.duration_s / dt)
         settle = round(SETTLE_S / dt)
         alive = torch.ones(n, dtype=torch.bool, device=device)
+        push_times = Condition().push_times  # the bench's kick times
+        push_steps = {round(t / dt) for t in push_times} if args.push_speed > 0 else set()
+        push_gen = torch.Generator(device=device).manual_seed(args.seed + 3)
         fall_step = torch.full((n,), -1, device=device)
         keys = ("lin", "ang", "vx", "vy", "wz", "height", "waist", "arm")
         sums = {k: torch.zeros(n, device=device) for k in keys}
@@ -142,6 +199,12 @@ def main(argv: list[str] | None = None) -> None:
         with torch.inference_mode():
             for k in range(steps):
                 hold_commands()
+                if k in push_steps:
+                    angle = 2.0 * torch.pi * torch.rand(n, generator=push_gen, device=device)
+                    vel = robot.data.root_com_vel_w.torch.clone()
+                    vel[:, 0] += args.push_speed * torch.cos(angle)
+                    vel[:, 1] += args.push_speed * torch.sin(angle)
+                    robot.write_root_velocity_to_sim_index(root_velocity=vel)
                 obs, _, dones, _ = venv.step(policy(obs))
                 fell = dones.bool() & alive
                 fall_step[fell] = k
@@ -166,26 +229,28 @@ def main(argv: list[str] | None = None) -> None:
                     arm_err = (arms - arm_term.command)[:, arm_cols].abs().mean(dim=-1)
                     sums["arm"] += arm_err * alive
                 count += alive.float()
+        # results first: with Isaac Sim (Kit), closing the simulation ends the process
+        rows = summarize(names, args.seeds, fall_step, sums, count, has_body, wilson_interval)
+        provenance.save_json(
+            args.out,
+            {
+                "label": args.label,
+                "task": args.task,
+                "checkpoint": str(args.checkpoint),
+                "seeds_per_scenario": args.seeds,
+                "reset_seed": args.seed,
+                "duration_s": args.duration_s,
+                "settle_s": SETTLE_S,
+                "randomized": args.randomized,
+                "push_speed": args.push_speed,
+                "overrides": overrides,
+                "scenarios": {s: asdict(scenarios[s]) for s in names},
+                "summary": rows,
+            },
+        )
+        print_table(rows)
+        print(f"[isaac-eval] wrote {args.out}")
         env.close()
-
-    rows = summarize(names, args.seeds, fall_step, sums, count, has_body, wilson_interval)
-    provenance.save_json(
-        args.out,
-        {
-            "label": args.label,
-            "task": args.task,
-            "checkpoint": str(args.checkpoint),
-            "seeds_per_scenario": args.seeds,
-            "reset_seed": args.seed,
-            "duration_s": args.duration_s,
-            "settle_s": SETTLE_S,
-            "randomized": args.randomized,
-            "scenarios": {s: asdict(scenarios[s]) for s in names},
-            "summary": rows,
-        },
-    )
-    print_table(rows)
-    print(f"[isaac-eval] wrote {args.out}")
 
 
 def _mean_over(sums, count, idx, up, key: str) -> float | None:
