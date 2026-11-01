@@ -684,8 +684,8 @@ finished at 0.65; that level is its own, not a teacher's:
   episodes with 1 m/s kicks, against 1. Without any randomization it also falls to sensor
   noise (32 of 220), as in the first protocol.
 - **Without friction randomization** it turns and walks sideways worse (0.31 rad/s, 0.24 m/s)
-  and falls more, with and without kicks. Without latency or mass randomization it is close to
-  the full student.
+  and falls more, with and without kicks. Seeds 2 and 3 repeat the falls but not the turning
+  (below). Without latency or mass randomization it is close to the full student.
 - **Crouch accuracy comes from training at full ranges, not from any randomization group.** The
   configurations whose teachers reached full ranges (level 1.0) crouch to within 0.1-0.2 cm;
   the others, at 0.75-0.90, are 1.7-3.8 cm off, like the first protocol's full students at
@@ -707,7 +707,33 @@ finished at 0.65; that level is its own, not a teacher's:
 - **Without sensor noise in training** the student does not fall more under noise (0 of 220).
   Noise reaches only the student's inputs, so this configuration's teacher is the full teacher
   trained again; it ended at level 0.75 against 0.85, a measure of how much teachers vary.
-- One training seed: seeds 2 and 3 run on the cluster.
+
+**Three training seeds, five configurations so far** (seeds 2 and 3 trained on the cluster,
+scored here; the other four configurations follow). Test seeds 1000-1199: falls per training
+seed 1 / 2 / 3, out of 4400 each, and pooled over the three. Speed and turn errors: development
+seeds, nominal robot, mean of both models. "Nothing" is each seed's step 4 warm-up student:
+
+| Trained without | Sensor noise | 1 kg per hand | 20 ms delay | 1 m/s kicks | 2 m/s kicks | Speed error, 1 m/s | Turn |
+|---|---|---|---|---|---|---|---|
+| nothing | 1 / 6 / 0 (0.05%) | 4 / 16 / 3 (0.17%) | 0 / 2 / 0 (0.02%) | 84 / 106 / 66 (1.9%) | 254 / 298 / 241 (6.0%) | 0.17 / 0.23 / 0.21 | 0.20 / 0.23 / 0.22 |
+| all six groups | 813 / 1294 / 1944 (30.7%) | 21 / 138 / 15 (1.3%) | 34 / 1 / 2 (0.28%) | 1671 / 2642 / 2299 (50.1%) | 4138 / 4351 / 4279 (96.7%) | 0.13 / 0.10 / 0.11 | 0.13 / 0.16 / 0.15 |
+| pushes | 41 / 151 / 200 (3.0%) | 35 / 39 / 18 (0.70%) | 10 / 322 / 31 (2.8%) | 4086 / 3817 / 4232 (91.9%) | 4400 / 4376 / 4400 (99.8%) | 0.29 / 0.13 / 0.26 | 0.16 / 0.21 / 0.17 |
+| latency | 3 / 4 / 0 (0.05%) | 5 / 0 / 0 (0.04%) | 4 / 10 / 0 (0.11%) | 118 / 25 / 14 (1.2%) | 316 / 221 / 90 (4.8%) | 0.16 / 0.20 / 0.15 | 0.20 / 0.29 / 0.29 |
+| friction | 54 / 3 / 1 (0.44%) | 96 / 40 / 2 (1.0%) | 10 / 0 / 1 (0.08%) | 395 / 207 / 239 (6.4%) | 700 / 1020 / 812 (19.2%) | 0.13 / 0.17 / 0.14 | 0.31 / 0.15 / 0.17 |
+| mass | 0 / 0 / 17 (0.13%) | 1 / 13 / 98 (0.85%) | 0 / 1 / 3 (0.03%) | 48 / 111 / 235 (3.0%) | 380 / 255 / 374 (7.6%) | 0.21 / 0.18 / 0.18 | 0.19 / 0.18 / 0.35 |
+
+- **The same on all three seeds:** without pushes, 1 m/s kicks floor the student in 92% of
+  episodes (full students 1.9%); without any randomization, sensor noise floors it in 31%
+  (0.05%) and it walks more precisely (0.10-0.13 m/s off at 1 m/s, against 0.17-0.23); without
+  friction randomization it falls to kicks about three times as often, although its teachers
+  reached level 1.0 and so trained with larger kicks than the full teachers (0.80-0.85).
+- **Not repeated, or one seed only:** seed 1's poorer turning without friction randomization
+  (0.31 rad/s; seeds 2 and 3: 0.15 and 0.17). Without pushes, seed 2 falls 322 times with a
+  20 ms delay (seeds 1 and 3: 10 and 31). Without mass randomization, seed 3 falls 98 times
+  with 1 kg in each hand (seeds 1 and 2: 1 and 13). Without latency randomization, seeds 2 and 3
+  turn worse (0.29 rad/s), and falls with a 20 ms delay stay rare (14 in 13200).
+- The pooled percentages count episodes. The spread between training seeds is larger than
+  their intervals, so only differences seen on every seed are claimed (D-011).
 
 **First-protocol result, all six groups off** (its student recovered full ranges by
 iteration 300, so it learned every command). Falls out of 4400 on the test seeds, with 95%
