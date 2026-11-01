@@ -634,15 +634,16 @@ knock it down in 2 of 3 standing episodes, as expected of a policy trained with 
 pushes. The step 3-4 policies train with pushes growing to 1.5 m/s. The Isaac Lab side of the
 evaluation protocol (the same commands and seeds in Isaac Lab) is still to do.
 
-## Step 6: ablation (in progress)
+## Step 6: ablation
 
 `scripts/ablation_queue.sh 1` on the workstation: for each configuration a teacher (3000
 iterations) and a student (1000), as the full student, with one randomization group switched
 off (`g1_robust.ABLATION_OVERRIDES`), all six, or none ("full", which reuses the full-length
 run's teacher). Then the MuJoCo bench on development seeds 0-9 (both models, 11 commands, 220
 episodes per condition, the same starts and kicks for every configuration) and on the test
-seeds 1000-1199 (4400 episodes per condition). Training seed 1 only so far; the design asks
-for 3 per configuration, so only large differences count here (D-011).
+seeds 1000-1199 (4400 episodes per condition). Seed 1 was trained here first (the first
+table); seeds 2 and 3 of every configuration were trained on the cluster and scored here (the
+second table). Only differences seen on all three seeds are claimed (D-011).
 
 **Protocol change (D-019).** The first two runs (all groups off, then pushes off) distilled
 their students with the curriculum still running. A student starts as an untrained network
@@ -708,10 +709,10 @@ finished at 0.65; that level is its own, not a teacher's:
   Noise reaches only the student's inputs, so this configuration's teacher is the full teacher
   trained again; it ended at level 0.75 against 0.85, a measure of how much teachers vary.
 
-**Three training seeds, five configurations so far** (seeds 2 and 3 trained on the cluster,
-scored here; the other four configurations follow). Test seeds 1000-1199: falls per training
-seed 1 / 2 / 3, out of 4400 each, and pooled over the three. Speed and turn errors: development
-seeds, nominal robot, mean of both models. "Nothing" is each seed's step 4 warm-up student:
+**Three training seeds, all ten configurations** (seeds 2 and 3 trained on the cluster,
+scored here). Test seeds 1000-1199: falls per training seed 1 / 2 / 3, out of 4400 each, and
+pooled over the three. Speed and turn errors: development seeds, nominal robot, mean of both
+models. "Nothing" is each seed's step 4 warm-up student:
 
 | Trained without | Sensor noise | 1 kg per hand | 20 ms delay | 1 m/s kicks | 2 m/s kicks | Speed error, 1 m/s | Turn |
 |---|---|---|---|---|---|---|---|
@@ -721,17 +722,38 @@ seeds, nominal robot, mean of both models. "Nothing" is each seed's step 4 warm-
 | latency | 3 / 4 / 0 (0.05%) | 5 / 0 / 0 (0.04%) | 4 / 10 / 0 (0.11%) | 118 / 25 / 14 (1.2%) | 316 / 221 / 90 (4.8%) | 0.16 / 0.20 / 0.15 | 0.20 / 0.29 / 0.29 |
 | friction | 54 / 3 / 1 (0.44%) | 96 / 40 / 2 (1.0%) | 10 / 0 / 1 (0.08%) | 395 / 207 / 239 (6.4%) | 700 / 1020 / 812 (19.2%) | 0.13 / 0.17 / 0.14 | 0.31 / 0.15 / 0.17 |
 | mass | 0 / 0 / 17 (0.13%) | 1 / 13 / 98 (0.85%) | 0 / 1 / 3 (0.03%) | 48 / 111 / 235 (3.0%) | 380 / 255 / 374 (7.6%) | 0.21 / 0.18 / 0.18 | 0.19 / 0.18 / 0.35 |
+| actuators | 0 / 11 / 1 (0.09%) | 3 / 24 / 123 (1.1%) | 0 / 4 / 10 (0.11%) | 48 / 134 / 87 (2.0%) | 385 / 318 / 425 (8.6%) | 0.21 / 0.19 / 0.12 | 0.16 / 0.25 / 0.29 |
+| sensor noise | 12 / 2 / 5 (0.14%) | 2 / 1 / 0 (0.02%) | 0 / 0 / 0 (0%) | 37 / 32 / 27 (0.73%) | 201 / 198 / 83 (3.7%) | 0.16 / 0.27 / 0.18 | 0.22 / 0.18 / 0.19 |
+| curriculum | 3 / 0 / 0 (0.02%) | 0 / 0 / 0 (0%) | 0 / 0 / 0 (0%) | 391 / 77 / 23 (3.7%) | 281 / 348 / 171 (6.1%) | 0.51 / 0.29 / 0.21 | 0.49 / 0.48 / 0.39 |
+| teacher (PPO alone) | 0 / 2 / 0 (0.02%) | 8 / 12 / 6 (0.20%) | 0 / 2 / 0 (0.02%) | 9 / 8 / 6 (0.17%) | 231 / 289 / 436 (7.2%) | 0.23 / 0.18 / 0.13 | 0.44 / 0.39 / 0.47 |
 
 - **The same on all three seeds:** without pushes, 1 m/s kicks floor the student in 92% of
   episodes (full students 1.9%); without any randomization, sensor noise floors it in 31%
   (0.05%) and it walks more precisely (0.10-0.13 m/s off at 1 m/s, against 0.17-0.23); without
   friction randomization it falls to kicks about three times as often, although its teachers
   reached level 1.0 and so trained with larger kicks than the full teachers (0.80-0.85).
+- **Also the same on all three seeds:** without a teacher, PPO alone turns worst (0.39-0.47
+  rad/s off) and falls least to 1 m/s kicks (9, 8 and 6 times, against 84, 106 and 66), but not
+  to 2 m/s kicks (7.2% against 6.0%); it reaches only levels 0.65, 0.50 and 0.55 of the
+  curriculum. Without the curriculum (full ranges from the start) the student turns about
+  twice as badly (0.39-0.49 rad/s) and almost never falls without kicks (3 times in 66000
+  episodes). Trained without sensor noise, the student falls less to kicks on every seed (1 m/s:
+  37, 32 and 27 against 84, 106 and 66; 2 m/s: 201, 198 and 83 against 254, 298 and 241) and
+  still rarely to sensor noise (19 in 13200, against 7).
+- **The crouch pattern holds on all three seeds, with one overlap.** The configurations whose
+  teachers reach level 1.0 on every seed (all groups off, pushes off, friction off, no
+  curriculum) crouch to within 0.1-1.8 cm; those at 0.75-0.90 (full, latency, mass, actuators,
+  sensor noise) are 1.6-3.9 cm off, and PPO alone 0.1-1.3 cm (development seeds, mean of both
+  models).
 - **Not repeated, or one seed only:** seed 1's poorer turning without friction randomization
   (0.31 rad/s; seeds 2 and 3: 0.15 and 0.17). Without pushes, seed 2 falls 322 times with a
   20 ms delay (seeds 1 and 3: 10 and 31). Without mass randomization, seed 3 falls 98 times
-  with 1 kg in each hand (seeds 1 and 2: 1 and 13). Without latency randomization, seeds 2 and 3
-  turn worse (0.29 rad/s), and falls with a 20 ms delay stay rare (14 in 13200).
+  with 1 kg in each hand (seeds 1 and 2: 1 and 13); without actuator randomization, seed 3
+  falls 123 times with it (seeds 1 and 2: 3 and 24). Without actuator randomization the
+  student also falls more to 2 m/s kicks on every seed, but only slightly on seed 2 (318 against
+  298). Without latency randomization, seeds 2 and 3 turn worse (0.29 rad/s), and falls with a
+  20 ms delay stay rare (14 in 13200). Without the curriculum, seed 1 walks 0.51 m/s off at
+  1 m/s, seed 3 only 0.21 (as the full student), and its 1 m/s kick falls range from 23 to 391.
 - The pooled percentages count episodes. The spread between training seeds is larger than
   their intervals, so only differences seen on every seed are claimed (D-011).
 
