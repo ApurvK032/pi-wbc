@@ -560,6 +560,16 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 - **Cost:** per seed about 25 min of teacher training, 20 min of distillation and the usual
   tests. Seed 1 first, on the workstation; seeds 2 and 3 after its result.
 
+## D-025: All rights reserved, and a map for the old commit hashes (2026-11-01)
+
+- **What:** the repository is public but not open source: [LICENSE](../LICENSE) reserves all
+  rights. The git history was rewritten so that every commit carries this license, which gave
+  every commit a new hash. Result files written on the old history (up to 2026-11-02) record
+  old hashes; [commit_map.tsv](commit_map.tsv) maps each old hash to its new one, whose code is
+  otherwise the same.
+- **Why:** the project is shared to be read, not yet for reuse.
+- **Cost:** a lookup in the map for any commit hash recorded on the old history.
+
 ## Open items
 
 - The stage 1 design ([STAGE1_DESIGN.md](STAGE1_DESIGN.md)) was accepted on 2026-10-29
