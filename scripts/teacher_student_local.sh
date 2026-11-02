@@ -28,6 +28,8 @@
 # for TEACHER_ITERS more iterations instead of training one, with its curriculum level ramped
 # from where it stopped (CONTINUE_LEVEL, read from its training log by default) to 1, the full
 # command ranges, over CONTINUE_RAMP environment steps (default 7200, 300 iterations; D-024).
+# Set TEACHER_CKPT to a teacher checkpoint (`{seed}` stands for the seed) to distill from it
+# without training or resuming a teacher.
 #
 # Like train_eval_local.sh: every step runs the code of the starting commit from a temporary
 # copy, at the lowest CPU priority on 16 of the 24 CPU threads, and a failed seed is skipped.
@@ -92,7 +94,12 @@ for SEED in "$@"; do
         T_RUN=pc-${TEACHER_LABEL:-${LABEL}}-teacher-s${SEED}-${T_ITERS}it
         S_RUN=pc-${LABEL}-student-${RECIPE}-s${SEED}-${S_ITERS}it
         T_LAST=logs/rsl_rl/pi_wbc_g1_teacher/${T_RUN}/model_$((T_ITERS - 1)).pt
-        if [ -n "${CONTINUE_FROM:-}" ]; then
+        T_GIVEN=""
+        if [ -n "${TEACHER_CKPT:-}" ]; then
+            T_GIVEN=${TEACHER_CKPT//\{seed\}/${SEED}}
+            T_RUN=$(basename "$(dirname "${T_GIVEN}")")
+            echo "[$(date +%H:%M)] seed ${SEED}: teacher given, ${T_GIVEN}"
+        elif [ -n "${CONTINUE_FROM:-}" ]; then
             FROM=${CONTINUE_FROM//\{seed\}/${SEED}}
             FROM_RUN=$(basename "$(dirname "${FROM}")")
             FROM_LEVEL=${CONTINUE_LEVEL:-$(tr '\r' '\n' < "logs/train_${FROM_RUN}.log" \
@@ -124,7 +131,7 @@ for SEED in "$@"; do
             fi
         fi
         T_DIR=$(ls -d logs/rsl_rl/*/"${T_RUN}")
-        T_CKPT=$(ls "${T_DIR}"/model_*.pt | sort -V | tail -1)
+        T_CKPT=${T_GIVEN:-$(ls "${T_DIR}"/model_*.pt | sort -V | tail -1)}
         # the student works up to the teacher's last level (it would restart at 0 otherwise)
         LEVEL=$(tr '\r' '\n' < "logs/train_${T_RUN}.log" | sed 's/\x1b\[[0-9;]*m//g' \
             | awk '/Curriculum\/upper_body_level/{v=$2} END{print (v == "" ? 0 : v)}')
