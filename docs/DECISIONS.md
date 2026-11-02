@@ -559,6 +559,13 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   controller-swap study (stage 5).
 - **Cost:** per seed about 25 min of teacher training, 20 min of distillation and the usual
   tests. Seed 1 first, on the workstation; seeds 2 and 3 after its result.
+- **Result (three seeds):** the teachers hardly fall with the arms over the full range (3 of
+  9900 test episodes) and walk at 0.91-0.98 m/s when asked for 1.0, but turn worse: seed 2's
+  teacher went from 0.78 to 0.40 rad/s when asked for 0.8, and seed 1's from 0.45 to 0.26 when
+  asked to turn while walking. The first students distilled from them fell more than B2's and
+  walked slower; D-026 fixes that. Details in
+  [results/stage1/README.md](../results/stage1/README.md), "Full command ranges and a 25-step
+  student".
 
 ## D-025: All rights reserved, and a map for the old commit hashes (2026-11-01)
 
@@ -569,6 +576,24 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   otherwise the same.
 - **Why:** the project is shared to be read, not yet for reuse.
 - **Cost:** a lookup in the map for any commit hash recorded on the old history.
+
+## D-026: The student sees the last 25 control steps (0.5 s) (2026-11-02)
+
+- **What:** the student is distilled from a full-range teacher (D-024) for 3000 iterations
+  with 25 steps of observation history instead of 6 (88 numbers per step, 2200 inputs; same
+  512-256-128 network), set with `env.observations.policy.history_length=25`. The code's
+  default stays 6, so earlier runs are unchanged; the export records the history length and the
+  MuJoCo bench reads it from there.
+- **Why:** with 6 steps (0.12 s) the full-range students either fell more than B2's (1000
+  iterations: 55 of 3300 test episodes) or, trained for 3000 iterations, walked at 0.71 m/s
+  when asked for 1.0, with the randomized robot too. With 25 steps, on three seeds: 0.91-1.00
+  m/s, 6 falls in 9900 nominal test episodes (B2: 53) and 84 with the randomized robot (B2: 285),
+  and 4 falls to 2 m/s kicks in 660 MuJoCo episodes (B2: 26). [STAGE1_DESIGN.md](STAGE1_DESIGN.md)
+  section 4 named a longer history as the fallback if the student could not match the teacher.
+- **Cost:** about 64 min of distillation per seed on the workstation (20 min before), and a
+  four times larger input layer. Turning stays worse than B2's (0.31-0.47 rad/s when asked for
+  0.8, B2 0.59-0.67), mostly lost in the full-range teachers; a narrow turning reward is being
+  tested for it.
 
 ## Open items
 

@@ -742,6 +742,53 @@ Newton, nominal robot, falls while standing with the arms moving (`pi-wbc-isaac-
 
 Raw data: [`arm_level/`](arm_level/).
 
+### Full command ranges and a 25-step student (D-024, D-026)
+
+Each B2 teacher was resumed for 1000 more iterations with its curriculum level ramped to 1, the
+full ranges (D-024), and a new student was distilled from it. Isaac Lab on Newton, arms over the
+full range, 300 robots per test command (3300 per seed over the 11 commands); seed 1 took three
+tries:
+
+| Seed 1 student | Distillation | History | Falls, nominal / randomized robot | Speed asked 1.0 m/s |
+|---|---|---|---|---|
+| first try | 1000 iterations | 6 steps (0.12 s) | 55 / not run | 0.80 |
+| longer | 3000 | 6 steps | 6 / 42 | 0.71 |
+| longer history | 3000 | 25 steps (0.5 s) | 5 / 24 | 1.00 |
+
+The 6-step student fell less when trained longer but walked slower, with the randomized robot
+too, so it is not a bias of the nominal test. With 25 steps of history it walks at the commanded
+speed (the fallback named in [STAGE1_DESIGN.md](../../docs/STAGE1_DESIGN.md) section 4). Three
+seeds (seeds 1 / 2 / 3, total with 95% interval):
+
+| Controller | Falls, nominal robot | Falls, randomized robot | Speed asked 1.0 m/s | Turn rate asked 0.8 rad/s | Turn rate asked 0.5 rad/s while walking at 0.6 m/s |
+|---|---|---|---|---|---|
+| B2 student (D-022) | 38 / 6 / 9 (53: 0.41%-0.70%) | 98 / 111 / 76 (285: 2.6%-3.2%) | 0.90 / 1.02 / 0.91 | 0.64 / 0.59 / 0.67 | 0.29 / 0.30 / 0.47 |
+| full-range teacher | 3 / 0 / 0 (3: 0.01%-0.09%) | 6 / 1 / 10 (17: 0.11%-0.27%) | 0.96 / 0.91 / 0.98 | 0.60 / 0.40 / 0.59 | 0.26 / 0.28 / 0.55 |
+| 25-step student | 5 / 1 / 0 (6: 0.03%-0.13%) | 24 / 36 / 24 (84: 0.69%-1.05%) | 1.00 / 0.91 / 0.98 | 0.47 / 0.31 / 0.45 | 0.17 / 0.25 / 0.45 |
+
+MuJoCo (development seeds 0-9, both robot models, 110 episodes per model and condition; seeds 1-3
+pooled, B2 against the 25-step student): falls without kicks 2 against 0 of 3300; with 1 m/s kicks
+4 against 2 of 660; with 2 m/s kicks 26 against 4 of 660. Speed error at 1 m/s 0.11 / 0.08 / 0.13
+against 0.07 / 0.10 / 0.08. Turn rate asked 0.8 rad/s in place (`scripts/turn_sweep.py`, mean of
+both models) 0.65 / 0.60 / 0.69 against 0.49 / 0.31 / 0.46.
+
+- **Falls:** the 25-step student falls about a ninth as often as B2 with the nominal robot and a
+  third as often with the randomized one, on every seed, and keeps the speed. With the
+  randomized robot it still falls five times as often as its teacher, 36 of its 84 falls while
+  walking at 1 m/s.
+- **Turning is worse, and most of the loss is in the teacher.** Seed 2's B2 teacher turned at
+  0.78 rad/s when asked for 0.8; after the full-range training it turned at 0.40. Seed 1's
+  teacher kept its turning in place (0.64, then 0.60) but lost it while walking (0.45, then
+  0.26). Each student then turns a little slower than its teacher. A longer history does not
+  help here: the gyro gives the student its turn rate directly.
+- Next: the full-range training again with a narrow turning reward, the speed fix's tool
+  (`track_ang_vel_z_fine`, std 0.25 rad/s, weight 0.5); running on three seeds. The test seeds
+  (1000-1199) wait for its result, since it may change the final controller.
+
+Raw data: [`full_range/`](full_range/) (MuJoCo; labels `full-range-s1` for the first try,
+`full-range-3k-s1`, `full-range-h25-s{1,2,3}`; the turn sweeps in `turn_sweep/`) and
+[`arm_level/`](arm_level/) (Isaac Lab, `*-arm1.0-300.json`, `-rand` for the randomized robot).
+
 ## Step 5: test conditions in the MuJoCo bench (in progress)
 
 `pi-wbc-sim2sim --condition` (`src/pi_wbc/sim2sim/commands.py`), the conditions of design
