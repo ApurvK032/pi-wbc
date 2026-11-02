@@ -32,6 +32,15 @@ from typing import Any
 SETTLE_S = 2.0
 
 
+def _repo_relative(path: Path) -> str:
+    """`path` relative to the working directory when it lies inside it, so that result files
+    don't record where the repository sits on this machine; unchanged otherwise."""
+    try:
+        return str(path.resolve().relative_to(Path.cwd().resolve()))
+    except ValueError:
+        return str(path)
+
+
 def _constant_obs(env, value: float):
     """(num_envs, 1) filled with `value`."""
     import torch
@@ -244,7 +253,7 @@ def main(argv: list[str] | None = None) -> None:
             {
                 "label": args.label,
                 "task": args.task,
-                "checkpoint": str(args.checkpoint),
+                "checkpoint": _repo_relative(args.checkpoint),
                 "seeds_per_scenario": args.seeds,
                 "reset_seed": args.seed,
                 "duration_s": args.duration_s,
