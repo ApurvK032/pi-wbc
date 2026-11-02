@@ -782,12 +782,49 @@ both models) 0.65 / 0.60 / 0.69 against 0.49 / 0.31 / 0.46.
   0.26). Each student then turns a little slower than its teacher. A longer history does not
   help here: the gyro gives the student its turn rate directly.
 - Next: the full-range training again with a narrow turning reward, the speed fix's tool
-  (`track_ang_vel_z_fine`, std 0.25 rad/s, weight 0.5); running on three seeds. The test seeds
-  (1000-1199) wait for its result, since it may change the final controller.
+  (`track_ang_vel_z_fine`, std 0.25 rad/s, weight 0.5); result in the next section: it does not
+  fix turning. The test seeds (1000-1199) wait until turning is settled, since it may change
+  the final controller.
 
 Raw data: [`full_range/`](full_range/) (MuJoCo; labels `full-range-s1` for the first try,
 `full-range-3k-s1`, `full-range-h25-s{1,2,3}`; the turn sweeps in `turn_sweep/`) and
 [`arm_level/`](arm_level/) (Isaac Lab, `*-arm1.0-300.json`, `-rand` for the randomized robot).
+
+### A narrow turning reward does not fix turning (D-027)
+
+The same training as the 25-step students above, with the narrow turning reward on in the
+teacher's 1000 full-range iterations (`env.rewards.track_ang_vel_z_fine.weight=0.5`). Seeds 1 and
+2 trained on the workstation, seed 3 on MSI (an L40S, same commit). Isaac Lab, the same tests
+(seeds 1 / 2 / 3, total with 95% interval):
+
+| Controller | Falls, nominal robot | Falls, randomized robot | Speed asked 1.0 m/s | Turn rate asked 0.8 rad/s | Turn rate asked 0.5 rad/s while walking at 0.6 m/s |
+|---|---|---|---|---|---|
+| full-range teacher | 3 / 0 / 0 (3: 0.01%-0.09%) | 6 / 1 / 10 (17: 0.11%-0.27%) | 0.96 / 0.91 / 0.98 | 0.60 / 0.40 / 0.59 | 0.26 / 0.28 / 0.55 |
+| same, with the turning reward | 0 / 0 / 2 (2: 0.01%-0.07%) | 4 / 3 / 22 (29: 0.20%-0.42%) | 0.92 / 0.93 / 0.94 | 0.58 / 0.48 / 0.41 | 0.34 / 0.33 / 0.47 |
+| 25-step student | 5 / 1 / 0 (6: 0.03%-0.13%) | 24 / 36 / 24 (84: 0.69%-1.05%) | 1.00 / 0.91 / 0.98 | 0.47 / 0.31 / 0.45 | 0.17 / 0.25 / 0.45 |
+| same, with the turning reward | 1 / 2 / 1 (4: 0.02%-0.10%) | 21 / 15 / 35 (71: 0.57%-0.90%) | 0.93 / 0.88 / 0.98 | 0.37 / 0.44 / 0.31 | 0.19 / 0.36 / 0.35 |
+
+MuJoCo (development seeds 0-9, both robot models, seeds 1-3 pooled; 25-step student against the
+one with the turning reward): no falls without kicks for either; with 1 m/s kicks 2 against 1 of
+660; with 2 m/s kicks 4 against 14 of 660. Yaw-rate error walking straight at 1 m/s 0.17 / 0.31
+/ 0.26 against 0.20 / 0.24 / 0.21 rad/s. Turn rate asked 0.8 rad/s in place (turn sweep, mean of
+both models) 0.49 / 0.31 / 0.46 against 0.37 / 0.46 / 0.33.
+
+- **No gain on average.** The reward helped seed 2 and hurt seeds 1 and 3, in the teacher and
+  in the student alike, and the student fell more often to hard kicks in MuJoCo. Straight
+  walking drifted a little less on two seeds of three. The reward stays off (D-027).
+- **Turning in place follows the gait.** In the MuJoCo turn sweep, students that step around
+  while turning in place (about 2.5 steps per second) reach 0.46-0.49 rad/s when asked for 0.8;
+  students that twist on their feet with fewer steps (1.3-1.9 per second) reach 0.31-0.37.
+  Without the reward one seed of three twists (seed 2), with it two (seeds 1 and 3). Only 10%
+  of the training robots are asked to turn in place.
+- Next: the same teacher trained for 7000 instead of 1000 iterations at the full ranges (seed 3,
+  on MSI), tested every 1000 iterations, to see whether the teacher is undertrained there; then
+  more robots turning in place during training.
+
+Raw data: [`turn_fine/`](turn_fine/) (MuJoCo, labels `turn-fine-s{1,2,3}`; the turn sweeps in
+`turn_sweep/`) and [`arm_level/`](arm_level/) (Isaac Lab, `turn-fine-s*` for the students,
+`turn-fine-teacher-s*` for the teachers).
 
 ## Step 5: test conditions in the MuJoCo bench (in progress)
 

@@ -592,8 +592,27 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   section 4 named a longer history as the fallback if the student could not match the teacher.
 - **Cost:** about 64 min of distillation per seed on the workstation (20 min before), and a
   four times larger input layer. Turning stays worse than B2's (0.31-0.47 rad/s when asked for
-  0.8, B2 0.59-0.67), mostly lost in the full-range teachers; a narrow turning reward is being
-  tested for it.
+  0.8, B2 0.59-0.67), mostly lost in the full-range teachers; a narrow turning reward did not
+  fix it (D-027).
+
+## D-027: The narrow turning reward stays off (2026-11-02)
+
+- **What:** `track_ang_vel_z_fine` (an exponential turn-rate reward with std 0.25 rad/s) keeps
+  weight 0 in the controller. It was tried at weight 0.5 in the full-range teacher training
+  (D-024) with 25-step students (D-026) on three seeds, and the code keeps it for later tests.
+- **Why:** it did not make turning better on average. Asked to turn at 0.8 rad/s in place, the
+  students turned at 0.37 / 0.44 / 0.31 rad/s (seeds 1 / 2 / 3) against 0.47 / 0.31 / 0.45
+  without it, and the teachers at 0.58 / 0.48 / 0.41 against 0.60 / 0.40 / 0.59: better on seed
+  2, worse on seeds 1 and 3. In MuJoCo the students fell 14 times in 660 episodes with 2 m/s
+  kicks, against 4 without it. The wide turning reward still pays 85% of its maximum at 0.2
+  rad/s off, but a narrow one barely pays at the 0.3-0.5 rad/s shortfall in place, so it
+  rewards turning faster only once the robot is already close to the command. The turn rate in place follows the gait instead:
+  students that step around while turning reach 0.46-0.49 rad/s, students that twist on their
+  feet with fewer steps 0.31-0.37, and which gait a seed learns did not follow the reward.
+- **Cost:** about 2 h per seed of training and tests (seeds 1 and 2 on the workstation, seed 3
+  on MSI); the full-range recipe of D-024 and D-026 stays the controller. Next for turning: a
+  longer teacher training at the full ranges (is the teacher undertrained there?), then more
+  robots turning in place during training (10% now).
 
 ## Open items
 
