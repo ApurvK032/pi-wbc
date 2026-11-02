@@ -15,7 +15,13 @@
 #                   ablation's from pi_wbc.tasks.g1_robust.ABLATION_OVERRIDES
 #
 # The student's curriculum level rises from 0 to the teacher's last level over its first 7200
-# environment steps (300 iterations), then stays there (D-021). Output:
+# environment steps (300 iterations), then stays there (D-021).
+#
+# Set CONTINUE_FROM to a teacher checkpoint and CONTINUE_LEVEL to that teacher's last curriculum
+# level (pass both in --export) to resume that teacher for teacher_iters more iterations instead
+# of training one, with its level ramped from CONTINUE_LEVEL to 1, the full command ranges,
+# over CONTINUE_RAMP environment steps (default 7200, 300 iterations; D-024), as
+# scripts/teacher_student_local.sh does. Output:
 # logs/rsl_rl/pi_wbc_g1_teacher/slurm-<jobid>-<tag>/ and logs/rsl_rl/pi_wbc_g1_student/
 # slurm-<jobid>-<tag>/ (checkpoints, params/, the student's exported/), job log
 # logs/slurm/piwbc-ts-<jobid>.out. Runs from a copy of PIWBC_COMMIT made under
@@ -52,9 +58,23 @@ echo "teacher-student, seed ${SEED}, variant ${TAG}, ${T_ITERS}+${S_ITERS} itera
 
 run() { apptainer exec --nv "${SIF}" uv run --frozen "$@"; }
 
+FROM=()
+RAMP=()
+if [ -n "${CONTINUE_FROM:-}" ]; then
+    : "${CONTINUE_LEVEL:?set CONTINUE_LEVEL to the last curriculum level of the resumed teacher}"
+    echo "teacher resumed from ${CONTINUE_FROM}, level ${CONTINUE_LEVEL} to 1 over ${CONTINUE_RAMP:-7200} steps"
+    FROM=(--checkpoint "${CONTINUE_FROM}")
+    RAMP=(
+        env.commands.body_pose.initial_level=1.0 env.commands.upper_body.initial_level=1.0
+        env.curriculum.upper_body_level.params.raise_below=-1.0
+        env.curriculum.upper_body_level.params.lower_above=2.0
+        "env.curriculum.upper_body_level.params.ramp_steps=${CONTINUE_RAMP:-7200}"
+        "env.curriculum.upper_body_level.params.ramp_from=${CONTINUE_LEVEL}"
+    )
+fi
 run isaaclab train --rl_library rsl_rl --task PiWbc-G1-Teacher --num_envs 4096 --seed "${SEED}" \
-    --max_iterations "${T_ITERS}" --run_timestamp "${RUN}" physics=newton_mjwarp \
-    "${OVERRIDES[@]}" > "logs/slurm/piwbc-ts-${SLURM_JOB_ID}-teacher.log" 2>&1
+    --max_iterations "${T_ITERS}" --run_timestamp "${RUN}" "${FROM[@]}" physics=newton_mjwarp \
+    "${OVERRIDES[@]}" "${RAMP[@]}" > "logs/slurm/piwbc-ts-${SLURM_JOB_ID}-teacher.log" 2>&1
 T_DIR=logs/rsl_rl/pi_wbc_g1_teacher/${RUN}
 T_CKPT=$(ls "${T_DIR}"/model_*.pt | sort -V | tail -1)
 LEVEL=$(tr '\r' '\n' < "logs/slurm/piwbc-ts-${SLURM_JOB_ID}-teacher.log" \
