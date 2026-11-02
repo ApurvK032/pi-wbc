@@ -24,6 +24,11 @@
 # PIWBC_COMMIT to run a given commit instead of HEAD. Set TEST_OUT to also test each student on
 # the test seeds (scripts/test_seeds.sh, in the background on CPU threads 16 and up) there.
 #
+# Set CONTINUE_FROM to a teacher checkpoint (`{seed}` stands for the seed) to resume that teacher
+# for TEACHER_ITERS more iterations instead of training one, with its curriculum level ramped
+# from where it stopped (CONTINUE_LEVEL, read from its training log by default) to 1, the full
+# command ranges, over CONTINUE_RAMP environment steps (default 7200, 300 iterations; D-024).
+#
 # Like train_eval_local.sh: every step runs the code of the starting commit from a temporary
 # copy, at the lowest CPU priority on 16 of the 24 CPU threads, and a failed seed is skipped.
 set -uo pipefail
@@ -87,7 +92,27 @@ for SEED in "$@"; do
         T_RUN=pc-${TEACHER_LABEL:-${LABEL}}-teacher-s${SEED}-${T_ITERS}it
         S_RUN=pc-${LABEL}-student-${RECIPE}-s${SEED}-${S_ITERS}it
         T_LAST=logs/rsl_rl/pi_wbc_g1_teacher/${T_RUN}/model_$((T_ITERS - 1)).pt
-        if [ -f "${T_LAST}" ] && [ -f "logs/train_${T_RUN}.log" ]; then
+        if [ -n "${CONTINUE_FROM:-}" ]; then
+            FROM=${CONTINUE_FROM//\{seed\}/${SEED}}
+            FROM_RUN=$(basename "$(dirname "${FROM}")")
+            FROM_LEVEL=${CONTINUE_LEVEL:-$(tr '\r' '\n' < "logs/train_${FROM_RUN}.log" \
+                | sed 's/\x1b\[[0-9;]*m//g' \
+                | awk '/Curriculum\/upper_body_level/{v=$2} END{print (v == "" ? 0 : v)}')}
+            echo "[$(date +%H:%M)] seed ${SEED}: teacher, ${T_ITERS} more iterations from ${FROM}," \
+                "level ${FROM_LEVEL} to 1 over ${CONTINUE_RAMP:-7200} steps (${T_RUN})"
+            if ! run isaaclab train --rl_library rsl_rl --task PiWbc-G1-Teacher --num_envs 4096 \
+                --max_iterations "${T_ITERS}" --seed "${SEED}" --run_timestamp "${T_RUN}" \
+                --checkpoint "${FROM}" physics=newton_mjwarp "${EXTRA[@]}" \
+                "env.commands.body_pose.initial_level=1.0" "env.commands.upper_body.initial_level=1.0" \
+                "env.curriculum.upper_body_level.params.raise_below=-1.0" \
+                "env.curriculum.upper_body_level.params.lower_above=2.0" \
+                "env.curriculum.upper_body_level.params.ramp_steps=${CONTINUE_RAMP:-7200}" \
+                "env.curriculum.upper_body_level.params.ramp_from=${FROM_LEVEL}" \
+                > "logs/train_${T_RUN}.log" 2>&1; then
+                echo "[$(date +%H:%M)] seed ${SEED}: teacher continuation failed, see logs/train_${T_RUN}.log"
+                continue
+            fi
+        elif [ -f "${T_LAST}" ] && [ -f "logs/train_${T_RUN}.log" ]; then
             echo "[$(date +%H:%M)] seed ${SEED}: teacher already trained, ${T_LAST}"
         else
             echo "[$(date +%H:%M)] seed ${SEED}: teacher, ${T_ITERS} iterations (${T_RUN})"

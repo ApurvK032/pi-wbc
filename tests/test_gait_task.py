@@ -229,6 +229,18 @@ def test_curriculum_ramp_climbs_to_the_starting_level_on_schedule_then_holds() -
     assert mdp.upper_body_level(env, slice(None), **ramp).item() == pytest.approx(0.5)
 
 
+def test_curriculum_ramp_can_start_from_a_resumed_teachers_level() -> None:
+    ramp = {**CURRICULUM, "ramp_steps": 480, "ramp_from": 0.7}
+    env, terms = _curriculum_env([True] * 4, [0.0] * 4, step=0)
+    terms["body"].level = terms["arms"].level = 1.0  # the target: the full ranges
+    assert mdp.upper_body_level(env, slice(None), **ramp).item() == pytest.approx(0.7)
+    env.common_step_counter = 240
+    assert mdp.upper_body_level(env, slice(None), **ramp).item() == pytest.approx(0.85)
+    env.common_step_counter = 5000
+    assert mdp.upper_body_level(env, slice(None), **ramp).item() == pytest.approx(1.0)
+    assert terms["body"].level == pytest.approx(1.0)
+
+
 @pytest.mark.parametrize(("ramp_pushes", "top_speed"), [(True, 0.75), (False, 1.0)])
 def test_curriculum_ramp_ramps_the_pushes_unless_told_not_to(
     ramp_pushes: bool, top_speed: float

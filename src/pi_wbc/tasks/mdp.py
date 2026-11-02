@@ -471,6 +471,7 @@ def upper_body_level(
     push_speeds: tuple[float, float] = (0.5, 1.5),
     ramp_steps: int = 0,
     ramp_pushes: bool = True,
+    ramp_from: float = 0.0,
 ) -> torch.Tensor:
     """Curriculum: widen the body-pose and arm-motion ranges while the robot walks well.
 
@@ -486,10 +487,12 @@ def upper_body_level(
     at 1 (m/s, both horizontal directions). Returns the level, which Isaac Lab logs.
 
     With `ramp_steps` > 0 the level follows a fixed schedule instead, for a student distilled
-    from a teacher (D-019): from 0 up to the starting level in a straight line over that many
-    policy steps, then held, whatever the falls and rewards. The pushes follow the ramp too,
-    unless `ramp_pushes` is False: then they stay at the starting level's size from the first
-    step, and only the command ranges warm up.
+    from a teacher (D-019): from `ramp_from` (default 0) up to the starting level in a straight
+    line over that many policy steps, then held, whatever the falls and rewards. The pushes
+    follow the ramp too, unless `ramp_pushes` is False: then they stay at the starting level's
+    size from the first step, and only the command ranges warm up. A teacher resumed with its
+    last level as `ramp_from` and 1 as the starting level is taken on to the full ranges
+    (D-024).
     """
     terms = [env.command_manager.get_term(n) for n in command_names]
     lead = terms[0]
@@ -503,7 +506,8 @@ def upper_body_level(
     if ramp_steps > 0:
         if not hasattr(lead, "ramp_target"):
             lead.ramp_target = lead.level
-        level = lead.ramp_target * min(1.0, env.common_step_counter / ramp_steps)
+        frac = min(1.0, env.common_step_counter / ramp_steps)
+        level = ramp_from + (lead.ramp_target - ramp_from) * frac
         for term in terms:
             term.level = level
         push_level = level if ramp_pushes else lead.ramp_target

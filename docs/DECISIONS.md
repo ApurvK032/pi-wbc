@@ -543,6 +543,23 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   `results/stage1/speed_fix/` (development seeds; labels `speed-w2`, `speed-fine`,
   `speed-fine05`).
 
+## D-024: Take the B2 teachers on to the full command ranges before distilling (2026-11-01)
+
+- **What:** each B2 teacher (D-022) is resumed from its last checkpoint for 1000 more PPO
+  iterations. Its curriculum level ramps on a fixed schedule from where it stopped to 1 (the
+  full body-pose and arm-motion ranges, and the full kick size, 1.5 m/s) over the first 300
+  iterations, then stays at 1, whatever the falls and rewards (`upper_body_level(...,
+  ramp_from=...)`; `scripts/teacher_student_local.sh` with `CONTINUE_FROM`). A new student is
+  then distilled from it with the warm-up of D-021, which now climbs to level 1.
+- **Why:** the tests move the arms over the full joint ranges, but the curriculum waits for the
+  turning reward and B2's teachers stopped at levels 0.70, 0.80 and 0.75. Seed 1's student falls
+  in 36 of 300 episodes while standing with the arms moving over the full range, and in none of
+  300 within the range it trained on (D-022). Stage 3 stands the robot at a table and moves its
+  arms; a controller with an untrained part of the arm range is a hidden risk there and in the
+  controller-swap study (stage 5).
+- **Cost:** per seed about 25 min of teacher training, 20 min of distillation and the usual
+  tests. Seed 1 first, on the workstation; seeds 2 and 3 after its result.
+
 ## Open items
 
 - The stage 1 design ([STAGE1_DESIGN.md](STAGE1_DESIGN.md)) was accepted on 2026-10-29
