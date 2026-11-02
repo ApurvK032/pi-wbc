@@ -156,6 +156,13 @@ class GaitRewardsCfg:
         weight=1.0,
         params={"command_name": "base_velocity", "std": 0.5},
     )
+    # off by default, like the speed one above: a narrow kernel for the turn rate (the wide one
+    # still pays 85% at 0.2 rad/s off); the turning test of 2026-11-02 switches it on
+    track_ang_vel_z_fine = RewTerm(
+        func=mdp.track_ang_vel_z_world_exp,
+        weight=0.0,
+        params={"command_name": "base_velocity", "std": 0.25},
+    )
     # new (design change 2026-10-29): the first gait policy drifted 0.2-0.5 rad/s off its
     # commanded turn rate and walked in circles; this penalizes the accumulated drift
     heading_tracking = RewTerm(

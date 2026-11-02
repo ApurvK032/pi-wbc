@@ -202,7 +202,8 @@ def test_ppo_student_trains_the_student_inputs_with_a_privileged_critic(monkeypa
     assert agent_cfg.actor.hidden_dims == [512, 256, 128]  # the distilled student's network
 
 
-def test_fine_speed_reward_is_off_unless_switched_on(monkeypatch) -> None:
+@pytest.mark.parametrize("term", ["track_lin_vel_xy_fine", "track_ang_vel_z_fine"])
+def test_fine_tracking_rewards_are_off_unless_switched_on(monkeypatch, term) -> None:
     import sys
 
     from isaaclab_tasks.utils import resolve_task_config
@@ -211,11 +212,11 @@ def test_fine_speed_reward_is_off_unless_switched_on(monkeypatch) -> None:
 
     monkeypatch.setattr(sys, "argv", ["test"])
     env_cfg, _ = resolve_task_config("PiWbc-G1-Teacher", "rsl_rl_cfg_entry_point", overrides=[])
-    fine = env_cfg.rewards.track_lin_vel_xy_fine
+    fine = getattr(env_cfg.rewards, term)
     assert fine.weight == 0.0 and fine.params["std"] == 0.25
-    on = ["env.rewards.track_lin_vel_xy_fine.weight=1.0"]
+    on = [f"env.rewards.{term}.weight=0.5"]
     env_cfg, _ = resolve_task_config("PiWbc-G1-Teacher", "rsl_rl_cfg_entry_point", overrides=on)
-    assert env_cfg.rewards.track_lin_vel_xy_fine.weight == 1.0
+    assert getattr(env_cfg.rewards, term).weight == 0.5
 
 
 def test_curriculum_ramp_climbs_to_the_starting_level_on_schedule_then_holds() -> None:
