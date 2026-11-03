@@ -16,6 +16,7 @@ from pi_wbc.sim2sim import compare, evaluate
 from pi_wbc.sim2sim.commands import (
     ALL_SCENARIOS,
     BODY_SCENARIOS,
+    CONDITIONS,
     SCENARIOS,
     CommandDriver,
     Scenario,
@@ -27,6 +28,7 @@ from pi_wbc.sim2sim.mujoco_g1 import (
     G1MujocoSim,
     PolicyIO,
     build_model,
+    contact_settings,
     match_name,
     wxyz_to_xyzw,
     xyzw_to_wxyz,
@@ -186,6 +188,43 @@ def test_base_linear_velocity_is_the_centre_of_mass_velocity(sim: G1MujocoSim) -
 
 
 @needs_model
+def test_observation_after_a_step_reads_the_end_of_the_step(sim: G1MujocoSim) -> None:
+    """After mj_step, MuJoCo's body frames and velocities still describe the start of the last
+    substep; only qpos and qvel moved on. Newton's state (what Isaac Lab trained on) is the end
+    of the step, so the readings must be recomputed from qpos and qvel."""
+    _set_root(sim, [1, 0, 0, 0], lin_w=(0.3, -0.2, 0.0), ang_local=(0.5, -0.4, 0.8))
+    sim.step(np.zeros(29))
+    obs = sim.observation((0, 0, 0))
+    fresh = G1MujocoSim(sim.model, sim.io)
+    fresh.data.qpos[:], fresh.data.qvel[:] = sim.data.qpos, sim.data.qvel
+    mujoco.mj_forward(fresh.model, fresh.data)
+    expected = fresh.observation((0, 0, 0))
+    for term in ("base_lin_vel", "base_ang_vel", "projected_gravity"):
+        got, want = _obs_term(sim, obs, term), _obs_term(fresh, expected, term)
+        assert np.allclose(got, want, atol=1e-6), term
+    v_xy, yaw_rate = sim.velocity_yaw_frame()
+    v_expected, yaw_expected = fresh.velocity_yaw_frame()
+    assert np.allclose(v_xy, v_expected, atol=1e-9) and yaw_rate == pytest.approx(yaw_expected)
+
+
+@needs_model
+def test_reading_the_end_of_the_step_does_not_change_the_physics(io: PolicyIO) -> None:
+    """The recomputation only refreshes derived quantities: the trajectory stays the same."""
+    model = build_model(SCENE, io)
+    a, b = G1MujocoSim(model, io), G1MujocoSim(model, io)
+    a.reset(yaw=0.3)
+    b.reset(yaw=0.3)
+    action = np.random.default_rng(0).uniform(-0.3, 0.3, 29)
+    for _ in range(10):
+        a.step(action)
+        for _ in range(a.steps_per_action):  # the same targets, stepped by hand
+            b.data.ctrl[b.actuator_ids] = a.data.ctrl[a.actuator_ids]
+            mujoco.mj_step(b.model, b.data)
+    assert np.array_equal(a.data.qpos, b.data.qpos)
+    assert np.array_equal(a.data.qvel, b.data.qvel)
+
+
+@needs_model
 def test_action_sets_joint_targets_around_the_default_pose(sim: G1MujocoSim) -> None:
     action = np.zeros(len(sim.policy_ids))
     knee = sim.io.action_joint_names.index("left_knee_joint")
@@ -232,6 +271,30 @@ def test_feet_get_the_floor_friction(io: PolicyIO, floor, robot, expected) -> No
     """Menagerie's foot spheres (priority 1, friction 0.6) must not override the floor (D-039)."""
     model = build_model(SCENE, io, floor_friction=floor, robot_friction=robot)
     assert _floor_contact_friction(model, io) == {expected}
+
+
+@needs_model
+def test_every_geom_has_the_same_contact_priority(io: PolicyIO) -> None:
+    """As in Newton's training model, so no geom's friction or softness overrides the other's:
+    every contact takes the larger friction and the solmix-weighted solref and solimp."""
+    model = build_model(SCENE, io, floor_friction=0.4)
+    assert set(model.geom_priority.tolist()) == {0}
+
+
+@needs_model
+def test_contact_settings_record_what_the_model_runs_with(io: PolicyIO) -> None:
+    model = build_model(SCENE, io, floor_friction=0.4, robot_friction=0.4)
+    record = contact_settings(model)
+    json.dumps(record)  # it goes into result files
+    floor = record["geoms"]["floor"]
+    assert [s["friction"][0] for s in floor] == [0.4] and floor[0]["geoms"] == 1
+    feet = record["geoms"]["feet"]
+    assert {s["priority"] for s in feet} == {0} and {s["friction"][0] for s in feet} == {0.4}
+    assert sum(s["geoms"] for s in feet) >= 2  # Menagerie: several spheres per foot
+    plane = int(np.flatnonzero(model.geom_type == mujoco.mjtGeom.mjGEOM_PLANE)[0])
+    assert floor[0]["solref"] == pytest.approx(model.geom_solref[plane].tolist())
+    assert record["solver"]["timestep"] == pytest.approx(0.0025)
+    assert record["solver"]["integrator"] == "mjINT_IMPLICITFAST"
 
 
 @needs_model
@@ -537,6 +600,17 @@ def test_driver_moves_only_arm_and_hand_targets(body_sim: G1MujocoSim) -> None:
 
 
 @needs_model
+def test_arm_motion_draws_from_its_own_random_stream(body_sim: G1MujocoSim) -> None:
+    """default_rng(seed) draws the episode's start perturbation; the arms must not reuse it."""
+    io = body_sim.io
+    driver = CommandDriver(body_sim, ALL_SCENARIOS["arms_walk"], seed=5)
+    start_stream = UpperBodyMotion(io.upper_body, _upper_default(io), np.random.default_rng(5))
+    assert not np.allclose(driver.arms.goal, start_stream.goal)
+    again = CommandDriver(body_sim, ALL_SCENARIOS["arms_walk"], seed=5)
+    assert np.allclose(driver.arms.goal, again.arms.goal)  # still seeded
+
+
+@needs_model
 def test_body_scenarios_need_a_body_policy(sim: G1MujocoSim) -> None:
     assert scenarios_for(sim.io) == list(SCENARIOS)
     with pytest.raises(ValueError):
@@ -612,6 +686,49 @@ def test_condition_delay_keeps_the_previous_targets(sim: G1MujocoSim) -> None:
     sim.delay_steps = 0
     sim.step(action)
     assert sim.data.ctrl[sim.actuator_ids][knee] == pytest.approx(first + sim.io.action_scale)
+
+
+@needs_model
+def test_delay_holds_only_the_joints_the_policy_drives(body_sim: G1MujocoSim) -> None:
+    """As pi_wbc.tasks.mdp: the action term's joints are delayed, starting from the reset pose
+    on the first step; arm and hand targets come from a command and are not."""
+    sim = body_sim
+    knee = sim.io.joint_names.index("left_knee_joint")
+    action = np.zeros(len(sim.policy_ids))
+    action[sim.io.action_joint_names.index("left_knee_joint")] = 1.0
+    sim.delay_steps = sim.io.decimation  # the whole policy period
+    arms = sim.base_target[sim.upper_ids] + 0.05
+    sim.set_upper_body_targets(arms)
+    sim.step(action)  # first step after the reset: the previous targets are the reset pose
+    ctrl = sim.data.ctrl[sim.actuator_ids]
+    assert ctrl[knee] == pytest.approx(sim.io.default_pos["left_knee_joint"])
+    assert np.allclose(ctrl[sim.upper_ids], arms)
+    sim.set_upper_body_targets(arms + 0.05)
+    sim.step(np.zeros(len(sim.policy_ids)))
+    ctrl = sim.data.ctrl[sim.actuator_ids]
+    expected = sim.io.default_pos["left_knee_joint"] + sim.io.action_scale
+    assert ctrl[knee] == pytest.approx(expected)  # the previous action's target
+    assert np.allclose(ctrl[sim.upper_ids], arms + 0.05)  # this step's, not delayed
+
+
+def test_kick_conditions_watch_the_last_kick_for_4_s() -> None:
+    """Falls come up to about 2.4 s after a kick, so 20 s episodes missed the 19 s kick's."""
+    for name, condition in CONDITIONS.items():
+        if condition.push_speed:
+            assert condition.episode_s >= max(condition.push_times) + 4.0, name
+        else:
+            assert condition.episode_s == 20.0, name
+
+
+def test_kick_counts_skip_a_kick_due_at_the_fall_time() -> None:
+    dt = 0.005 * 4  # the policy step, as run_episode computes fall times
+    times = [3.0, 7.0, 11.0, 15.0, 19.0]
+    episodes = [
+        {"fell": False, "fall_time_s": None},  # all 5 kicks
+        {"fell": True, "fall_time_s": (349 + 1) * dt},  # fell in the step before the 7 s kick
+        {"fell": True, "fall_time_s": (405 + 1) * dt},  # 8.12 s: after the kicks at 3 and 7 s
+    ]
+    assert evaluate.kick_counts(episodes, times) == (2, 5 + 1 + 2)
 
 
 @needs_model
