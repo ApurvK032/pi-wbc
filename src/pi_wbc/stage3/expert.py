@@ -19,6 +19,7 @@ the body sways; a slow bounded correction on the measured palm error removes the
 
 from __future__ import annotations
 
+import collections
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -56,6 +57,10 @@ LABELS = ("success", "fell", "knocked", "missed_grasp", "dropped", "wrong_bin", 
 class ExpertParams:
     stance_rel: tuple[float, float] = (0.40, -0.18)  # object in the robot's heading frame
     lean: float = 0.28  # waist pitch while reaching (rad; trained up to 0.45)
+    # pelvis height at the table, from leaning to the lift (m; None: the nominal 0.78). Reaching
+    # down beside the object tips the pelvis back up to 0.17 rad (the controller balancing the
+    # arm), raising the shoulder until the low point is out of reach; a crouch lowers it again
+    crouch: float | None = None
     grasp_in_palm: tuple[float, float, float] = (0.085, 0.062, 0.0)  # grasp centre, palm frame
     grasp_height: float = 0.07  # grasp centre above the table top
     pre_up: float = 0.15  # start of the descent above the grasp
@@ -134,6 +139,7 @@ class Expert:
         self.objects = [base.scene[f"obj_{name}"] for name in L.OBJECT_NAMES]
         self.q_hang = np.array([float(high_level.upper.default[high_level.index([j])[0]])
                                 for j in RIGHT_ARM])  # fmt: skip
+        self.nominal_height = float(high_level.body.nominal[0])
         n = self.n
         self.phase = np.full(n, P["walk_obj"])
         self.t = np.zeros(n, dtype=int)  # steps in the current phase
@@ -150,6 +156,13 @@ class Expert:
         self.target_k = np.zeros(n, dtype=int)
         self.tries = np.zeros(n, dtype=int)
         self.notes: list[dict] = [{} for _ in range(n)]  # measurements for failure analysis
+        # the last 2 s of each episode, saved in its notes when it fails: phase, steps in it,
+        # object in the heading frame from the palm (cm), object moved (cm), waist pitch,
+        # pelvis pitch (rad), palm target minus palm in the heading frame (cm), and the IK's own
+        # miss (cm)
+        self.trace = [collections.deque(maxlen=100) for _ in range(n)]
+        self.ik_err = np.zeros(n)
+        self.waist_pitch_id = names.index("waist_pitch_joint")
         # a smoothed view of the body for the arm's IK: chasing every sway of the torso with
         # the arm excites the sway further (the arm's reaction moves the waist)
         self.body_pos = self.robot.data.root_pos_w.torch.clone()
@@ -190,6 +203,7 @@ class Expert:
             self.plan[i] = {}
             self.tries[i] = 0
             self.notes[i] = {}
+            self.trace[i].clear()
             self.target_k[i] = L.OBJECT_NAMES.index(lay.target_object)
             obj = torch.tensor(lay.object_pos(lay.target_object)[:2], device=self.dev)[None]
             self.goal[i] = nav.stance_for(obj, self.p.stance_rel, torch.zeros(1, device=self.dev))[
@@ -243,12 +257,17 @@ class Expert:
         if g.pos_err > 0.01 or g.rot_err > 0.05:
             return False
         q = g.q
-        for a, b in ((grasp, out), (out, pre), (pre, start)):
+        # the planned arm angles at each waypoint: each step's IK is pulled toward them (rest
+        # posture), so the arm's spare freedom doesn't drift onto a joint limit on the way
+        q_plan = {"grasp": g.q.copy()}
+        for name, a, b in (("out", grasp, out), ("pre", out, pre), ("start", pre, start)):
             for s in np.linspace(0.0, 1.0, max(2, int(np.linalg.norm(b - a) / 0.005)))[1:]:
                 q = ik.solve(a + s * (b - a), rot, q, iters=100).q
+            q_plan[name] = q.copy()
+        q_plan["lift"] = ik.solve(grasp + np.array([0.0, 0.0, p.lift_up]), rot, g.q, iters=200).q
         q_now = self.robot.data.joint_pos.torch[i, self.arm_ids].cpu().numpy()
         self.plan[i] = {"rot": rot, "grasp": grasp, "out": out, "pre": pre, "start": start,
-                        "q_start": q,
+                        "q_start": q, "q_plan": q_plan,
                         "q_from": q_now}  # fmt: skip
         return True
 
@@ -288,11 +307,22 @@ class Expert:
         )
         return True
 
-    def _ik_follow(self, i: int, target: np.ndarray, rot: np.ndarray) -> np.ndarray:
+    def _ik_follow(
+        self, i: int, target: np.ndarray, rot: np.ndarray, q_rest: np.ndarray | None = None
+    ) -> np.ndarray:
         """One step of the arm along its path; a solution that misses the target by more than
         3 cm is not taken (the arm keeps its last angles instead of running to its limits)."""
         self._ik_state(i)
-        r = self.iks[i].solve(target, rot, self.q_ik[i], iters=40)
+        r = self.iks[i].solve(target, rot, self.q_ik[i], iters=40, q_rest=q_rest)
+        self.ik_err[i] = r.pos_err
+        if r.pos_err > 0.01:  # which arm joints held it back (failure analysis)
+            ik = self.iks[i]
+            stuck = self.notes[i].setdefault("ik_limits", {})
+            ph = PHASES[self.phase[i]]
+            for j in np.where((r.q - ik.lower < 0.02) | (ik.upper - r.q < 0.02))[0]:
+                side = "low" if r.q[j] - ik.lower[j] < 0.02 else "high"
+                key = f"{ph}:{RIGHT_ARM[j][6:-6]}:{side}"
+                stuck[key] = stuck.get(key, 0) + 1
         if r.pos_err < 0.03:
             self.q_ik[i] = r.q
         else:
@@ -307,6 +337,7 @@ class Expert:
     def _fail(self, i: int, label: str) -> None:
         self.label[i] = label
         self.failed_in[i] = PHASES[self.phase[i]]
+        self.notes[i]["trace"] = list(self.trace[i])
         self._go(i, "failed")
 
     def step(self) -> None:
@@ -359,6 +390,8 @@ class Expert:
                     self._fail(i, "timed_out")
             elif ph in ("lean_obj", "lean_bin"):
                 hl.body_goal[i, 3] = p.lean
+                if ph == "lean_obj" and p.crouch is not None:
+                    hl.body_goal[i, 0] = p.crouch
                 if k * dt >= p.lean_s:
                     self._go(i, "align_obj" if ph == "lean_obj" else "align_bin")
             elif ph in ("align_obj", "align_bin"):
@@ -402,8 +435,12 @@ class Expert:
                     "slide": (pl["out"], pl["grasp"], p.slide_s),
                     "lift": (pl["grasp"], pl["grasp"] + [0.0, 0.0, p.lift_up], p.lift_s),
                 }[ph]
-                target = a + _smooth(k * dt / dur) * (b - a)
-                arm = self._ik_follow(i, target, pl["rot"])
+                ra, rb = {"reach": ("start", "pre"), "lower": ("pre", "out"),
+                          "slide": ("out", "grasp"), "lift": ("grasp", "lift")}[ph]  # fmt: skip
+                s_ = _smooth(k * dt / dur)
+                target = a + s_ * (b - a)
+                q_rest = pl["q_plan"][ra] + s_ * (pl["q_plan"][rb] - pl["q_plan"][ra])
+                arm = self._ik_follow(i, target, pl["rot"], q_rest)
                 targets[i] = (target, pl["rot"])
                 if ph == "lift":
                     self.hand[i] = HAND_CLOSED
@@ -426,8 +463,9 @@ class Expert:
                 pl = self.plan[i]
                 if ph == "fine_grasp":
                     self._update_grasp(i, obj[i])
-                target = pl[{"fine_pre": "pre", "fine_out": "out", "fine_grasp": "grasp"}[ph]]
-                arm = self._ik_follow(i, target, pl["rot"])
+                where = {"fine_pre": "pre", "fine_out": "out", "fine_grasp": "grasp"}[ph]
+                target = pl[where]
+                arm = self._ik_follow(i, target, pl["rot"], pl["q_plan"][where])
                 targets[i] = (target, pl["rot"])
                 err = float(np.linalg.norm(palm_pos[i].cpu().numpy() - target))
                 tol = {"fine_pre": p.fine_pre_tol, "fine_out": p.fine_out_tol,
@@ -445,7 +483,7 @@ class Expert:
                     )
             elif ph == "close":
                 pl = self.plan[i]
-                arm = self._ik_follow(i, pl["grasp"], pl["rot"])
+                arm = self._ik_follow(i, pl["grasp"], pl["rot"], pl["q_plan"]["grasp"])
                 targets[i] = (pl["grasp"], pl["rot"])
                 s = min(1.0, k * dt / p.close_s)  # fingers and thumb together
                 self.hand[i] = HAND_OPEN + s * (HAND_CLOSED - HAND_OPEN)
@@ -454,6 +492,7 @@ class Expert:
             elif ph == "straighten":
                 arm = self.plan[i]["q_hold"]
                 hl.body_goal[i, 3] = 0.0
+                hl.body_goal[i, 0] = self.nominal_height
                 if k * dt >= p.straighten_s:
                     lay = self.base.pick_place_layouts[i]
                     bxy = torch.tensor(lay.bin_xy(lay.target_bin), device=self.dev)[None]
@@ -470,7 +509,7 @@ class Expert:
                     self._go(i, "release")
             elif ph == "release":
                 pl = self.plan[i]
-                arm = self._ik_follow(i, pl["to"], pl["rot"])
+                arm = self._ik_follow(i, pl["to"], pl["rot"], pl["q_rel"])
                 s = min(1.0, k * dt / 0.5)
                 self.hand[i] = HAND_CLOSED + s * (HAND_OPEN - HAND_CLOSED)
                 if k * dt >= p.release_s:
@@ -481,7 +520,7 @@ class Expert:
                 rise = 0.6
                 if k * dt < rise:
                     target = pl["to"] + _smooth(k * dt / rise) * np.array([0.0, 0.0, 0.10])
-                    arm = self._ik_follow(i, target, pl["rot"])
+                    arm = self._ik_follow(i, target, pl["rot"], pl["q_rel"])
                     targets[i] = (target, pl["rot"])
                     pl["q_from"] = self.q_ik[i].copy()
                 else:
@@ -498,6 +537,7 @@ class Expert:
                 self.hand[i], device=self.dev, dtype=torch.float32
             )
 
+        self._record(pose, obj, palm_pos, moved, targets)
         # palm height above the table at each bin phase's end (failure analysis)
         for i in range(self.n):
             ph = PHASES[self.phase[i]]
@@ -515,6 +555,35 @@ class Expert:
             hl.arm_hand[i, self.arm_slots] = (
                 torch.tensor(arm + ff, device=self.dev, dtype=torch.float32) + self.q_corr[i]
             )
+
+    def _record(self, pose, obj, palm_pos, moved, targets) -> None:
+        c, s = torch.cos(pose[:, 2]), torch.sin(pose[:, 2])
+        d = obj - palm_pos
+        rel = torch.stack([c * d[:, 0] + s * d[:, 1], -s * d[:, 0] + c * d[:, 1], d[:, 2]], -1)
+        rel = (rel * 100).cpu().numpy()
+        palm = palm_pos.cpu().numpy()
+        yaw = pose[:, 2].cpu().numpy()
+        waist = self.robot.data.joint_pos.torch[:, self.waist_pitch_id].cpu().numpy()
+        g = self.robot.data.projected_gravity_b.torch[:, :3].cpu().numpy()
+        pitch = np.arctan2(-g[:, 0], -g[:, 2])
+        for i in range(self.n):
+            if PHASES[self.phase[i]] in ("done", "failed"):
+                continue
+            row = [int(self.phase[i]), int(self.t[i]), *np.round(rel[i], 1).tolist()]
+            row += [round(float(moved[i]) * 100, 1), round(float(waist[i]), 3)]
+            row.append(round(float(pitch[i]), 3))
+            if i in targets:  # palm error in the heading frame, and its extremes per phase
+                e = _rz(float(yaw[i])).T @ (targets[i][0] - palm[i]) * 100
+                row += [*np.round(e, 1).tolist(), round(float(self.ik_err[i]) * 100, 1)]
+                ph = PHASES[self.phase[i]]
+                ext = (
+                    self.notes[i]
+                    .setdefault("palm_err_cm", {})
+                    .setdefault(ph, [[e[0], e[0]], [e[1], e[1]], [e[2], e[2]]])
+                )
+                for a in range(3):
+                    ext[a] = [round(min(ext[a][0], e[a]), 1), round(max(ext[a][1], e[a]), 1)]
+            self.trace[i].append(row)
 
     def _update_grasp(self, i: int, obj: torch.Tensor) -> None:
         """Move the grasp point with the object (privileged), keeping its planned height."""

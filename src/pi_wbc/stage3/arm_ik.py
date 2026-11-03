@@ -8,7 +8,10 @@ the other joints (waist, the other arm) to the robot's current state and moves o
 joints of one arm: damped least squares on the palm's position and orientation, with radians
 counting `w_rot` as much as metres, so an orientation that is hard to reach does not cost
 position. Joints are clamped to the controller's trained arm ranges (from its `policy_io.json`),
-so the arm stays where the controller learned to balance it.
+so the arm stays where the controller learned to balance it. The arm has one joint more than the
+palm's pose needs; given a rest posture, each step also moves the arm toward it in the directions
+that leave the palm where it is, so the spare freedom doesn't drift onto a joint limit while the
+solve is repeated every control step from the last answer.
 
 MuJoCo quaternions are (w, x, y, z); this module takes and returns Isaac Lab's (x, y, z, w).
 """
@@ -138,8 +141,14 @@ class ArmIK:
         iters: int = 60,
         tol_pos: float = 1e-4,
         tol_rot: float = 1e-3,
+        q_rest: np.ndarray | None = None,
+        k_rest: float = 0.3,
     ) -> IkResult:
-        """Arm angles that put the palm at target_pos with rotation matrix target_rot (world)."""
+        """Arm angles that put the palm at target_pos with rotation matrix target_rot (world).
+
+        With `q_rest`, each iteration also moves a share `k_rest` of the way toward it within the
+        palm task's null space (and doesn't stop at the tolerance, so the posture settles).
+        """
         m, d = self.model, self.data
         q = np.clip(np.asarray(q_init, dtype=float), self.lower, self.upper)
         jp = np.zeros((3, m.nv))
@@ -151,12 +160,15 @@ class ArmIK:
             mujoco.mj_comPos(m, d)
             ep = target_pos - d.xpos[self.palm]
             er = _rot_err(target_rot, d.xmat[self.palm].reshape(3, 3))
-            if np.linalg.norm(ep) < tol_pos and np.linalg.norm(er) < tol_rot:
+            if q_rest is None and np.linalg.norm(ep) < tol_pos and np.linalg.norm(er) < tol_rot:
                 break
             mujoco.mj_jacBody(m, d, jp, jr, self.palm)
             j = np.vstack([jp[:, self._arm_d], self.w_rot * jr[:, self._arm_d]])
             e = np.concatenate([ep, self.w_rot * er])
-            dq = j.T @ np.linalg.solve(j @ j.T + eye, e)
+            j_pinv = j.T @ np.linalg.inv(j @ j.T + eye)
+            dq = j_pinv @ e
+            if q_rest is not None:
+                dq += (np.eye(len(q)) - j_pinv @ j) @ (k_rest * (q_rest - q))
             q = np.clip(q + dq, self.lower, self.upper)
         pos, rot = self.palm_pose(q)
         return IkResult(

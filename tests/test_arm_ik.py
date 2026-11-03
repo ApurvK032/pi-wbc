@@ -43,3 +43,14 @@ def test_stays_inside_trained_ranges_when_out_of_reach(ik):
     r = ik.solve(np.array([0.8, -0.2, 0.8]), np.eye(3), ik.q_default, iters=100)
     assert r.pos_err > 0.1  # too far: reports the miss instead of leaving the ranges
     assert np.all(r.q >= ik.lower - 1e-9) and np.all(r.q <= ik.upper + 1e-9)
+
+
+def test_rest_posture_moves_only_the_spare_freedom(ik):
+    target = np.array([0.315, -0.242, 0.825])
+    free = ik.solve(target, np.eye(3), ik.q_default, iters=400)
+    # a rest posture away from that solution: the palm still lands on the target, and the
+    # arm ends closer to the rest posture than without it
+    q_rest = free.q + np.array([0.0, 0.0, 0.4, 0.0, 0.0, 0.0, 0.0])
+    held = ik.solve(target, np.eye(3), free.q, iters=400, q_rest=q_rest)
+    assert held.pos_err < 2e-3 and held.rot_err < 2e-2
+    assert np.linalg.norm(held.q - q_rest) < np.linalg.norm(free.q - q_rest) - 0.05

@@ -28,11 +28,25 @@ parser.add_argument(
     default=None,
     help="save the last 9 s of every failed episode as a GIF in this folder",
 )
+parser.add_argument(
+    "--cam",
+    choices=["side", "front"],
+    default="side",
+    help="side: the robot's right, approach and table; front: across the table, at the hand",
+)
+parser.add_argument(
+    "--param",
+    action="append",
+    default=[],
+    metavar="NAME=VALUE",
+    help="override an ExpertParams field (number, comma list or None), e.g. lean=0.3",
+)
 parser.add_argument("--out", type=Path, required=True)
 add_launcher_args(parser)
 args, overrides = parser.parse_known_args()
 
 import collections  # noqa: E402
+import dataclasses  # noqa: E402
 import time  # noqa: E402
 
 import gymnasium as gym  # noqa: E402
@@ -48,7 +62,7 @@ from isaaclab_tasks.utils import resolve_task_config  # noqa: E402
 import pi_wbc.tasks  # noqa: E402, F401
 from pi_wbc import provenance  # noqa: E402
 from pi_wbc.stage3 import layout as L  # noqa: E402
-from pi_wbc.stage3.expert import PHASES, Expert  # noqa: E402
+from pi_wbc.stage3.expert import PHASES, Expert, ExpertParams  # noqa: E402
 from pi_wbc.stats import wilson_interval  # noqa: E402
 from pi_wbc.tasks.g1_pick_place import HighLevel  # noqa: E402
 
@@ -73,14 +87,18 @@ def look_at(eye, target):
     return tuple(Rotation.from_matrix(np.stack([f, left, up], axis=1)).as_quat())
 
 
-EYE, TARGET = (-1.6, -2.4, 1.6), (-0.6, 0.0, 0.8)  # robot's right side, approach and table front
+CAMERAS = {  # (eye, target) in the environment's frame; the table's front edge is at x = 0
+    "side": ((-1.6, -2.4, 1.6), (-0.6, 0.0, 0.8)),  # robot's right side, approach and table front
+    "front": ((0.75, -0.15, 1.15), (0.12, -0.10, 0.82)),  # across the table, at the hand
+}
 
 
-def side_camera(small: bool = False):
+def side_camera(small: bool = False, cam: str = "side"):
     import isaaclab.sim as sim_utils
     from isaaclab.sensors import CameraCfg
     from isaaclab_newton.renderers import NewtonWarpRendererCfg
 
+    eye, target = CAMERAS[cam]
     return CameraCfg(
         prim_path="{ENV_REGEX_NS}/debug_cam",
         update_period=0.0,
@@ -88,7 +106,7 @@ def side_camera(small: bool = False):
         height=214 if small else 320,
         data_types=["rgb"],
         spawn=sim_utils.PinholeCameraCfg(focal_length=18.0, clipping_range=(0.05, 30.0)),
-        offset=CameraCfg.OffsetCfg(pos=EYE, rot=look_at(EYE, TARGET), convention="world"),
+        offset=CameraCfg.OffsetCfg(pos=eye, rot=look_at(eye, target), convention="world"),
         renderer_cfg=NewtonWarpRendererCfg(),
     )
 
@@ -111,7 +129,7 @@ def main() -> None:
     n = min(args.num_envs, args.episodes)
     env_cfg.scene.num_envs = n
     if args.gif is not None or args.fail_gifs is not None:
-        env_cfg.scene.debug_cam = side_camera(small=args.fail_gifs is not None)
+        env_cfg.scene.debug_cam = side_camera(small=args.fail_gifs is not None, cam=args.cam)
     with launch_simulation(env_cfg, args):
         env = gym.make(TASK, cfg=env_cfg)
         venv = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
@@ -120,7 +138,17 @@ def main() -> None:
         policy = runner.get_inference_policy(device=venv.unwrapped.device)
         base = venv.unwrapped
         hl = HighLevel(env)
-        expert = Expert(env, hl, args.run / "exported")
+        params = {}
+        for item in args.param:
+            name, _, value = item.partition("=")
+            if value == "None":
+                params[name] = None
+            elif "," in value:  # a tuple, e.g. stance_rel=0.36,-0.18
+                params[name] = tuple(float(v) for v in value.split(","))
+            else:
+                params[name] = float(value)
+        expert_params = dataclasses.replace(ExpertParams(), **params)
+        expert = Expert(env, hl, args.run / "exported", expert_params)
         dt = base.step_dt
         results, frames = [], []
         seed = args.first_seed
