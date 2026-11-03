@@ -1,0 +1,395 @@
+{
+  "label": "full-range-h25-s2-arm1.0-300",
+  "task": "PiWbc-G1-Student",
+  "checkpoint": "logs/rsl_rl/pi_wbc_g1_student/pc-full-range-h25-student-ramp-s2-3000it/model_2999.pt",
+  "seeds_per_scenario": 300,
+  "reset_seed": 1,
+  "duration_s": 20.0,
+  "settle_s": 2.0,
+  "randomized": false,
+  "push_speed": 0.0,
+  "arm_level": 1.0,
+  "overrides": [
+    "env.observations.policy.history_length=25",
+    "physics=newton_mjwarp"
+  ],
+  "scenarios": {
+    "stand": {
+      "velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "body": null,
+      "arm_motion": false
+    },
+    "walk_0.5": {
+      "velocity": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "body": null,
+      "arm_motion": false
+    },
+    "walk_1.0": {
+      "velocity": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "body": null,
+      "arm_motion": false
+    },
+    "side_0.3": {
+      "velocity": [
+        0.0,
+        0.3,
+        0.0
+      ],
+      "body": null,
+      "arm_motion": false
+    },
+    "turn_0.8": {
+      "velocity": [
+        0.0,
+        0.0,
+        0.8
+      ],
+      "body": null,
+      "arm_motion": false
+    },
+    "walk_turn": {
+      "velocity": [
+        0.6,
+        0.0,
+        0.5
+      ],
+      "body": null,
+      "arm_motion": false
+    },
+    "crouch_0.6": {
+      "velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "body": [
+        0.6,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "arm_motion": false
+    },
+    "walk_low": {
+      "velocity": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "body": [
+        0.65,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "arm_motion": false
+    },
+    "lean_0.4": {
+      "velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "body": [
+        0.78,
+        0.0,
+        0.0,
+        0.4
+      ],
+      "arm_motion": false
+    },
+    "arms_stand": {
+      "velocity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "body": null,
+      "arm_motion": true
+    },
+    "arms_walk": {
+      "velocity": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "body": null,
+      "arm_motion": true
+    }
+  },
+  "summary": [
+    {
+      "model": "isaac",
+      "scenario": "stand",
+      "episodes": 300,
+      "falls": 0,
+      "fall_rate": 0.0,
+      "fall_rate_ci95": [
+        0.0,
+        0.012642971421476655
+      ],
+      "lin_err_mean": 0.002787189760565525,
+      "ang_err_mean": 0.010450081761276427,
+      "velocity_mean": [
+        0.0010792756030084524,
+        -0.00032463674956867785,
+        0.006361387235501752
+      ],
+      "height_err_mean": 0.01709603635594249,
+      "waist_err_mean": 0.012302765996816258,
+      "arm_err_mean": 0.00569080748129636
+    },
+    {
+      "model": "isaac",
+      "scenario": "walk_0.5",
+      "episodes": 300,
+      "falls": 0,
+      "fall_rate": 0.0,
+      "fall_rate_ci95": [
+        0.0,
+        0.012642971421476655
+      ],
+      "lin_err_mean": 0.04661160932232936,
+      "ang_err_mean": 0.22658143068353334,
+      "velocity_mean": [
+        0.47312225500742594,
+        -0.0011090219970780405,
+        -0.03398735399047534
+      ],
+      "height_err_mean": 0.007994874725118279,
+      "waist_err_mean": 0.019058206006884574,
+      "arm_err_mean": 0.006177686654652159
+    },
+    {
+      "model": "isaac",
+      "scenario": "walk_1.0",
+      "episodes": 300,
+      "falls": 0,
+      "fall_rate": 0.0,
+      "fall_rate_ci95": [
+        0.0,
+        0.012642971421476655
+      ],
+      "lin_err_mean": 0.10417082458734513,
+      "ang_err_mean": 0.29636166592439017,
+      "velocity_mean": [
+        0.9146960141261419,
+        0.011779233331690193,
+        0.003849457950903646
+      ],
+      "height_err_mean": 0.0057378230694060525,
+      "waist_err_mean": 0.02244376502931118,
+      "arm_err_mean": 0.007862588454348346
+    },
+    {
+      "model": "isaac",
+      "scenario": "side_0.3",
+      "episodes": 300,
+      "falls": 0,
+      "fall_rate": 0.0,
+      "fall_rate_ci95": [
+        0.0,
+        0.012642971421476655
+      ],
+      "lin_err_mean": 0.11793677593270938,
+      "ang_err_mean": 0.19883456071217856,
+      "velocity_mean": [
+        0.0005490903216074608,
+        0.1892547716697057,
+        -0.005853121186495021
+      ],
+      "height_err_mean": 0.008197291870601475,
+      "waist_err_mean": 0.014280856779466073,
+      "arm_err_mean": 0.006022799341008067
+    },
+    {
+      "model": "isaac",
+      "scenario": "turn_0.8",
+      "episodes": 300,
+      "falls": 0,
+      "fall_rate": 0.0,
+      "fall_rate_ci95": [
+        0.0,
+        0.012642971421476655
+      ],
+      "lin_err_mean": 0.07265506640076637,
+      "ang_err_mean": 0.4947407033046087,
+      "velocity_mean": [
+        0.041276412233710286,
+        -0.009353686108176286,
+        0.3100665619969368
+      ],
+      "height_err_mean": 0.0046281519578769805,
+      "waist_err_mean": 0.011252225559825699,
+      "arm_err_mean": 0.006533227593948443
+    },
+    {
+      "model": "isaac",
+      "scenario": "walk_turn",
+      "episodes": 300,
+      "falls": 0,
+      "fall_rate": 0.0,
+      "fall_rate_ci95": [
+        0.0,
+        0.012642971421476655
+      ],
+      "lin_err_mean": 0.06664447846511999,
+      "ang_err_mean": 0.39634632706642153,
+      "velocity_mean": [
+        0.5572581213712692,
+        -0.005415451465936106,
+        0.2507865486542384
+      ],
+      "height_err_mean": 0.007768208004223804,
+      "waist_err_mean": 0.01619647884120544,
+      "arm_err_mean": 0.007066513469132284
+    },
+    {
+      "model": "isaac",
+      "scenario": "crouch_0.6",
+      "episodes": 300,
+      "falls": 0,
+      "fall_rate": 0.0,
+      "fall_rate_ci95": [
+        0.0,
+        0.012642971421476655
+      ],
+      "lin_err_mean": 0.001956141304447859,
+      "ang_err_mean": 0.006143620001579014,
+      "velocity_mean": [
+        0.00026739795804379203,
+        -0.000722214425694195,
+        0.003997309516344103
+      ],
+      "height_err_mean": 0.006128304538239414,
+      "waist_err_mean": 0.015058827235673864,
+      "arm_err_mean": 0.008577383362377683
+    },
+    {
+      "model": "isaac",
+      "scenario": "walk_low",
+      "episodes": 300,
+      "falls": 0,
+      "fall_rate": 0.0,
+      "fall_rate_ci95": [
+        0.0,
+        0.012642971421476655
+      ],
+      "lin_err_mean": 0.06770399123430253,
+      "ang_err_mean": 0.20990710193912188,
+      "velocity_mean": [
+        0.5184542151292165,
+        -0.05181027372678121,
+        -0.10590139674643675
+      ],
+      "height_err_mean": 0.015753972722838322,
+      "waist_err_mean": 0.019550211609651647,
+      "arm_err_mean": 0.00734671519137919
+    },
+    {
+      "model": "isaac",
+      "scenario": "lean_0.4",
+      "episodes": 300,
+      "falls": 1,
+      "fall_rate": 0.0033333333333333335,
+      "fall_rate_ci95": [
+        0.0005886577153496192,
+        0.018636693896650527
+      ],
+      "lin_err_mean": 0.005198484049260424,
+      "ang_err_mean": 0.016331462115968226,
+      "velocity_mean": [
+        0.002069232935108338,
+        0.0003820551119315154,
+        0.002664688919538209
+      ],
+      "height_err_mean": 0.022504739550543468,
+      "waist_err_mean": 0.01525608921130764,
+      "arm_err_mean": 0.011903985855122872
+    },
+    {
+      "model": "isaac",
+      "scenario": "arms_stand",
+      "episodes": 300,
+      "falls": 0,
+      "fall_rate": 0.0,
+      "fall_rate_ci95": [
+        0.0,
+        0.012642971421476655
+      ],
+      "lin_err_mean": 0.021612136429175734,
+      "ang_err_mean": 0.0299791206450512,
+      "velocity_mean": [
+        -0.0056543138370564825,
+        0.0006898541445267862,
+        -0.008547430216470578
+      ],
+      "height_err_mean": 0.02362627279323836,
+      "waist_err_mean": 0.015888079333429537,
+      "arm_err_mean": 0.03458834446966648
+    },
+    {
+      "model": "isaac",
+      "scenario": "arms_walk",
+      "episodes": 300,
+      "falls": 0,
+      "fall_rate": 0.0,
+      "fall_rate_ci95": [
+        0.0,
+        0.012642971421476655
+      ],
+      "lin_err_mean": 0.07085325116912523,
+      "ang_err_mean": 0.21184068247675897,
+      "velocity_mean": [
+        0.456198570728302,
+        0.03468415546696633,
+        -0.012346399973709291
+      ],
+      "height_err_mean": 0.013311740998178721,
+      "waist_err_mean": 0.017761284885928035,
+      "arm_err_mean": 0.03467707058414817
+    }
+  ],
+  "provenance": {
+    "time_utc": "2026-11-02T10:08:26+00:00",
+    "git": {
+      "commit": "a9c9092d408365fe5d35927ddab47e9665dbd45d",
+      "dirty": false,
+      "changes": []
+    },
+    "python": "3.12.3",
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+    "host": "godzilla",
+    "packages": {
+      "pi-wbc": "0.0.1",
+      "isaaclab": "3.0.0",
+      "newton": "1.6.1",
+      "warp-lang": "1.17.0",
+      "torch": "2.11.0+cu130",
+      "rsl-rl-lib": "5.5.1",
+      "mujoco": "3.12.0",
+      "onnxruntime": "1.31.1",
+      "numpy": "2.5.4"
+    },
+    "torch_cuda": "13.0",
+    "gpus": [
+      {
+        "name": "NVIDIA GeForce RTX 4070",
+        "driver": "595.99.02",
+        "memory_mib": "12282"
+      }
+    ]
+  }
+}

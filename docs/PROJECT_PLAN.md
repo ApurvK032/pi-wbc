@@ -34,7 +34,9 @@ unless a policy has run on real hardware.
 
 Each stage ends with a result that stands on its own. Times are rough; about 6-7 weeks in all.
 
-### Stage 0: Setup (3-4 days)
+### Stage 0: Setup (3-4 days): done
+
+Results: [results/stage0](../results/stage0/README.md).
 
 - Repository: uv, Python 3.12, ruff, pytest, pre-commit, license file, README, this plan and
   the decision log.
@@ -49,7 +51,9 @@ Each stage ends with a result that stands on its own. Times are rough; about 6-7
 - **Done when** a G1 policy trains on the workstation and on MSI from the same commit, and the
   MuJoCo bench runs a policy.
 
-### Stage 1: Whole-body controller (~1.5 weeks)
+### Stage 1: Whole-body controller (~1.5 weeks): done
+
+Results: [results/stage1](../results/stage1/README.md); design: [STAGE1_DESIGN.md](STAGE1_DESIGN.md).
 
 - Our own environment on Isaac Lab's G1 assets, with our own rewards (each term documented with
   its reason). Commands: base velocity (vx, vy, yaw rate), optionally body height, and

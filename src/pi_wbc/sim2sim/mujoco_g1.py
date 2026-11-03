@@ -100,6 +100,10 @@ class PolicyIO:
     # leg actions centred on a crouch that follows the commanded height: pelvis heights and
     # each listed joint's offset from the default pose at them; None for plain actions
     height_pose: dict[str, Any] | None = None
+    # uniform noise range per observation term as trained ({} for exports that don't record it)
+    obs_noise: dict[str, tuple[float, float]] = field(default_factory=dict)
+    # frames of observation history the policy sees, oldest first (0: the current step only)
+    obs_history: int = 0
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> PolicyIO:
@@ -146,6 +150,11 @@ class PolicyIO:
             body_pose=raw.get("body_pose"),
             upper_body=raw.get("upper_body"),
             height_pose=raw["action"].get("height_pose"),
+            obs_noise={
+                k: (float(v[0]), float(v[1]))
+                for k, v in (raw["observation"].get("noise") or {}).items()
+            },
+            obs_history=int(raw["observation"].get("history_length") or 0),
         )
 
     @classmethod
@@ -154,16 +163,24 @@ class PolicyIO:
 
     @property
     def obs_dim(self) -> int:
-        return sum(size for _, size in self.obs_terms)
+        return sum(size for _, size in self.obs_terms) * max(self.obs_history, 1)
 
 
-def build_model(xml_path: str | Path, io: PolicyIO, floor_friction: float = 1.0) -> mujoco.MjModel:
+def build_model(
+    xml_path: str | Path,
+    io: PolicyIO,
+    floor_friction: float = 1.0,
+    robot_friction: float | None = None,
+    hand_payload_kg: float = 0.0,
+) -> mujoco.MjModel:
     """Load an MJCF and give it the training's actuators, joint dynamics and solver settings.
 
     The model's own actuators and keyframes are removed. Joint damping is set to 0 and joint
     friction, armature and effort limits come from `io`. Planes (the floor) get
     `floor_friction`: Newton, like MuJoCo, uses the larger of two touching surfaces' friction,
-    and Isaac Lab's ground is 1.0.
+    and Isaac Lab's ground is 1.0. For a slippery floor, set `robot_friction` too (every other
+    geom), or the robot's own friction decides. `hand_payload_kg` is added to each palm (in
+    Menagerie's model, the wrist link the palm belongs to).
     """
     spec = mujoco.MjSpec.from_file(str(xml_path))
     for actuator in list(spec.actuators):
@@ -197,7 +214,19 @@ def build_model(xml_path: str | Path, io: PolicyIO, floor_friction: float = 1.0)
     for geom in spec.geoms:
         if geom.type == mujoco.mjtGeom.mjGEOM_PLANE:
             geom.friction = [floor_friction, geom.friction[1], geom.friction[2]]
-    return spec.compile()
+        elif robot_friction is not None:
+            geom.friction = [robot_friction, geom.friction[1], geom.friction[2]]
+    model = spec.compile()
+    if hand_payload_kg:
+        bodies = [model.body(i).name for i in range(model.nbody)]
+        for side in ("left", "right"):
+            # Menagerie's model has no separate palm: it is part of the wrist's last link
+            try:
+                hand = match_name(bodies, f"{side}_hand_palm_link")
+            except KeyError:
+                hand = match_name(bodies, f"{side}_wrist_yaw_link")
+            model.body_mass[hand] += hand_payload_kg
+    return model
 
 
 class G1MujocoSim:
@@ -281,6 +310,12 @@ class G1MujocoSim:
         self.steps = 0  # policy steps since reset, as Isaac Lab's episode_length_buf
         self.last_action = np.zeros(len(self.policy_ids))
         self._vel6 = np.zeros(6)
+        # test conditions (evaluate.py): action delay in physics steps, observation noise
+        self.delay_steps = 0
+        self.noise: dict[str, tuple[float, float]] = {}
+        self.noise_rng = np.random.default_rng(0)
+        self._last_target: np.ndarray | None = None
+        self._history: list[np.ndarray] = []  # observation frames, oldest first
 
     # -- state -------------------------------------------------------------------------------
 
@@ -311,6 +346,8 @@ class G1MujocoSim:
             self.body_command = np.array(self.io.body_pose["nominal"], dtype=float)
         self.last_action = np.zeros(len(self.policy_ids))
         self.steps = 0
+        self._last_target = None
+        self._history = []
         mujoco.mj_forward(m, d)
 
     def set_upper_body_targets(self, targets: np.ndarray) -> None:
@@ -354,8 +391,21 @@ class G1MujocoSim:
             value = np.asarray(terms[name], dtype=float).ravel()
             if value.size != size:
                 raise ValueError(f"{name}: got {value.size} values, policy expects {size}")
+            if name in self.noise:
+                lo, hi = self.noise[name]
+                value = value + self.noise_rng.uniform(lo, hi, value.size)
             parts.append(value)
-        return np.concatenate(parts).astype(np.float32)
+        frame = np.concatenate(parts).astype(np.float32)
+        history = self.io.obs_history
+        if not history:
+            return frame
+        # as Isaac Lab's history buffer: the first frame after a reset fills every slot, then
+        # each call shifts in one frame (call once per policy step)
+        if not self._history:
+            self._history = [frame] * history
+        else:
+            self._history = [*self._history[1:], frame]
+        return np.concatenate(self._history)
 
     def step(self, action: np.ndarray) -> None:
         """Apply one policy action and advance one policy period."""
@@ -367,9 +417,12 @@ class G1MujocoSim:
             target[self.pose_ids] += [
                 np.interp(height, self.pose_heights, row) for row in self.pose_offsets
             ]
-        self.data.ctrl[self.actuator_ids] = target
-        for _ in range(self.steps_per_action):
+        # a delay of k physics steps keeps the previous targets for k x num_substeps MuJoCo steps
+        held = self.delay_steps * self.io.num_substeps if self._last_target is not None else 0
+        for i in range(self.steps_per_action):
+            self.data.ctrl[self.actuator_ids] = self._last_target if i < held else target
             mujoco.mj_step(self.model, self.data)
+        self._last_target = target
         self.last_action = action.copy()
         self.steps += 1
 

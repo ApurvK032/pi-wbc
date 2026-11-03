@@ -143,10 +143,25 @@ class GaitRewardsCfg:
         weight=1.0,
         params={"command_name": "base_velocity", "std": 0.5},
     )
+    # off by default (Isaac Lab skips zero weights): a narrow kernel that pays for the last
+    # 0.1-0.2 m/s, which the wide one above barely rewards (at 0.14 m/s off it still pays 92%);
+    # the speed-tracking test of 2026-11-01 switches it on
+    track_lin_vel_xy_fine = RewTerm(
+        func=mdp.track_lin_vel_xy_yaw_frame_exp,
+        weight=0.0,
+        params={"command_name": "base_velocity", "std": 0.25},
+    )
     track_ang_vel_z_exp = RewTerm(
         func=mdp.track_ang_vel_z_world_exp,
         weight=1.0,
         params={"command_name": "base_velocity", "std": 0.5},
+    )
+    # off by default, like the speed one above: a narrow kernel for the turn rate (the wide one
+    # still pays 85% at 0.2 rad/s off); the turning test of 2026-11-02 switches it on
+    track_ang_vel_z_fine = RewTerm(
+        func=mdp.track_ang_vel_z_world_exp,
+        weight=0.0,
+        params={"command_name": "base_velocity", "std": 0.25},
     )
     # new (design change 2026-10-29): the first gait policy drifted 0.2-0.5 rad/s off its
     # commanded turn rate and walked in circles; this penalizes the accumulated drift

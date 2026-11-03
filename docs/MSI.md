@@ -53,10 +53,26 @@ tail -f logs/slurm/piwbc-stage0-<jobid>.out
 |---|---|---|
 | `train_stage0.sbatch` | Trains `PiWbc-G1-Flat-Stage0` (4096 envs, 1500 iterations), then exports the policy for the MuJoCo bench | 1.5 h |
 | `train.sbatch` | Trains any of our tasks (first argument, e.g. `PiWbc-G1-Gait`), then exports the policy; runs from a copy of the commit passed as `PIWBC_COMMIT` at submission (see the script) | 3 h |
+| `teacher_student.sbatch` | Trains `PiWbc-G1-Teacher`, distills `PiWbc-G1-Student` from it (starting at the teacher's curriculum level), exports the student; same commit pinning as `train.sbatch` | 4 h |
+| `ablation.sbatch` | Stage 1 ablation: for each configuration given (a randomization group switched off, or `none` for all), trains a teacher and a student that warms up to the teacher's level (D-021) and exports the student; `curriculum` and `teacher` are the two training ablations (D-020); about 65 min per configuration on an L40S | 6 h (set with `--time`) |
 | `bench_stage0.sbatch` | Throughput sweep, 512-16384 environments, of the built-in G1 flat task | 45 min |
 
 Both run well inside the 24 h GPU limit, so they have no checkpoint-and-requeue logic yet;
 stage 1's long runs will add it.
+
+**Ask for an L40S.** The scripts ask for any GPU (`--gres=gpu:1`), which has mostly meant an
+A40. The L40S trains about twice as fast: the stage 0 task ran at 144,000 simulation steps per
+second on one (one run) against 75,000-79,000 on the A40 (12 runs). So a teacher-student job of
+about 2 h on an A40 should take about 1 h, which beats an A40 now unless the L40S queue wait is
+over an hour. Add `--gres=gpu:l40s:1` to `sbatch` (`sinfo -o "%P %G"` lists the GPU types of
+each partition); the command line overrides the script's `#SBATCH` line. Check first that one
+is free or soon will be: `sinfo -p <partition> -N -O "NodeList:10,Gres:28,GresUsed:44"` shows
+the GPUs in use per node, and `squeue -t R -w <L40S nodes> -o "%.10i %.7N %.12L %b"` the time
+left of the jobs on them. When every L40S is taken for hours, ask for any GPU instead.
+
+Some partitions allow only one running job per user: further jobs wait with reason
+`AssocMaxJobsLimit` and start, one by one, as earlier ones end. `sacctmgr -n show assoc
+user=$USER format=account,partition%20,maxjobs` shows these limits.
 
 ## Bringing results home
 

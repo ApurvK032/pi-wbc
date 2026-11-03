@@ -467,6 +467,11 @@ def upper_body_level(
     level_step: float,
     min_interval_steps: int,
     min_episodes: int = 100,
+    push_event: str | None = None,
+    push_speeds: tuple[float, float] = (0.5, 1.5),
+    ramp_steps: int = 0,
+    ramp_pushes: bool = True,
+    ramp_from: float = 0.0,
 ) -> torch.Tensor:
     """Curriculum: widen the body-pose and arm-motion ranges while the robot walks well.
 
@@ -477,8 +482,17 @@ def upper_body_level(
     the level of every named command rises by `level_step` (up to 1); if over `lower_above`
     fell, it drops by the same step. Then the tally restarts. Judging a whole window, not each
     step's few resetting envs, keeps the level from moving on noise. Listing the turning reward
-    keeps the ranges from widening while turning is being unlearned. Returns the level, which
-    Isaac Lab logs.
+    keeps the ranges from widening while turning is being unlearned. With `push_event`, the
+    pushes' top speed also follows the level, from `push_speeds[0]` at 0 to `push_speeds[1]`
+    at 1 (m/s, both horizontal directions). Returns the level, which Isaac Lab logs.
+
+    With `ramp_steps` > 0 the level follows a fixed schedule instead, for a student distilled
+    from a teacher (D-019): from `ramp_from` (default 0) up to the starting level in a straight
+    line over that many policy steps, then held, whatever the falls and rewards. The pushes
+    follow the ramp too, unless `ramp_pushes` is False: then they stay at the starting level's
+    size from the first step, and only the command ranges warm up. A teacher resumed with its
+    last level as `ramp_from` and 1 as the starting level is taken on to the full ranges
+    (D-024).
     """
     terms = [env.command_manager.get_term(n) for n in command_names]
     lead = terms[0]
@@ -486,6 +500,19 @@ def upper_body_level(
         lead.tally_episodes = 0
         lead.tally_falls = torch.zeros((), device=env.device)
         lead.tally_rewards = {k: torch.zeros((), device=env.device) for k in reward_thresholds}
+        # a run may start above level 0 (a student distilled at its teacher's level): the
+        # pushes follow the starting level from the first step
+        _set_push_speed(env, push_event, push_speeds, lead.level)
+    if ramp_steps > 0:
+        if not hasattr(lead, "ramp_target"):
+            lead.ramp_target = lead.level
+        frac = min(1.0, env.common_step_counter / ramp_steps)
+        level = ramp_from + (lead.ramp_target - ramp_from) * frac
+        for term in terms:
+            term.level = level
+        push_level = level if ramp_pushes else lead.ramp_target
+        _set_push_speed(env, push_event, push_speeds, push_level)
+        return torch.tensor(level)
     for name in reward_thresholds:
         sums = env.reward_manager._episode_sums[name][env_ids]  # env_ids may be a slice
         lead.tally_rewards[name] += sums.sum() / env.max_episode_length_s
@@ -508,11 +535,26 @@ def upper_body_level(
         for term in terms:
             term.level = level
             term.last_level_change = env.common_step_counter
+        _set_push_speed(env, push_event, push_speeds, level)
         lead.tally_episodes = 0
         lead.tally_falls.zero_()
         for value in lead.tally_rewards.values():
             value.zero_()
     return torch.tensor(level)
+
+
+def _set_push_speed(env, push_event: str | None, push_speeds: tuple[float, float], level: float):
+    """Set the push event's top speed for this curriculum level (if there are pushes)."""
+    if push_event is None or push_event not in _event_names(env):
+        return
+    speed = push_speeds[0] + level * (push_speeds[1] - push_speeds[0])
+    params = env.event_manager.get_term_cfg(push_event).params
+    params["velocity_range"] = {"x": (-speed, speed), "y": (-speed, speed)}
+
+
+def _event_names(env: ManagerBasedRLEnv) -> set[str]:
+    """Names of the active event terms, over all modes."""
+    return {name for names in env.event_manager.active_terms.values() for name in names}
 
 
 def base_height_command_l2(env: ManagerBasedRLEnv, command_name: str, asset_cfg) -> torch.Tensor:
@@ -580,6 +622,10 @@ class HeightPoseJointPositionAction(JointPositionAction):
     between). At the nominal height the offset is zero. A zero action then holds the commanded
     crouch, and the policy learns corrections rather than having to find a crouch that needs
     actions of 5 or more on its own.
+
+    With `max_delay_steps` > 0 (step 3's latency randomization), each env draws a delay of 0 to
+    that many physics steps at every reset, and for that many physics steps after a new action
+    the PD targets stay at the previous action's (`delayed_targets`).
     """
 
     cfg: HeightPoseJointPositionActionCfg
@@ -601,6 +647,10 @@ class HeightPoseJointPositionAction(JointPositionAction):
         )[0]
         self._pose_cols = torch.tensor(cols, device=self.device)
         self._pose_delta = table - nominal.unsqueeze(-1)  # zero at the nominal height
+        self._delay = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        self._previous = self._offset.expand(self.num_envs, -1).clone()
+        self._fresh = torch.ones(self.num_envs, dtype=torch.bool, device=self.device)
+        self._substep = 0
 
     @property
     def pose_joint_names(self) -> list[str]:
@@ -611,9 +661,41 @@ class HeightPoseJointPositionAction(JointPositionAction):
         return interp_table(height, self._pose_heights, self._pose_delta)
 
     def process_actions(self, actions: torch.Tensor):
+        # envs that just reset keep the default pose as their "previous" targets
+        fresh = self._fresh.unsqueeze(-1)
+        self._previous = torch.where(fresh, self._previous, self._processed_actions)
+        self._fresh[:] = False
         super().process_actions(actions)
         height = self._env.command_manager.get_command(self.cfg.command_name)[:, 0]
         self._processed_actions[:, self._pose_cols] += self.pose_offset(height)
+        self._substep = 0
+
+    def apply_actions(self):
+        if self.cfg.max_delay_steps == 0:
+            super().apply_actions()
+            return
+        target = delayed_targets(
+            self._previous, self._processed_actions, self._substep, self._delay
+        )
+        self._asset.set_joint_position_target_index(target=target, joint_ids=self._joint_ids)
+        self._substep += 1
+
+    def reset(self, env_ids: Sequence[int] | None = None) -> None:
+        super().reset(env_ids)
+        ids = slice(None) if env_ids is None else env_ids
+        n = _count(ids, self.num_envs)
+        self._delay[ids] = torch.randint(0, self.cfg.max_delay_steps + 1, (n,), device=self.device)
+        # no stale target from the last episode: the "previous" action is the default pose
+        self._previous[ids] = self._offset.expand(self.num_envs, -1)[ids]
+        self._fresh[ids] = True
+
+
+def delayed_targets(
+    previous: torch.Tensor, current: torch.Tensor, substep: int, delay: torch.Tensor
+) -> torch.Tensor:
+    """PD targets at physics step `substep` of a policy step: the previous action's targets
+    while `substep` < the env's `delay`, the current ones after."""
+    return torch.where((substep < delay).unsqueeze(-1), previous, current)
 
 
 @configclass
@@ -621,8 +703,128 @@ class HeightPoseJointPositionActionCfg(JointPositionActionCfg):
     class_type: type = HeightPoseJointPositionAction
     command_name: str = "body_pose"
     """Command whose first value is the pelvis height."""
+    max_delay_steps: int = 0
+    """Largest action delay drawn per env at reset, in physics steps (0: no delay)."""
     nominal_height: float = 0.78
     heights: list[float] = MISSING
     """Pelvis heights of the table (m), ascending."""
     poses: dict[str, list[float]] = MISSING
     """Joint-name pattern -> joint angle (rad) at each height."""
+
+
+# -- privileged observations for the teacher (stage 1, step 4) -----------------------------------
+
+
+def feet_contact(env: ManagerBasedRLEnv, sensor_cfg) -> torch.Tensor:
+    """(num_envs, feet): 1 where a foot presses on the ground (net force over 1 N), else 0."""
+    return _feet_in_contact(env, sensor_cfg).float()
+
+
+def feet_height(env: ManagerBasedRLEnv, asset_cfg) -> torch.Tensor:
+    """(num_envs, feet): height of each foot link origin above the (flat) ground."""
+    asset = env.scene[asset_cfg.name]
+    return asset.data.body_pos_w.torch[:, asset_cfg.body_ids, 2]
+
+
+def _first_read(env: ManagerBasedRLEnv, key: str, values: torch.Tensor) -> torch.Tensor:
+    """`values` as first seen (cached on the env): startup randomization has already run, so
+    this is each robot's own value; the mean over robots stands in for the nominal one."""
+    cache = env.__dict__.setdefault("_pi_wbc_first_read", {})
+    if key not in cache:
+        cache[key] = values.clone()
+    return cache[key]
+
+
+def body_mass_offset(env: ManagerBasedRLEnv, asset_cfg) -> torch.Tensor:
+    """(num_envs, bodies): each listed body's mass minus its mean over all robots (kg)."""
+    asset = env.scene[asset_cfg.name]
+    mass = asset.data.body_mass.torch[:, asset_cfg.body_ids]
+    return mass - mass.mean(dim=0, keepdim=True)
+
+
+def body_com_offset(env: ManagerBasedRLEnv, asset_cfg) -> torch.Tensor:
+    """(num_envs, 3 x bodies): each listed body's centre of mass minus its mean over robots."""
+    asset = env.scene[asset_cfg.name]
+    com = asset.data.body_com_pos_b.torch[:, asset_cfg.body_ids]
+    return (com - com.mean(dim=0, keepdim=True)).reshape(env.num_envs, -1)
+
+
+def stiffness_scale(env: ManagerBasedRLEnv, asset_cfg) -> torch.Tensor:
+    """(num_envs, 1): mean PD stiffness of the listed joints over its mean across robots."""
+    asset = env.scene[asset_cfg.name]
+    k = asset.data.joint_stiffness.torch[:, asset_cfg.joint_ids]
+    return (k / k.mean(dim=0, keepdim=True).clamp_min(1e-9)).mean(dim=-1, keepdim=True)
+
+
+def action_delay(env: ManagerBasedRLEnv, action_name: str = "joint_pos") -> torch.Tensor:
+    """(num_envs, 1): this episode's action delay in physics steps (0 without latency)."""
+    term = env.action_manager.get_term(action_name)
+    delay = getattr(term, "_delay", None)
+    if delay is None:
+        return torch.zeros(env.num_envs, 1, device=env.device)
+    return delay.float().unsqueeze(-1)
+
+
+def _shape_friction(env: ManagerBasedRLEnv, asset_name: str) -> dict:
+    """Newton's per-shape friction of an articulation, as a writable torch view (cached).
+
+    The same binding Isaac Lab's friction randomization writes to. Returns {"view": (num_envs,
+    shapes), "shape_body": body index of each shape in the view's body order, "body_names"}.
+    """
+    cache = env.__dict__.setdefault("_pi_wbc_shape_friction", {})
+    if asset_name not in cache:
+        import warp as wp
+
+        view = env.scene[asset_name]._root_view
+        model = env.sim.physics_manager.get_model()
+        mu = view.get_attribute("shape_material_mu", model)
+        mu = mu[:, 0] if len(mu.shape) == 3 else mu
+        shape_body = view.get_attribute("shape_body", model)
+        shape_body = shape_body[:, 0] if len(shape_body.shape) == 3 else shape_body
+        cache[asset_name] = {
+            "binding": mu,  # keeps the warp array alive
+            "view": wp.to_torch(mu),
+            "shape_body": wp.to_torch(shape_body)[0].tolist(),
+            "body_names": list(view.body_names),
+        }
+    return cache[asset_name]
+
+
+def randomize_robot_friction(
+    env: ManagerBasedRLEnv,
+    env_ids: torch.Tensor | None,
+    asset_cfg,
+    friction_range: tuple[float, float],
+) -> None:
+    """Event (Newton): one friction per robot, drawn uniformly and given to all its shapes.
+
+    Isaac Lab's material randomization draws a value per collision shape. A G1 foot touches
+    the ground through four spheres, so each foot's friction would be a mix of four draws and
+    every robot would sit near the middle of the range; one value per robot covers the range.
+    """
+    from newton import ModelFlags
+
+    friction = _shape_friction(env, asset_cfg.name)
+    view = friction["view"]
+    rows = slice(None) if env_ids is None else env_ids
+    n = _count(rows, env.num_envs)
+    lo, hi = friction_range
+    values = lo + (hi - lo) * torch.rand(n, device=view.device)
+    view[rows, :] = values.unsqueeze(-1)
+    env.sim.physics_manager.add_model_change(ModelFlags.SHAPE_PROPERTIES)
+
+
+def feet_friction(env: ManagerBasedRLEnv, asset_cfg) -> torch.Tensor:
+    """(num_envs, 1): mean friction of the listed bodies' collision shapes, as Newton holds it
+    (the value the solver uses)."""
+    friction = _shape_friction(env, asset_cfg.name)
+    cache = env.__dict__.setdefault("_pi_wbc_friction_cols", {})
+    key = (asset_cfg.name, tuple(asset_cfg.body_ids))
+    if key not in cache:
+        asset = env.scene[asset_cfg.name]
+        wanted = {friction["body_names"].index(asset.body_names[i]) for i in asset_cfg.body_ids}
+        cols = [k for k, b in enumerate(friction["shape_body"]) if b in wanted]
+        if not cols:
+            raise RuntimeError("no collision shapes found for the friction observation")
+        cache[key] = torch.tensor(cols, device=env.device)
+    return friction["view"][:, cache[key]].mean(dim=-1, keepdim=True)

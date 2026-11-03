@@ -13,7 +13,6 @@ variant, differences smaller than the spread between runs are not evidence of an
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import statistics
 from pathlib import Path
@@ -128,7 +127,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--out", type=Path, default=None, help="also write the rows as JSON")
     args = parser.parse_args(argv)
 
-    results = [json.loads(p.read_text()) for p in args.results]
+    from pi_wbc.provenance import load_json
+
+    results = [load_json(p) for p in args.results]
     rows = compare(results, args.model, args.scenario, per_run=args.per_run)
     print(f"Tracking and gait: model {args.model}, command {args.scenario}\n")
     print(markdown_table(rows))

@@ -78,13 +78,29 @@ def collect(env: Any) -> dict[str, Any]:
     obs_mgr = env.observation_manager
     terms = obs_mgr.active_terms["policy"]
     dims = obs_mgr.group_obs_term_dim["policy"]
+    # With history (stage 1, step 4), the policy sees the last `history_length` frames, oldest
+    # first, each frame holding every term ("time" order); the layout below is one frame.
+    group_cfg = env.cfg.observations.policy
+    history = int(group_cfg.history_length or 0)
+    if history and getattr(group_cfg, "history_order", "term") != "time":
+        raise ValueError("only time-major observation history is supported")
     obs_layout, start = [], 0
     for name, dim in zip(terms, dims, strict=True):
         size = 1
         for d in dim:
             size *= d
+        size //= max(history, 1)
         obs_layout.append({"name": name, "start": start, "size": size})
         start += size
+
+    # Uniform observation noise per term, as configured for training (recorded even when the
+    # export itself runs without noise, e.g. after make_nominal).
+    # Read from the task config: the observation manager drops noise when it is switched off.
+    obs_noise: dict[str, list[float]] = {}
+    for name in terms:
+        noise = getattr(getattr(group_cfg, name, None), "noise", None)
+        if noise is not None and hasattr(noise, "n_min"):
+            obs_noise[name] = [float(noise.n_min), float(noise.n_max)]
 
     # Joint order of each joint observation, from its resolved asset config.
     obs_joint_names: dict[str, list[str]] = {}
@@ -149,7 +165,14 @@ def collect(env: Any) -> dict[str, Any]:
             "clip": action_term.cfg.clip,
             "height_pose": height_pose,
         },
-        "observation": {"dim": start, "terms": obs_layout, "joint_names": obs_joint_names},
+        "observation": {
+            "dim": start * max(history, 1),
+            "history_length": history,
+            "frame_dim": start,
+            "terms": obs_layout,
+            "joint_names": obs_joint_names,
+            "noise": obs_noise,
+        },
         "gait": None if gait is None else gait.to_dict(),
         # body-pose command (pelvis height, waist yaw, roll, pitch) and random arm and hand
         # motion (stage 1, step 2); None for tasks without them
@@ -162,10 +185,14 @@ def collect(env: Any) -> dict[str, Any]:
             "lin_vel_y": list(command_cfg.ranges.lin_vel_y),
             "ang_vel_z": list(command_cfg.ranges.ang_vel_z),
         },
-        "friction": {
-            "static": list(friction["static_friction_range"]),
-            "dynamic": list(friction["dynamic_friction_range"]),
-        },
+        "friction": (
+            {"robot": list(friction["friction_range"])}  # one value per robot (stage 1, step 3)
+            if "friction_range" in friction
+            else {
+                "static": list(friction["static_friction_range"]),
+                "dynamic": list(friction["dynamic_friction_range"]),
+            }
+        ),
         "root_init": {
             "pos": list(robot.cfg.init_state.pos),
             "rot_xyzw": list(robot.cfg.init_state.rot),
@@ -193,6 +220,8 @@ def main(argv: list[str] | None = None) -> None:
 
     env_cfg, _ = resolve_task_config(args.task, "rsl_rl_cfg_entry_point", overrides=overrides)
     env_cfg.scene.num_envs = 1
+    if hasattr(env_cfg, "make_nominal"):  # nominal gains and masses, no noise or delay
+        env_cfg.make_nominal()
     if args.save_mjcf is not None:
         args.save_mjcf.parent.mkdir(parents=True, exist_ok=True)
         env_cfg.sim.physics.solver_cfg.save_to_mjcf = str(args.save_mjcf.resolve())

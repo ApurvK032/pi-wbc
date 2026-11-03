@@ -150,6 +150,11 @@ class G1BodyEnvCfg(G1GaitEnvCfg):
             },
         )
 
+        # Turning keeps the gait task's weight (1.0) and share of turn-in-place commands (10%).
+        # v8 doubled both: turning held through a 1400-iteration run, but at 3000 iterations it
+        # never learned to walk (training speed error 0.35, at the standing-still level) and
+        # turned worse than v7 (0.32 against 0.22 rad/s in MuJoCo), so it was reverted.
+
         # curriculum: widen body-pose and arm ranges while walking stays good
         self.curriculum.upper_body_level = CurrTerm(
             func=pi_mdp.upper_body_level,

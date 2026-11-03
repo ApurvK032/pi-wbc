@@ -85,3 +85,13 @@ def test_save_json_adds_provenance(repo: Path, tmp_path: Path) -> None:
 def test_save_json_refuses_to_overwrite_provenance(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         provenance.save_json(tmp_path / "r.json", {"provenance": {}})
+
+
+def test_save_json_gz_round_trip(repo: Path, tmp_path: Path) -> None:
+    plain = provenance.save_json(tmp_path / "r.json", {"falls": [0, 1]}, repo=repo)
+    packed = provenance.save_json(tmp_path / "r.json.gz", {"falls": [0, 1]}, repo=repo)
+    assert packed.read_bytes()[:2] == b"\x1f\x8b"  # gzip magic
+    loaded = provenance.load_json(packed)
+    assert loaded["falls"] == [0, 1]
+    commit = provenance.load_json(plain)["provenance"]["git"]["commit"]
+    assert loaded["provenance"]["git"]["commit"] == commit

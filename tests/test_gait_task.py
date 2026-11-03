@@ -127,3 +127,140 @@ def test_interp_table_is_linear_between_rows_and_clamped_outside() -> None:
 def test_curriculum_holds_while_turning_is_poor() -> None:
     env, _ = _curriculum_env([False] * 4, [0.8] * 4, step=480, turn_per_s=[0.2] * 4)
     assert mdp.upper_body_level(env, slice(None), **CURRICULUM).item() == pytest.approx(0.5)
+
+
+def test_delayed_targets_hold_the_previous_action_for_the_delay() -> None:
+    previous, current = torch.zeros(3, 2), torch.ones(3, 2)
+    delay = torch.tensor([0, 2, 4])
+    rows = [mdp.delayed_targets(previous, current, k, delay)[:, 0].tolist() for k in range(4)]
+    # env 0: no delay; env 1: 2 physics steps; env 2: the whole 4-step policy period
+    assert rows == [[1, 0, 0], [1, 0, 0], [1, 1, 0], [1, 1, 0]]
+
+
+def test_curriculum_raises_the_push_speed_with_the_level() -> None:
+    from types import SimpleNamespace
+
+    env, _ = _curriculum_env([False] * 4, [0.8] * 4, step=480)
+    push = SimpleNamespace(params={"velocity_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5)}})
+    env.event_manager = SimpleNamespace(
+        active_terms={"interval": ["push_robot"]}, get_term_cfg=lambda name: push
+    )
+    level = mdp.upper_body_level(
+        env, slice(None), **CURRICULUM, push_event="push_robot", push_speeds=(0.5, 1.5)
+    ).item()
+    assert level == pytest.approx(0.55)
+    assert push.params["velocity_range"]["x"] == pytest.approx((-1.05, 1.05))
+
+
+def test_curriculum_holds_its_level_with_out_of_reach_thresholds() -> None:
+    # D-019: a student keeps its teacher's level, all falling or none falling
+    held = {**CURRICULUM, "raise_below": -1.0, "lower_above": 2.0}
+    for falls in ([True] * 4, [False] * 4):
+        env, _ = _curriculum_env(falls, [0.8] * 4, step=480)
+        assert mdp.upper_body_level(env, slice(None), **held).item() == pytest.approx(0.5)
+
+
+@pytest.mark.parametrize("config", ["none", "full", "curriculum", "friction", "pushes"])
+def test_ablation_overrides_resolve_on_the_student_task(config: str, monkeypatch) -> None:
+    import sys
+
+    from isaaclab_tasks.utils import resolve_task_config
+
+    monkeypatch.setattr(sys, "argv", ["test"])  # Isaac Lab reads these when overrides are empty
+
+    import pi_wbc.tasks  # noqa: F401
+    from pi_wbc.tasks.g1_robust import ABLATION_OVERRIDES, TRAINING_ABLATIONS
+
+    assert not set(ABLATION_OVERRIDES) & set(TRAINING_ABLATIONS)
+    groups = {"none": list(ABLATION_OVERRIDES), "full": []}.get(config, [config])
+    table = {**ABLATION_OVERRIDES, **TRAINING_ABLATIONS}
+    overrides = [o for g in groups for o in table[g]]
+    env_cfg, _ = resolve_task_config(
+        "PiWbc-G1-Student", "rsl_rl_cfg_entry_point", overrides=overrides
+    )
+    if config in ("none", "pushes"):
+        assert env_cfg.events.push_robot is None
+    if config == "curriculum":
+        assert env_cfg.commands.body_pose.initial_level == 1.0
+        assert env_cfg.curriculum.upper_body_level.params["lower_above"] == 2.0
+    if config == "full":
+        assert env_cfg.events.push_robot is not None
+
+
+def test_ppo_student_trains_the_student_inputs_with_a_privileged_critic(monkeypatch) -> None:
+    import sys
+
+    from isaaclab_tasks.utils import resolve_task_config
+
+    import pi_wbc.tasks  # noqa: F401
+
+    monkeypatch.setattr(sys, "argv", ["test"])
+    _, agent_cfg = resolve_task_config(
+        "PiWbc-G1-Student-PPO", "rsl_rl_cfg_entry_point", overrides=[]
+    )
+    assert agent_cfg.obs_groups == {"actor": ["policy"], "critic": ["teacher"]}
+    assert agent_cfg.actor.hidden_dims == [512, 256, 128]  # the distilled student's network
+
+
+@pytest.mark.parametrize("term", ["track_lin_vel_xy_fine", "track_ang_vel_z_fine"])
+def test_fine_tracking_rewards_are_off_unless_switched_on(monkeypatch, term) -> None:
+    import sys
+
+    from isaaclab_tasks.utils import resolve_task_config
+
+    import pi_wbc.tasks  # noqa: F401
+
+    monkeypatch.setattr(sys, "argv", ["test"])
+    env_cfg, _ = resolve_task_config("PiWbc-G1-Teacher", "rsl_rl_cfg_entry_point", overrides=[])
+    fine = getattr(env_cfg.rewards, term)
+    assert fine.weight == 0.0 and fine.params["std"] == 0.25
+    on = [f"env.rewards.{term}.weight=0.5"]
+    env_cfg, _ = resolve_task_config("PiWbc-G1-Teacher", "rsl_rl_cfg_entry_point", overrides=on)
+    assert getattr(env_cfg.rewards, term).weight == 0.5
+
+
+def test_curriculum_ramp_climbs_to_the_starting_level_on_schedule_then_holds() -> None:
+    ramp = {**CURRICULUM, "ramp_steps": 480}
+    env, terms = _curriculum_env([True] * 4, [0.0] * 4, step=0)  # starts at level 0.5
+    assert mdp.upper_body_level(env, slice(None), **ramp).item() == pytest.approx(0.0)
+    env.common_step_counter = 240
+    assert mdp.upper_body_level(env, slice(None), **ramp).item() == pytest.approx(0.25)
+    assert terms["arms"].level == pytest.approx(0.25)
+    env.common_step_counter = 5000  # all falling, poor rewards: still held at the target
+    assert mdp.upper_body_level(env, slice(None), **ramp).item() == pytest.approx(0.5)
+
+
+def test_curriculum_ramp_can_start_from_a_resumed_teachers_level() -> None:
+    ramp = {**CURRICULUM, "ramp_steps": 480, "ramp_from": 0.7}
+    env, terms = _curriculum_env([True] * 4, [0.0] * 4, step=0)
+    terms["body"].level = terms["arms"].level = 1.0  # the target: the full ranges
+    assert mdp.upper_body_level(env, slice(None), **ramp).item() == pytest.approx(0.7)
+    env.common_step_counter = 240
+    assert mdp.upper_body_level(env, slice(None), **ramp).item() == pytest.approx(0.85)
+    env.common_step_counter = 5000
+    assert mdp.upper_body_level(env, slice(None), **ramp).item() == pytest.approx(1.0)
+    assert terms["body"].level == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(("ramp_pushes", "top_speed"), [(True, 0.75), (False, 1.0)])
+def test_curriculum_ramp_ramps_the_pushes_unless_told_not_to(
+    ramp_pushes: bool, top_speed: float
+) -> None:
+    from types import SimpleNamespace
+
+    env, _ = _curriculum_env([False] * 4, [0.8] * 4, step=240)  # halfway up a ramp to 0.5
+    push = SimpleNamespace(params={"velocity_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5)}})
+    env.event_manager = SimpleNamespace(
+        active_terms={"interval": ["push_robot"]}, get_term_cfg=lambda name: push
+    )
+    level = mdp.upper_body_level(
+        env,
+        slice(None),
+        **CURRICULUM,
+        push_event="push_robot",
+        push_speeds=(0.5, 1.5),
+        ramp_steps=480,
+        ramp_pushes=ramp_pushes,
+    ).item()
+    assert level == pytest.approx(0.25)  # the command ranges warm up either way
+    assert push.params["velocity_range"]["x"] == pytest.approx((-top_speed, top_speed))
