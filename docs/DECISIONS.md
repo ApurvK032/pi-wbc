@@ -46,6 +46,7 @@ items at the [end](#open-items)):
 | [D-036](#d-036-the-scripted-expert-a-state-machine-over-the-true-state-no-retries-2026-11-03) | The scripted expert: a state machine over the true state, no retries | 2026-11-03 |
 | [D-037](#d-037-the-dataset-1000-episodes-per-controller-head-camera-replay-check-2026-11-03) | The dataset: 1,000 episodes per controller, head camera, replay check | 2026-11-03 |
 | [D-038](#d-038-the-g1s-heel-contact-spheres-at-unitrees-urdf-position-from-stage-3-on-2026-11-03) | The G1's heel contact spheres at Unitree's URDF position from stage 3 on | 2026-11-03 |
+| [D-039](#d-039-erratum-on-menageries-model-the-mujoco-benchs-feet-stood-on-friction-06-2026-11-03) | Erratum: on Menagerie's model the MuJoCo bench's feet stood on friction 0.6 | 2026-11-03 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -142,7 +143,7 @@ items at the [end](#open-items)):
 
   Both get the training's PD gains, armature, effort limits, 2.5 ms step (Newton runs 2
   substeps per 5 ms physics step), implicit-fast integrator, solver iterations and floor
-  friction 1.0. Evaluation: 6 fixed velocity commands inside the training ranges, seeded
+  friction 1.0 (on Menagerie's model the feet had 0.6 until D-039 corrected it). Evaluation: 6 fixed velocity commands inside the training ranges, seeded
   starts (joint offsets ±0.05 rad, random heading, base velocity ±0.1 m/s), 20 s episodes. A
   fall is the torso touching the floor (Isaac Lab's termination) or the pelvis below 0.35 m.
   Tracking error is measured after 2 s, as the training rewards measure it. Fall rates carry
@@ -826,6 +827,32 @@ items at the [end](#open-items)):
 - **Cost:** our controller runs on a foot it was not trained on: it turns in place a little
   more slowly (0.64 against 0.70 rad/s for 0.8). Stage 1's Newton numbers were taken on the
   asset's heel. Which position matches the real robot's sole was not checked.
+
+## D-039: Erratum: on Menagerie's model the MuJoCo bench's feet stood on friction 0.6 (2026-11-03)
+
+- **What:** every MuJoCo-bench run on Menagerie's G1 in stages 0 and 1, except under the
+  `friction_0.4` condition, had the feet touching the floor with friction 0.6, not the 1.0 that
+  D-008 states. Menagerie's foot spheres have `priority="1"` and friction 0.6, and MuJoCo takes
+  the higher-priority geom's friction instead of the larger of the two. The bench now gives the
+  floor the highest priority of the model's geoms, so the larger friction applies, as in Newton
+  (`build_model`, with a test that reads the friction of the actual foot-floor contacts). Runs
+  on Newton's exported model were never affected (all its geoms have priority 0 and friction
+  1.0), nor was the `friction_0.4` condition (it sets the robot's friction too).
+- **What changes** (seed 1's stage 1 controller, Menagerie, development seeds,
+  [results/stage1/foot_friction](../results/stage1/foot_friction/)):
+  - Nominal and with 1 m/s kicks (110 episodes each): no falls before or after; speed and
+    turn-rate errors move by at most 0.03; sole slip a little lower (walking at 1 m/s 0.043
+    against 0.045 m/s nominal, 0.069 against 0.082 with kicks).
+  - The weakness stage 1 reported on the test seeds (walking at 0.5 m/s, seed 1 fell after a
+    0.5 m/s kick in 30 of 200 episodes on Menagerie's model, never on Newton's) came from the
+    0.6 floor: on the same 100 development seeds it falls in 16 with the old floor
+    (`scripts/sim2sim_old_floor.py`; 95% CI 10-24%) and in none with the corrected one (0-4%).
+  - Not explained by it: Menagerie's model still slips more than Newton's (about 0.04 against
+    0.005 m/s at 1 m/s), so that gap comes from the models' other contact settings.
+  - Stage 1's conclusions stand: every finish-line target was met on the more slippery floor.
+- **Cost:** stage 0 and stage 1 Menagerie results are not re-run (the test seeds take several
+  hours); their result files record `floor_friction: 1.0` although the feet had 0.6, and later
+  Menagerie results are not directly comparable with them.
 
 ## Open items
 
