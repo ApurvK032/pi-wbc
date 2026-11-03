@@ -95,6 +95,8 @@ class ArmIK:
         }
         self.lower = np.array([rng[n][0] for n in self.arm])
         self.upper = np.array([rng[n][1] for n in self.arm])
+        self.kp = np.array([io["joints"][n]["stiffness"] for n in self.arm])
+        self._palm_mass0 = float(self.model.body_mass[self.palm])
 
     def set_state(
         self, base_pos, base_quat_xyzw, joint_pos: dict[str, float] | None = None
@@ -115,6 +117,18 @@ class ArmIK:
             self.data.qpos[self._arm_q] = q
         mujoco.mj_kinematics(self.model, self.data)
         return self.data.xpos[self.palm].copy(), self.data.xmat[self.palm].reshape(3, 3).copy()
+
+    def gravity_offset(self, q: np.ndarray, payload_kg: float = 0.0) -> np.ndarray:
+        """What to add to the arm's PD targets so that, at rest at `q`, gravity is held exactly:
+        each joint's gravity torque divided by its stiffness (with `payload_kg` in the palm)."""
+        m, d = self.model, self.data
+        m.body_mass[self.palm] = self._palm_mass0 + payload_kg
+        d.qpos[self._arm_q] = q
+        d.qvel[:] = 0.0
+        mujoco.mj_forward(m, d)
+        bias = d.qfrc_bias[self._arm_d].copy()  # gravity only: the robot is at rest
+        m.body_mass[self.palm] = self._palm_mass0
+        return bias / self.kp
 
     def solve(
         self,

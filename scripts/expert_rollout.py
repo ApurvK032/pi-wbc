@@ -21,6 +21,7 @@ parser.add_argument("--episodes", type=int, default=8)
 parser.add_argument("--first-seed", type=int, default=50_000, help="development layouts")
 parser.add_argument("--run", type=Path, default=Path(DEFAULT_RUN), help="controller run folder")
 parser.add_argument("--gif", type=Path, default=None)
+parser.add_argument("--gif-env", type=int, default=0, help="which robot of the first batch")
 parser.add_argument("--out", type=Path, required=True)
 add_launcher_args(parser)
 args, overrides = parser.parse_known_args()
@@ -125,7 +126,7 @@ def main() -> None:
                     obs, _, _, _ = venv.step(policy(obs))
                     sim_steps += 1
                     if args.gif is not None and not results and k % 3 == 0:
-                        rgb = tt(base.scene["debug_cam"].data.output["rgb"])[0, ..., :3]
+                        rgb = tt(base.scene["debug_cam"].data.output["rgb"])[args.gif_env, ..., :3]
                         frames.append(rgb.clamp(0, 255).to(torch.uint8).cpu().numpy())
                     if expert.finished()[:m].all():
                         break
@@ -135,10 +136,12 @@ def main() -> None:
                 results.append({
                     "seed": lay.seed, "instruction": lay.instruction, "label": label,
                     "phase": PHASES[expert.phase[i]], "failed_in": expert.failed_in[i],
-                    "time_s": round(expert.age[i] * dt, 2),
+                    "time_s": round(expert.age[i] * dt, 2), "notes": expert.notes[i],
                 })  # fmt: skip
                 print(f"[expert] seed {lay.seed}: {label:12s} (in {expert.failed_in[i]}) "
                       f"after {expert.age[i] * dt:5.1f} s  '{lay.instruction}'")  # fmt: skip
+                if expert.notes[i]:
+                    print(f"         {expert.notes[i]}")
         wall = time.perf_counter() - t0
         counts = collections.Counter(r["label"] for r in results)
         ok = counts.get("success", 0)
@@ -151,7 +154,8 @@ def main() -> None:
             "controller_run": str(args.run), "first_seed": args.first_seed,
             "episodes": len(results), "success": ok, "success_ci95": [lo, hi],
             "labels": dict(counts), "results": results,
-            "expert_params": {k: v for k, v in vars(expert.p).items() if k != "nav"},
+            "expert_params": {k: (vars(v) if hasattr(v, "__dataclass_fields__") else v)
+                              for k, v in vars(expert.p).items()},
         })  # fmt: skip
         if frames:
             from PIL import Image
