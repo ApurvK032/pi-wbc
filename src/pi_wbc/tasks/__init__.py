@@ -83,3 +83,14 @@ gym.register(
         "default_agent": "rsl_rl",
     },
 )
+
+gym.register(
+    id="PiWbc-G1-PickPlace",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.g1_pick_place:G1PickPlaceEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{__name__}.g1_pick_place:G1PickPlaceRunnerCfg",
+        "default_agent": "rsl_rl",
+    },
+)
