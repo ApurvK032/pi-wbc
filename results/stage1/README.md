@@ -103,7 +103,12 @@ Isaac Sim's PhysX: [below](#the-stage-1-controller-on-isaac-sims-physx).
   tracking error.
 - **One weakness the test seeds showed:** walking at 0.5 m/s on Menagerie's model, seed 1 falls
   1.5-2 s after a gentle 0.5 m/s kick in 30 of 200 episodes, but never after a 1 m/s kick there.
-  Larger kicks seem to trigger a recovery step that small ones don't; not investigated.
+  **Corrected (D-039):** the bench's feet stood on friction 0.6 on Menagerie's model, not 1.0.
+  On 100 development seeds this case falls in 16 with that floor and in none with the corrected
+  one ([foot_friction/](foot_friction/)).
+- **Note on every Menagerie number of stages 0 and 1 (D-039):** except under the friction 0.4
+  condition, the feet had friction 0.6. Re-run on seed 1's development seeds, falls and tracking
+  are unchanged and slip is a little lower; the finish line holds.
 
 Raw data: [`full_range_long_test/`](full_range_long_test/) (labels `full-range-long-s{1,2,3}`,
 the kick sweep in `push/`); the command-tracking runs of the front page in
@@ -210,8 +215,9 @@ Walking at 1 m/s, per run:
   0.14 m/s on Menagerie's model).
 - **Every policy slips more on Menagerie's model than on Newton's**, the stage 0 shuffle as
   well (0.14 against 0.03 m/s). That points at the models rather than the policies: Menagerie's
-  contacts are softer (stage 0 results, part 4), which may let a loaded foot creep. Not yet
-  checked.
+  contacts are softer (stage 0 results, part 4), which may let a loaded foot creep. Its feet
+  also had friction 0.6 instead of 1.0 (D-039), but that is not the cause: with 1.0, seed 1's
+  final controller still slips 0.043 m/s there at 1 m/s (0.045 with 0.6).
 - **Training's slip penalty uses the ankle's velocity too,** so it also discourages rolling.
   Whether that matters is a question for the reward work in later steps (D-016).
 
