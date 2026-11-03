@@ -122,7 +122,7 @@ In Newton, with the heel spheres moved to -0.05 m
 | | Falls, all 11 commands | Standing still | Turn in place 0.8 rad/s |
 |---|---:|---|---:|
 | NVIDIA's, arms hanging | 0/110 (heel -0.02: 13/110) | still | 0.75 rad/s |
-| NVIDIA's, arms at zero | 0/110 (heel -0.02: 4/110) | still (heel -0.02: back at 0.33 m/s) | 0.78 rad/s |
+| NVIDIA's, arms at zero | 0/110 (heel -0.02: 3/110) | still (heel -0.02: back at 0.33 m/s) | 0.78 rad/s |
 | Ours, seed 1, nominal | 0/1100 (heel -0.02, stage 1: 0/3300) | still | 0.64 rad/s (heel -0.02: 0.70) |
 | Ours, seed 1, 1 m/s kicks | 0/550 (heel -0.02: 0/550) | — | 0.63 rad/s (heel -0.02: 0.68) |
 
