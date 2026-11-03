@@ -10,6 +10,7 @@ records the commit, package versions and GPU it came from.
 - [Grasp test: can the Dex3 hand hold the task's objects in Newton?](#grasp-test-can-the-dex3-hand-hold-the-tasks-objects-in-newton)
 - [NVIDIA's controller on our G1 in Newton](#nvidias-controller-on-our-g1-in-newton)
 - [Step 1: the controller at 4 physics substeps](#step-1-the-controller-at-4-physics-substeps)
+- [Steps 2-3 (in progress): the task and the expert](#steps-2-3-in-progress-the-task-and-the-expert)
 
 ## Grasp test: can the Dex3 hand hold the task's objects in Newton?
 
@@ -158,3 +159,50 @@ Files: [substeps/](substeps/). 4 substeps change nothing measurable: falls stay 
 (3 against 2 in 4,950 robots) and speed and turning agree within 0.02. Seed 1 had no falls at
 2 m/s kicks in an earlier, identical run, so 1-2 falls in 550 are within Newton's run-to-run
 variation. So the stage 3 scenes run at 4 substeps.
+
+## Steps 2-3 (in progress): the task and the expert
+
+The task environment (`PiWbc-G1-PickPlace`,
+[src/pi_wbc/tasks/g1_pick_place.py](../../src/pi_wbc/tasks/g1_pick_place.py)) puts the stage 1
+controller (seed 1) in the loop with a table, three of five round objects, two bins and seeded
+layouts ([src/pi_wbc/stage3/layout.py](../../src/pi_wbc/stage3/layout.py)). The scripted expert
+([src/pi_wbc/stage3/expert.py](../../src/pi_wbc/stage3/expert.py)) reads the true state and
+sends only the controller's commands. On development layouts 50,000-50,095
+([scripts/expert_rollout.py](../../scripts/expert_rollout.py)):
+
+![The expert picks the red can and puts it in the purple bin](expert/expert_dev_50000.gif)
+
+| | Episodes |
+|---|---:|
+| Success | 78 of 96 (81%; 95% CI 72-88%) |
+| Knocked the object before closing the hand | 11 |
+| Missed the grasp | 5 |
+| Object not in the bin | 2 |
+| Robot fell | 0 |
+
+File: [expert/dev-50000-50095.json](expert/dev-50000-50095.json). An identical earlier run gave
+80 of 96; single episodes change outcome between runs (Newton is not repeatable). The target is
+95% (D-036), so the expert is not finished. What it took to get here, each found from the
+measured state of failed episodes:
+
+- **Contact budget.** With the bins' kinematic boxes touching each other, the scene needed
+  more contacts than the 120 per robot allowed; the rest were dropped and the objects tipped
+  over by themselves after a second. The bin's parts now keep 1 mm gaps and the budget is 300.
+- **Lean, then align.** Leaning the torso moves the pelvis back about 10 cm, which put the
+  object out of reach. The robot now walks to its stance upright, leans, and steps onto the
+  stance again with the lean held.
+- **Gravity fed forward.** The arm's PD controllers leave it 1-2 cm low; a slow correction on
+  the measured error, made stronger, oscillated with the torso. The targets now add each
+  joint's gravity torque divided by its stiffness (`ArmIK.gravity_offset`), and the palm
+  arrives within 2-4 mm.
+- **Slide in.** On the way down the hand drifts up to 3 cm towards the object, enough for the
+  lower finger to clip it. It now comes down 3 cm further out, waits there, and slides in.
+- **Reach.** A lift of 15 cm and a carry pose in front of the chest were both at the edge of the
+  arm's reach in the grasp's orientation: the IK sometimes ran to the joint limits and the hand
+  flung the object at the bin. The lift is 10 cm, the arm then holds its joint angles while
+  the robot straightens and walks (which raises the object clear of the others), the reach
+  over the bin goes in joint space to a solution found beforehand, and an IK step that misses
+  by more than 3 cm is not taken.
+
+The remaining knocks happen while the hand waits beside the object: there the torso sways by
+up to 0.1 rad (the controller balances the arm's weight held forward), moving the hand 2-4 cm.
