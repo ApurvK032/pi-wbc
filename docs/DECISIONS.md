@@ -776,6 +776,9 @@ items at the [end](#open-items)):
   reach.
 - **Cost:** round objects only, about 1 cm of tolerance, and physics twice as slow as
   training's, at a substep count the controller was not trained with.
+- **Check (2026-11-03, step 1):** at 4 substeps with the URDF's heel the controller is unchanged:
+  3 falls against 2 in 4,950 robots over nominal, randomized and kicked conditions and three
+  seeds, speed and turning within 0.02 ([results/stage3](../results/stage3/README.md), step 1).
 
 ## D-035: The task: one table, three round objects, two bins, frozen seed ranges (2026-11-03)
 

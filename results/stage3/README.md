@@ -9,6 +9,7 @@ records the commit, package versions and GPU it came from.
 
 - [Grasp test: can the Dex3 hand hold the task's objects in Newton?](#grasp-test-can-the-dex3-hand-hold-the-tasks-objects-in-newton)
 - [NVIDIA's controller on our G1 in Newton](#nvidias-controller-on-our-g1-in-newton)
+- [Step 1: the controller at 4 physics substeps](#step-1-the-controller-at-4-physics-substeps)
 
 ## Grasp test: can the Dex3 hand hold the task's objects in Newton?
 
@@ -136,3 +137,24 @@ demonstrations.
 
 Not checked: which heel position matches the real robot's sole (Unitree's URDF is the closest
 source here), and NVIDIA's controller under kicks.
+
+## Step 1: the controller at 4 physics substeps
+
+The grasp needs Newton at 4 substeps (D-034); the controller was trained at 2. In Isaac Lab, with
+the URDF's heel (D-038), the bench's 11 commands, `--substeps 2` against `--substeps 4`
+([src/pi_wbc/isaac_eval.py](../../src/pi_wbc/isaac_eval.py); kicks as in the MuJoCo bench at 3,
+7, 11, 15 and 19 s; "randomized" keeps training's randomization and pushes):
+
+| Seed | Condition | Robots | Falls, 2 substeps | Falls, 4 substeps | Speed at 1.0 m/s (2 / 4) | Turn at 0.8 rad/s (2 / 4) |
+|---|---|---:|---:|---:|---|---|
+| 1 | nominal | 1100 | 0 | 0 | 0.92 / 0.91 | 0.64 / 0.62 |
+| 1 | randomized | 550 | 1 | 0 | 0.91 / 0.91 | 0.67 / 0.67 |
+| 1 | kicks-1.0 | 550 | 0 | 0 | 0.91 / 0.90 | 0.62 / 0.62 |
+| 1 | kicks-2.0 | 550 | 1 | 2 | 0.90 / 0.89 | 0.59 / 0.59 |
+| 2 | nominal | 1100 | 0 | 0 | 0.92 / 0.92 | 0.51 / 0.51 |
+| 3 | nominal | 1100 | 0 | 1 | 0.99 / 0.99 | 0.63 / 0.63 |
+
+Files: [substeps/](substeps/). 4 substeps change nothing measurable: falls stay at noise level
+(3 against 2 in 4,950 robots) and speed and turning agree within 0.02. Seed 1 had no falls at
+2 m/s kicks in an earlier, identical run, so 1-2 falls in 550 are within Newton's run-to-run
+variation. So the stage 3 scenes run at 4 substeps.
