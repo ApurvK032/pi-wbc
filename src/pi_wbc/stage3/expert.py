@@ -94,13 +94,13 @@ class ExpertParams:
     fine_grasp_tol: float = 0.005  # and at the grasp point before closing
     fine_max_s: float = 1.5
     knock_dist: float = 0.03  # target object moved this far before the grasp: knocked
-    grab_tol: float = 0.0  # >0: close once the object is this close to the grasp point in the
+    grab_tol: float = 0.015  # >0: close once the object is this close to the grasp point in the
     # hand (and not short of it), without waiting for the palm (the grasp target follows the
     # object, so a palm that pushes it would keep pushing)
     ik_w_rot: float = 0.3  # IK weight of the palm's orientation against its position
     tilt_gain: float = 0.0  # >0: while the arm works at the table, lean the waist further by
     # this share of the pelvis's backward tilt (the controller tips it back as the arm reaches)
-    release_away: float = 0.0  # after opening over the bin, move the palm this far off the
+    release_away: float = 0.04  # after opening over the bin, move the palm this far off the
     # object before judging, so one resting on the open hand falls off
     nav: nav.NavParams = field(default_factory=nav.NavParams)
     # the bin's opening is much larger than the grasp's tolerance
