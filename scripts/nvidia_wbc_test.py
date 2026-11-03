@@ -38,6 +38,12 @@ parser.add_argument(
     "script; forearms forward)",
 )
 parser.add_argument("--scenarios", default=None, help="comma list (default: all)")
+parser.add_argument(
+    "--heel-x",
+    type=float,
+    default=None,
+    help="move the feet's heel contact spheres here (m; asset -0.02, URDF -0.05)",
+)
 parser.add_argument("--check-targets", action="store_true", help="print held arm targets")
 parser.add_argument("--policy-dir", type=Path, default=Path("third_party/gr00t_wbc/policy"))
 parser.add_argument(
@@ -141,6 +147,11 @@ def main() -> None:
         dev = sim.device
         dt = sim.get_physics_dt() * cfg.sim.render_interval
         robot = scene["robot"]
+        if args_cli.heel_x is not None:
+            from pi_wbc.stage3.feet import set_heel_x
+
+            moved = set_heel_x(args_cli.heel_x)
+            print(f"[nvidia-wbc] moved {moved} heel spheres to x={args_cli.heel_x}")
         q0 = tt(robot.data.default_joint_pos).clone()
         if args_cli.arms == "zero":
             arm_ids0 = robot.find_joints([".*_shoulder_.*", ".*_elbow_joint", ".*_wrist_.*"])[0]
@@ -276,6 +287,7 @@ def main() -> None:
                 "settle_s": SETTLE_S,
                 "nominal_height_command": args_cli.height,
                 "arms": args_cli.arms,
+                "heel_x": args_cli.heel_x,
                 "summary": rows,
             },
         )

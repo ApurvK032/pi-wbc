@@ -72,6 +72,13 @@ def main(argv: list[str] | None = None) -> None:
         help="kicks as in the MuJoCo bench: this speed (m/s) added to the pelvis in a random "
         "horizontal direction at 3, 7, 11, 15 and 19 s",
     )
+    parser.add_argument(
+        "--heel-x",
+        type=float,
+        default=None,
+        help="move the feet's heel contact spheres here (m; Isaac Lab asset -0.02, Unitree's URDF "
+        "-0.05), see pi_wbc.stage3.feet",
+    )
     parser.add_argument("--label", default=None)
     parser.add_argument("--out", type=Path, required=True)
     add_launcher_args(parser)
@@ -159,6 +166,10 @@ def main(argv: list[str] | None = None) -> None:
         policy = runner.get_inference_policy(device=venv.unwrapped.device)
         base = venv.unwrapped
         device = base.device
+        if args.heel_x is not None:
+            from pi_wbc.stage3.feet import set_heel_x
+
+            print(f"[isaac-eval] moved {set_heel_x(args.heel_x)} heel spheres to x={args.heel_x}")
         robot = base.scene["robot"]
 
         scenario_of = torch.arange(n, device=device) // args.seeds
@@ -261,6 +272,7 @@ def main(argv: list[str] | None = None) -> None:
                 "randomized": args.randomized,
                 "push_speed": args.push_speed,
                 "arm_level": args.arm_level,
+                "heel_x": args.heel_x,
                 "overrides": overrides,
                 "scenarios": {s: asdict(scenarios[s]) for s in names},
                 "summary": rows,
