@@ -94,6 +94,14 @@ class ExpertParams:
     fine_grasp_tol: float = 0.005  # and at the grasp point before closing
     fine_max_s: float = 1.5
     knock_dist: float = 0.03  # target object moved this far before the grasp: knocked
+    grab_tol: float = 0.0  # >0: close once the object is this close to the grasp point in the
+    # hand (and not short of it), without waiting for the palm (the grasp target follows the
+    # object, so a palm that pushes it would keep pushing)
+    ik_w_rot: float = 0.3  # IK weight of the palm's orientation against its position
+    tilt_gain: float = 0.0  # >0: while the arm works at the table, lean the waist further by
+    # this share of the pelvis's backward tilt (the controller tips it back as the arm reaches)
+    release_away: float = 0.0  # after opening over the bin, move the palm this far off the
+    # object before judging, so one resting on the open hand falls off
     nav: nav.NavParams = field(default_factory=nav.NavParams)
     # the bin's opening is much larger than the grasp's tolerance
     nav_bin: nav.NavParams = field(
@@ -127,7 +135,12 @@ class Expert:
         self.robot = base.scene["robot"]
         export_dir = Path(export_dir)
         self.iks = [
-            ArmIK(export_dir / "newton_model.xml", export_dir / "policy_io.json", "right")
+            ArmIK(
+                export_dir / "newton_model.xml",
+                export_dir / "policy_io.json",
+                "right",
+                w_rot=self.p.ik_w_rot,
+            )
             for _ in range(self.n)
         ]
         names = list(self.robot.joint_names)
@@ -470,7 +483,16 @@ class Expert:
                 err = float(np.linalg.norm(palm_pos[i].cpu().numpy() - target))
                 tol = {"fine_pre": p.fine_pre_tol, "fine_out": p.fine_out_tol,
                        "fine_grasp": p.fine_grasp_tol}[ph]  # fmt: skip
-                if err < tol or k * dt >= p.fine_max_s:
+                in_hand = False
+                if ph == "fine_grasp" and p.grab_tol > 0:
+                    rel = pl["rot"].T @ (obj[i] - palm_pos[i]).cpu().numpy()
+                    lay = self.base.pick_place_layouts[i]
+                    want = np.array(p.grasp_in_palm)
+                    want[2] += L.OBJECTS[lay.target_object]["height"] / 2 - p.grasp_height
+                    off = rel - want
+                    in_hand = (abs(off[0]) < p.grab_tol and abs(off[2]) < p.grab_tol
+                               and off[1] < p.grab_tol / 2)  # fmt: skip
+                if err < tol or in_hand or k * dt >= p.fine_max_s:
                     if ph == "fine_grasp":  # where the object sits in the hand as it closes
                         rel = pl["rot"].T @ (obj[i] - palm_pos[i]).cpu().numpy()
                         e3 = palm_pos[i].cpu().numpy() - pl["grasp"]
@@ -509,7 +531,10 @@ class Expert:
                     self._go(i, "release")
             elif ph == "release":
                 pl = self.plan[i]
-                arm = self._ik_follow(i, pl["to"], pl["rot"], pl["q_rel"])
+                away = _smooth(k * dt / 0.5 - 1.0) * p.release_away  # after the hand is open
+                target = pl["to"] - away * pl["rot"][:, 1]
+                arm = self._ik_follow(i, target, pl["rot"], pl["q_rel"])
+                pl["release_end"] = target
                 s = min(1.0, k * dt / 0.5)
                 self.hand[i] = HAND_CLOSED + s * (HAND_OPEN - HAND_CLOSED)
                 if k * dt >= p.release_s:
@@ -519,7 +544,8 @@ class Expert:
                 pl = self.plan[i]
                 rise = 0.6
                 if k * dt < rise:
-                    target = pl["to"] + _smooth(k * dt / rise) * np.array([0.0, 0.0, 0.10])
+                    start = pl.get("release_end", pl["to"])
+                    target = start + _smooth(k * dt / rise) * np.array([0.0, 0.0, 0.10])
                     arm = self._ik_follow(i, target, pl["rot"], pl["q_rel"])
                     targets[i] = (target, pl["rot"])
                     pl["q_from"] = self.q_ik[i].copy()
@@ -537,6 +563,13 @@ class Expert:
                 self.hand[i], device=self.dev, dtype=torch.float32
             )
 
+        if p.tilt_gain > 0:  # lean further as the pelvis tips back, at the table
+            g = self.robot.data.projected_gravity_b.torch
+            back = torch.atan2(-g[:, 0], -g[:, 2]).cpu().numpy()  # pelvis tipped back (rad)
+            for i in range(self.n):
+                if P["raise"] <= self.phase[i] <= P["lift"]:
+                    extra = p.tilt_gain * min(max(float(back[i]), 0.0), 0.15)
+                    hl.body_goal[i, 3] = min(p.lean + extra, 0.45)
         self._record(pose, obj, palm_pos, moved, targets)
         # palm height above the table at each bin phase's end (failure analysis)
         for i in range(self.n):
