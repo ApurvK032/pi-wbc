@@ -253,6 +253,11 @@ class HighLevel:
         return [self.arm_hand_names.index(name) for name in names]
 
     def reset(self, env_ids) -> None:
+        self.velocity, self.body_goal, self.arm_hand = (
+            self.velocity.clone(),
+            self.body_goal.clone(),
+            self.arm_hand.clone(),
+        )  # see Expert.reset
         self.velocity[env_ids] = 0.0
         self.body_goal[env_ids] = self.body.nominal
         self.arm_hand[env_ids] = self.upper.default

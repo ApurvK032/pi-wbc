@@ -22,6 +22,12 @@ parser.add_argument("--first-seed", type=int, default=50_000, help="development 
 parser.add_argument("--run", type=Path, default=Path(DEFAULT_RUN), help="controller run folder")
 parser.add_argument("--gif", type=Path, default=None)
 parser.add_argument("--gif-env", type=int, default=0, help="which robot of the first batch")
+parser.add_argument(
+    "--fail-gifs",
+    type=Path,
+    default=None,
+    help="save the last 9 s of every failed episode as a GIF in this folder",
+)
 parser.add_argument("--out", type=Path, required=True)
 add_launcher_args(parser)
 args, overrides = parser.parse_known_args()
@@ -70,7 +76,7 @@ def look_at(eye, target):
 EYE, TARGET = (-1.6, -2.4, 1.6), (-0.6, 0.0, 0.8)  # robot's right side, approach and table front
 
 
-def side_camera():
+def side_camera(small: bool = False):
     import isaaclab.sim as sim_utils
     from isaaclab.sensors import CameraCfg
     from isaaclab_newton.renderers import NewtonWarpRendererCfg
@@ -78,13 +84,23 @@ def side_camera():
     return CameraCfg(
         prim_path="{ENV_REGEX_NS}/debug_cam",
         update_period=0.0,
-        width=480,
-        height=320,
+        width=320 if small else 480,
+        height=214 if small else 320,
         data_types=["rgb"],
         spawn=sim_utils.PinholeCameraCfg(focal_length=18.0, clipping_range=(0.05, 30.0)),
         offset=CameraCfg.OffsetCfg(pos=EYE, rot=look_at(EYE, TARGET), convention="world"),
         renderer_cfg=NewtonWarpRendererCfg(),
     )
+
+
+def save_gif(frames, path: Path) -> None:
+    from PIL import Image
+
+    if not frames:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    imgs = [Image.fromarray(f) for f in frames]
+    imgs[0].save(path, save_all=True, append_images=imgs[1:], duration=60, loop=0)
 
 
 def main() -> None:
@@ -94,8 +110,8 @@ def main() -> None:
     agent_cfg = handle_deprecated_rsl_rl_cfg(agent_cfg, check_rsl_rl_version())
     n = min(args.num_envs, args.episodes)
     env_cfg.scene.num_envs = n
-    if args.gif is not None:
-        env_cfg.scene.debug_cam = side_camera()
+    if args.gif is not None or args.fail_gifs is not None:
+        env_cfg.scene.debug_cam = side_camera(small=args.fail_gifs is not None)
     with launch_simulation(env_cfg, args):
         env = gym.make(TASK, cfg=env_cfg)
         venv = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
@@ -118,13 +134,28 @@ def main() -> None:
             base.reset()
             expert.reset(list(range(n)))
             obs = venv.get_observations()
+            clips = [collections.deque(maxlen=150) for _ in range(n)]
+            saved = set()
             max_steps = round(expert.p.episode_timeout_s / dt) + 10
-            with torch.inference_mode():
+            # no_grad, not inference_mode: tensors made in inference mode (also inside the
+            # environment's action term) can't be changed by the next batch's reset
+            with torch.no_grad():
                 for k in range(max_steps):
                     expert.step()
                     hl.apply()
                     obs, _, _, _ = venv.step(policy(obs))
                     sim_steps += 1
+                    if args.fail_gifs is not None and k % 3 == 0:
+                        rgb = tt(base.scene["debug_cam"].data.output["rgb"])[..., :3]
+                        rgb = rgb.clamp(0, 255).to(torch.uint8).cpu().numpy()
+                        for i in range(m):
+                            if not expert.finished()[i]:
+                                clips[i].append(rgb[i])
+                            elif expert.label[i] != "success" and i not in saved:
+                                saved.add(i)
+                                save_gif(clips[i], args.fail_gifs / (
+                                    f"{base.pick_place_layouts[i].seed}-{expert.label[i]}-"
+                                    f"{expert.failed_in[i]}.gif"))  # fmt: skip
                     if args.gif is not None and not results and k % 3 == 0:
                         rgb = tt(base.scene["debug_cam"].data.output["rgb"])[args.gif_env, ..., :3]
                         frames.append(rgb.clamp(0, 255).to(torch.uint8).cpu().numpy())
