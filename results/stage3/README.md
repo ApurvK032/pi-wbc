@@ -103,7 +103,36 @@ tracks better than our controller (0.77-0.79 against its 0.57-0.73 rad/s, D-029)
 is not: over height commands from 0.70 to 0.78 m (its nominal is 0.74) it falls in 7-10 of 10
 with the arms hanging, and with the arms at zero either drifts backwards at 0.26-0.32 m/s or, at
 0.78 m, falls every time (files `stand-h*.json`). Yet crouching and leaning, which also run the
-Balance policy, stay still. Whether the drift is in the policy or in our model and physics
-(NVIDIA trained and tested in MuJoCo, on a model whose feet touch the floor through four small
-spheres each) is the next check. Since the task is mostly standing at a table, the
-demonstrations are recorded with our controller (D-032).
+Balance policy, stay still.
+
+### The drift comes from the asset's short heel
+
+Each foot touches the floor through four small spheres: two at the toe and two at the heel.
+Isaac Lab's G1 asset, on which stage 1 trained, puts the heel pair at x = -0.02 m on the
+ankle-roll link; Unitree's URDF (in NVIDIA's copy), NVIDIA's MuJoCo models and MuJoCo
+Menagerie's model all put it at -0.05 m, a 3 cm longer support (the toes are at 0.12 m in all of
+them). In plain MuJoCo, NVIDIA's policy stands still on its own model and on Menagerie's, and
+drifts backwards at 0.31-0.32 m/s on any of them once the heel spheres are moved to -0.02; on
+Newton's model of our G1 it drifts at 0.32 m/s, and stands still once they are moved to -0.05.
+The observation code was checked line by line against NVIDIA's.
+
+In Newton, with the heel spheres moved to -0.05 m
+([src/pi_wbc/stage3/feet.py](../../src/pi_wbc/stage3/feet.py), `--heel-x -0.05`):
+
+| | Falls, all 11 commands | Standing still | Turn in place 0.8 rad/s |
+|---|---:|---|---:|
+| NVIDIA's, arms hanging | 0/110 (heel -0.02: 13/110) | still | 0.75 rad/s |
+| NVIDIA's, arms at zero | 0/110 (heel -0.02: 4/110) | still (heel -0.02: back at 0.33 m/s) | 0.78 rad/s |
+| Ours, seed 1, nominal | 0/1100 (heel -0.02, stage 1: 0/3300) | still | 0.64 rad/s (heel -0.02: 0.70) |
+| Ours, seed 1, 1 m/s kicks | 0/550 (heel -0.02: 0/550) | — | 0.63 rad/s (heel -0.02: 0.68) |
+
+Files: [nvidia_wbc/all-arms-default-heel-0.05.json](nvidia_wbc/all-arms-default-heel-0.05.json),
+[nvidia_wbc/all-arms-zero-heel-0.05.json](nvidia_wbc/all-arms-zero-heel-0.05.json),
+[heel/](heel/). Our controller, trained on the short heel, is unchanged on the longer one apart
+from turning in place a little more slowly; it was already tested on Menagerie's longer heel in
+MuJoCo in stage 1. So the stage 3 scenes are proposed to use the URDF's heel for every
+controller (D-038, proposed), which also makes NVIDIA's controller usable for recording
+demonstrations.
+
+Not checked: which heel position matches the real robot's sole (Unitree's URDF is the closest
+source here), and NVIDIA's controller under kicks.

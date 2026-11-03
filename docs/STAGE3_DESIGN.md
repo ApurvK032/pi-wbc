@@ -45,12 +45,14 @@ aims for (0.1-0.5 kg). What it takes:
 
 **NVIDIA's controller runs on our G1 in Newton** through the same commands
 ([nvidia_wbc_test.py](../scripts/nvidia_wbc_test.py)): it walks (0.5 m/s gives 0.44-0.45),
-turns in place better than ours (0.77-0.79 rad/s of 0.8), crouches to 0.58 m of 0.6 and never
-fell walking. Standing still, its separate "Balance" policy drifts backwards at 0.25-0.4 m/s
-and, depending on arm pose and height command, falls (9 of 10 with stage 1's hanging arms at
-its nominal height). Whether that drift is in the policy or in our physics is being checked in
-plain MuJoCo. Until it is fixed it can't record demonstrations of a task that is mostly
-standing at a table, so the demonstrations are recorded with our controller (section 6).
+turns in place better than ours (0.75-0.79 rad/s of 0.8) and crouches to 0.58 m of 0.6. On
+Isaac Lab's G1 asset it could not stand still: its "Balance" policy drifted backwards at
+0.25-0.4 m/s and often fell. The cause is the asset's foot contact geometry: its heel contact
+spheres sit 3 cm further forward than in Unitree's URDF, NVIDIA's models and MuJoCo Menagerie's
+(x = -0.02 against -0.05 m). With the heel moved to -0.05 m, NVIDIA's controller never fell in
+any of the 11 test commands and stands still; ours is unchanged (no falls in 1,100 robots, 550
+more with kicks) except for turning in place a little more slowly (0.64 against 0.70 rad/s).
+So the scenes use the URDF's heel for every controller (D-038, proposed).
 
 ## 3. The scene
 
@@ -67,7 +69,8 @@ standing at a table, so the demonstrations are recorded with our controller (sec
   as in the renderer test), 640 x 480; a fixed side camera for GIFs only, not in the dataset.
   Dex3 has no wrist cameras, and GR00T's G1 setup uses the head camera only (`ego_view`).
 - **Physics**: Newton with training's settings except 4 substeps (to be checked with the
-  controller first, section 11, step 1).
+  controller first, section 11, step 1), and the feet's heel contact spheres at Unitree's
+  URDF position (D-038).
 
 **Layouts** are drawn from a seed: robot start, which three objects, their places on the table
 (spread along its front 25 cm, at least 12 cm apart), which bin is where. **Seed ranges, frozen
@@ -133,14 +136,14 @@ with the ideal body (section 7): a failure there is the expert's.
 
 ## 6. Which controller records the demonstrations
 
-Stage 1's controller, seed 1 (the only seed that met the turning target, D-029). The other two
-seeds and the ablation controllers are used in stage 5 for evaluation, not for recording.
-
-NVIDIA's controller would record a second, smaller set over the same layouts if its standing
-drift (section 2) gets fixed: recording is cheap because rendering comes afterwards (section 8),
-and stage 4 then chooses what the VLA trains on. If not, the comparison in stage 5 reports that
-the VLA has only seen our controller, and the grid of section 7 measures how much that matters
-for the expert.
+Both, over the same layouts. The main set goes through stage 1's controller, seed 1 (the only
+seed that met the turning target, D-029); a matched set goes through NVIDIA's controller, now
+that it stands with the URDF's heel (section 2). Recording is cheap, since rendering comes
+afterwards (section 8). Stage 4 then chooses what the VLA trains on: our demonstrations only,
+both mixed, or one VLA per controller, which measures the confound of D-032 directly. The
+expert is the same for both; if it succeeds much less often through NVIDIA's controller, that
+is itself a stage 5 result. The other two seeds of ours and the ablation controllers are used
+in stage 5 for evaluation, not for recording.
 
 ## 7. The low-level layers for the stage 5 grid
 
@@ -219,8 +222,9 @@ parallel). Long unattended runs on the workstation still need Apurv's OK.
 - **Tight grasp tolerance for the VLA.** About 1 cm of tolerance is demanding for a learned
   policy; stage 4 may see grasp misses dominate. That is a finding for stage 5, and the failure
   labels will show it.
-- **NVIDIA's controller** may stay unusable for standing tasks in our simulator; the stage 5
-  comparison then covers walking and reports standing as it is.
+- **NVIDIA's controller under load.** It stands and walks with the URDF's heel, but it has not
+  been tested with kicks, leaning to reach, or an object in hand; the expert may need more
+  margin with it.
 - **Plain images**: Newton's renderer is simpler than RTX; if the VLA's vision struggles, the
   recorded states can be re-rendered with OVRTX without re-running anything.
 
@@ -232,8 +236,8 @@ Accepted by Apurv on 2026-11-03:
 - **D-031**: Newton's renderer for the dataset and for closed-loop testing; states recorded
   first and rendered afterwards; OVRTX for front-page GIFs.
 - **D-032**: the perfect-layer grid for stage 5; NVIDIA's controller tried in Newton first (done:
-  section 2); demonstrations recorded with ours (seed 1), NVIDIA's set only if its standing is
-  fixed.
+  section 2); demonstrations recorded with ours (seed 1), and a second set with NVIDIA's once
+  it stands (it does with the URDF's heel, D-038).
 - **D-033**: Dex3 hands confirmed for GR00T N1.6 (its G1 joint space has 7 joints per hand with
   Dex3's names); the hands move between open and closed poses.
 
@@ -245,4 +249,8 @@ Proposed, for Apurv's OK:
   right hand only in version 1.
 - **D-036** (expert): the state machine and failure labels of section 5, no retries.
 - **D-037** (dataset): 1,000 training episodes, head camera 640 x 480 at 25 frames per second,
-  the replay check of section 8, GR00T and LeRobot formats.
+  the replay check of section 8, GR00T and LeRobot formats; a matched set through NVIDIA's
+  controller (section 6).
+- **D-038** (feet): stage 3 onwards, the G1's heel contact spheres sit where Unitree's URDF has
+  them (x = -0.05 m), for every controller; stage 1's Newton numbers were taken with the
+  asset's -0.02 m.
