@@ -158,7 +158,11 @@ the URDF's heel (D-038), the bench's 11 commands, `--substeps 2` against `--subs
 Files: [substeps/](substeps/). 4 substeps change nothing measurable: falls stay at noise level
 (3 against 2 in 4,950 robots) and speed and turning agree within 0.02. Seed 1 had no falls at
 2 m/s kicks in an earlier, identical run, so 1-2 falls in 550 are within Newton's run-to-run
-variation. So the stage 3 scenes run at 4 substeps.
+variation. NVIDIA's controller is unchanged too: with the URDF's heel at 4 substeps it fell in
+none of 110 robots with either arm pose, tracking as at 2
+([nvidia_wbc/all-arms-default-heel-0.05-sub4.json](nvidia_wbc/all-arms-default-heel-0.05-sub4.json),
+[nvidia_wbc/all-arms-zero-heel-0.05-sub4.json](nvidia_wbc/all-arms-zero-heel-0.05-sub4.json)).
+So the stage 3 scenes run at 4 substeps.
 
 ## Steps 2-3 (in progress): the task and the expert
 
