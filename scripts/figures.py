@@ -572,7 +572,7 @@ def engines(t, mode):
     fig.text(
         0.01,
         0.98,
-        "One policy, four simulators",
+        "One policy, three simulators, four setups",
         color=t["ink"],
         fontsize=12,
         fontweight="bold",
@@ -581,7 +581,8 @@ def engines(t, mode):
     fig.text(
         0.01,
         0.9,
-        "Stage 1 controller, nominal robot, no retraining; dots: training seeds, bar: their mean",
+        "MuJoCo with two robot models; nominal robot, no retraining; dots: training seeds, "
+        "bar: their mean",
         color=t["ink2"],
         fontsize=9,
         va="top",

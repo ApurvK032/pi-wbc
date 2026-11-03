@@ -188,7 +188,10 @@ survived at 2.5 m/s, 85-94% at 3 m/s); the B2 students' was 2.0 m/s (92-95% at 2
 weakness: walking at 0.5 m/s on Menagerie's model, seed 1 trips over gentle 0.5 m/s kicks in 30
 of 200 episodes, though never over 1 m/s kicks there; the cause was not investigated.
 
-### One policy, four simulators
+### One policy, three simulators
+
+Four setups: Isaac Lab on Newton (training), Isaac Sim on PhysX, and MuJoCo with two robot
+models (Menagerie's G1 and the training model).
 
 <p align="center">
 <picture>
@@ -227,6 +230,11 @@ each. Seen on every seed:
   episodes, but it walks more precisely (speed error at 1 m/s 0.10-0.13 m/s against 0.17-0.23).
 - **Without friction randomization, falls to kicks triple.** Without the curriculum, or without
   the teacher (PPO alone), the turning error about doubles.
+- **Two surprises.** The student trained without a teacher fell least of all to 1 m/s kicks
+  (9 / 8 / 6 falls against 84 / 106 / 66 for the full recipe), and the one trained without sensor
+  noise fell less to kicks of both sizes (1 m/s: 37 / 32 / 27; 2 m/s: 201 / 198 / 83 against
+  254 / 298 / 241) while still rarely falling to noise. So here the teacher bought precise command following, not
+  robustness, and noise randomization cost some push recovery. Neither cause was tested.
 
 ## What went wrong on the way, and the fixes
 
