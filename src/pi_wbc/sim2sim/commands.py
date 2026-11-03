@@ -138,7 +138,8 @@ class Condition:
     """What a test condition changes from nominal."""
 
     floor_friction: float = 1.0
-    robot_friction: float | None = None  # set too, or the robot's own friction (1.0) decides
+    robot_friction: float | None = None  # set too, or the robot's own friction decides (1.0;
+    # Menagerie's feet 0.6, so the larger, the floor's 1.0, applies when nominal)
     hand_payload_kg: float = 0.0
     delay_steps: int = 0  # physics steps the previous PD targets are kept after a new action
     noise: bool = False  # the training's observation noise

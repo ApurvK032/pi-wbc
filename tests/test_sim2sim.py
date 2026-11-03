@@ -213,6 +213,27 @@ def test_episode_runs_with_a_zero_policy(sim: G1MujocoSim) -> None:
     assert drift is None  # 1 s ends before the 2 s settling time, or it fell
 
 
+def _floor_contact_friction(model: mujoco.MjModel, io: PolicyIO) -> set[float]:
+    sim = G1MujocoSim(model, io)
+    sim.reset()
+    for _ in range(50):  # let the feet settle on the floor
+        mujoco.mj_step(sim.model, sim.data)
+    plane = mujoco.mjtGeom.mjGEOM_PLANE
+    return {
+        round(float(c.friction[0]), 3)
+        for c in sim.data.contact[: sim.data.ncon]
+        if plane in (model.geom_type[c.geom1], model.geom_type[c.geom2]) and c.exclude == 0
+    }
+
+
+@needs_model
+@pytest.mark.parametrize(("floor", "robot", "expected"), [(1.0, None, 1.0), (0.4, 0.4, 0.4)])
+def test_feet_get_the_floor_friction(io: PolicyIO, floor, robot, expected) -> None:
+    """Menagerie's foot spheres (priority 1, friction 0.6) must not override the floor (D-039)."""
+    model = build_model(SCENE, io, floor_friction=floor, robot_friction=robot)
+    assert _floor_contact_friction(model, io) == {expected}
+
+
 @needs_model
 def test_inactive_gap_contacts_do_not_count_as_touching(io: PolicyIO) -> None:
     model = build_model(SCENE, io)

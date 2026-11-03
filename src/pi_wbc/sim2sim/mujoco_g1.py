@@ -179,8 +179,11 @@ def build_model(
     friction, armature and effort limits come from `io`. Planes (the floor) get
     `floor_friction`: Newton, like MuJoCo, uses the larger of two touching surfaces' friction,
     and Isaac Lab's ground is 1.0. For a slippery floor, set `robot_friction` too (every other
-    geom), or the robot's own friction decides. `hand_payload_kg` is added to each palm (in
-    Menagerie's model, the wrist link the palm belongs to).
+    geom), or the robot's own friction decides. The floor also gets the highest priority of
+    the model's geoms: MuJoCo takes the larger friction only between geoms of equal priority,
+    and otherwise the higher-priority geom's. Menagerie's foot spheres have priority 1 and
+    friction 0.6, so without this every Menagerie run stood on 0.6 (D-039). `hand_payload_kg`
+    is added to each palm (in Menagerie's model, the wrist link the palm belongs to).
     """
     spec = mujoco.MjSpec.from_file(str(xml_path))
     for actuator in list(spec.actuators):
@@ -211,9 +214,11 @@ def build_model(
         )
         actuator.set_to_position(kp=io.stiffness[name], kv=io.damping[name])
 
+    top_priority = max((g.priority for g in spec.geoms), default=0)
     for geom in spec.geoms:
         if geom.type == mujoco.mjtGeom.mjGEOM_PLANE:
             geom.friction = [floor_friction, geom.friction[1], geom.friction[2]]
+            geom.priority = top_priority  # equal priority: MuJoCo then takes the larger friction
         elif robot_friction is not None:
             geom.friction = [robot_friction, geom.friction[1], geom.friction[2]]
     model = spec.compile()
