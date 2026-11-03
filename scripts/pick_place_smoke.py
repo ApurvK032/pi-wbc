@@ -114,6 +114,12 @@ def main() -> None:
         print(f"[smoke] falls {int((~alive).sum())}/{n}; walked {walked.mean():.2f} m "
               f"(commanded {args.speed * args.walk_s:.2f}); objects moved at most "
               f"{moved.max() * 100:.2f} cm")  # fmt: skip
+        for i in range(n):
+            far = [(L.OBJECT_NAMES[k], round(float(moved[i, k]) * 100, 1),
+                    [round(v, 2) for v in (obj_now[i, k] - base.scene.env_origins[i]).tolist()])
+                   for k in range(len(L.OBJECT_NAMES)) if moved[i, k] > 0.01]  # fmt: skip
+            if far:
+                print(f"   env {i} objects moved (cm, now at): {far}")
         for i in range(min(n, 4)):
             lay = base.pick_place_layouts[i]
             print(f"   env {i}: seed {lay.seed}: '{lay.instruction}', objects {lay.objects}")

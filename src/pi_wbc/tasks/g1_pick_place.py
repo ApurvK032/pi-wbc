@@ -36,15 +36,18 @@ ROBOT_START_Z = 0.8  # pelvis height at reset, as in training
 PARK = (-6.0, 6.0)  # where unused objects stand (env frame): far behind and to the side
 
 # a bin is five kinematic boxes: a floor and four walls, offsets from the bin's centre on the
-# table top
+# table top. Parts keep 1 mm gaps from each other and from the table: Newton generates contacts
+# between touching kinematic bodies too, and they use up the contact budget.
 _FT, _WT, _WH = 0.01, L.BIN_WALL[0], L.BIN_WALL[1]
 _BX, _BY = L.BIN_SIZE
+_GAP = 0.001
+_WZ = _GAP + _FT + _GAP + _WH / 2  # wall centres sit on top of the floor
 BIN_PARTS = {
-    "floor": ((_BX, _BY, _FT), (0.0, 0.0, _FT / 2)),
-    "wall_xm": ((_WT, _BY, _WH), (-(_BX - _WT) / 2, 0.0, _FT + _WH / 2)),
-    "wall_xp": ((_WT, _BY, _WH), ((_BX - _WT) / 2, 0.0, _FT + _WH / 2)),
-    "wall_ym": ((_BX, _WT, _WH), (0.0, -(_BY - _WT) / 2, _FT + _WH / 2)),
-    "wall_yp": ((_BX, _WT, _WH), (0.0, (_BY - _WT) / 2, _FT + _WH / 2)),
+    "floor": ((_BX, _BY, _FT), (0.0, 0.0, _GAP + _FT / 2)),
+    "wall_xm": ((_WT, _BY, _WH), (-(_BX - _WT) / 2, 0.0, _WZ)),
+    "wall_xp": ((_WT, _BY, _WH), ((_BX - _WT) / 2, 0.0, _WZ)),
+    "wall_ym": ((_BX - 2 * _WT - 2 * _GAP, _WT, _WH), (0.0, -(_BY - _WT) / 2, _WZ)),
+    "wall_yp": ((_BX - 2 * _WT - 2 * _GAP, _WT, _WH), (0.0, (_BY - _WT) / 2, _WZ)),
 }
 
 
@@ -125,8 +128,10 @@ def reset_layout(env, env_ids: torch.Tensor | None) -> None:
         env.pick_place_layouts = layouts
     state = LayoutState(layouts, env.device)
     env.pick_place_state = state
-    ids = torch.arange(env.num_envs, device=env.device) if env_ids is None else env_ids
-    ids = torch.as_tensor(ids, device=env.device, dtype=torch.long)
+    if env_ids is None or isinstance(env_ids, slice):  # a full reset passes slice(None)
+        ids = torch.arange(env.num_envs, device=env.device)
+    else:
+        ids = torch.as_tensor(env_ids, device=env.device, dtype=torch.long)
     origins = env.scene.env_origins[ids]
     n = len(ids)
     zeros6 = torch.zeros(n, 6, device=env.device)
@@ -221,8 +226,8 @@ class G1PickPlaceEnvCfg(G1TeacherStudentEnvCfg):
         # physics: finer substeps for grasping, room for the extra contacts
         newton = self.sim.physics.newton_mjwarp
         newton.num_substeps = SUBSTEPS
-        newton.solver_cfg.njmax = 600
-        newton.solver_cfg.nconmax = 120
+        newton.solver_cfg.njmax = 1200  # per world
+        newton.solver_cfg.nconmax = 300
 
 
 class HighLevel:
