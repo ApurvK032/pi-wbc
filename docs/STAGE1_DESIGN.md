@@ -1,8 +1,9 @@
 # Stage 1 design: the π-WBC whole-body controller
 
-**Status: accepted (2026-10-29).** Apurv accepted all seven recommendations of section 15;
-they are recorded as D-012 to D-015 in [DECISIONS.md](DECISIONS.md). Details below may still
-change as the work shows what is needed; changes are logged there.
+**Status: accepted (2026-10-29), carried out.** All seven recommendations of section 15 were
+accepted and are recorded as D-012 to D-015 in [DECISIONS.md](DECISIONS.md). Where the work
+changed a detail below, the change is logged there. Results:
+[results/stage1](../results/stage1/README.md).
 
 Stage 0 left us with a working pipeline (Isaac Lab training on the workstation and on MSI, a
 MuJoCo sim-to-sim bench, gait measurements) and a bench policy that walks without falling but
