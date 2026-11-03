@@ -95,3 +95,22 @@ def test_save_json_gz_round_trip(repo: Path, tmp_path: Path) -> None:
     assert loaded["falls"] == [0, 1]
     commit = provenance.load_json(plain)["provenance"]["git"]["commit"]
     assert loaded["provenance"]["git"]["commit"] == commit
+
+
+def test_source_digest_changes_with_the_code(tmp_path: Path) -> None:
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "a.py").write_text("x = 1\n")
+    (tmp_path / "sub" / "b.py").write_text("y = 2\n")
+    (tmp_path / "notes.txt").write_text("not code\n")
+    first = provenance.source_digest(tmp_path)
+    assert first["files"] == 2 and len(first["sha256"]) == 64
+    (tmp_path / "notes.txt").write_text("changed\n")
+    assert provenance.source_digest(tmp_path) == first  # only .py files count
+    (tmp_path / "sub" / "b.py").write_text("y = 3\n")
+    assert provenance.source_digest(tmp_path)["sha256"] != first["sha256"]
+
+
+def test_provenance_records_the_code_hash_and_isaac_sim() -> None:
+    record = provenance.collect(packages=provenance.DEFAULT_PACKAGES)
+    assert record["source"] == provenance.source_digest()  # this package, outside git too
+    assert "isaacsim" in record["packages"]

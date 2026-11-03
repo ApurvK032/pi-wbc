@@ -1,4 +1,4 @@
-"""Record where a result came from: commit, package versions, GPU.
+"""Record where a result came from: commit, code hash, package versions, GPU.
 
 Every result file in this project embeds this record, so any number can be
 traced back to the code and machine that produced it.
@@ -7,6 +7,7 @@ traced back to the code and machine that produced it.
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 import platform
 import subprocess
@@ -20,6 +21,7 @@ from typing import Any
 DEFAULT_PACKAGES = (
     "pi-wbc",
     "isaaclab",
+    "isaacsim",
     "newton",
     "warp-lang",
     "torch",
@@ -69,6 +71,21 @@ def git_info(repo: Path | None = None) -> dict[str, Any]:
         if len(entry) > 3 and not entry[3:].startswith("results/")
     ]
     return {"commit": commit, "dirty": bool(changes), "changes": changes[:20]}
+
+
+def source_digest(package_dir: Path | None = None) -> dict[str, Any]:
+    """SHA-256 over this package's .py files: each relative path and its bytes, sorted by path.
+
+    Ties a result to its code where git can't: code run from a copy outside the checkout, or
+    in a container without git. The same digest computed at a commit means the same code.
+    """
+    root = package_dir if package_dir is not None else Path(__file__).resolve().parent
+    files = sorted(p for p in root.rglob("*.py") if "__pycache__" not in p.parts)
+    digest = hashlib.sha256()
+    for path in files:
+        digest.update(path.relative_to(root).as_posix().encode() + b"\0")
+        digest.update(path.read_bytes() + b"\0")
+    return {"sha256": digest.hexdigest(), "files": len(files)}
 
 
 def package_versions(names: Iterable[str] = DEFAULT_PACKAGES) -> dict[str, str | None]:
@@ -122,6 +139,7 @@ def collect(repo: Path | None = None, packages: Iterable[str] = DEFAULT_PACKAGES
     return {
         "time_utc": datetime.now(UTC).isoformat(timespec="seconds"),
         "git": git_info(repo),
+        "source": source_digest(),
         "python": platform.python_version(),
         "platform": platform.platform(),
         "host": platform.node(),

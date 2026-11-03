@@ -18,6 +18,7 @@ import argparse
 from pathlib import Path
 
 from pi_wbc.provenance import load_json
+from pi_wbc.sim2sim.evaluate import kick_counts
 from pi_wbc.stats import wilson_interval
 
 SEEDS = (1, 2, 3)
@@ -47,10 +48,8 @@ def summary(folder: Path, prefix: str, seed: int, cond: str) -> dict:
 def kicks(folder: Path, prefix: str, seed: int, speed: str) -> tuple[int, int, float]:
     """(episodes that fell, episodes, share of kicks survived) of one kick-sweep run."""
     d = load_json(folder / "push" / f"{prefix}-s{seed}-push_{speed}.json.gz")
-    times = d["condition_settings"]["push_times"]
     eps = d["episodes"]
-    falls = sum(e["fell"] for e in eps)
-    given = sum(sum(1 for t in times if not e["fell"] or t <= e["fall_time_s"]) for e in eps)
+    falls, given = kick_counts(eps, d["condition_settings"]["push_times"])
     return falls, len(eps), 1 - falls / given
 
 

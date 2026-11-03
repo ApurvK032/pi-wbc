@@ -16,13 +16,12 @@ from typing import TYPE_CHECKING
 import mujoco
 import numpy as np
 
-from pi_wbc.sim2sim.mujoco_g1 import match_name
+from pi_wbc.sim2sim.mujoco_g1 import FOOT_BODIES, match_name
 
 if TYPE_CHECKING:
     from pi_wbc.sim2sim.mujoco_g1 import G1MujocoSim
 
 MIN_AIR_S = 0.06
-FOOT_BODIES = ("left_ankle_roll_link", "right_ankle_roll_link")
 KNEE_JOINTS = ("left_knee_joint", "right_knee_joint")
 SHOULDER_JOINTS = ("left_shoulder_pitch_joint", "right_shoulder_pitch_joint")
 

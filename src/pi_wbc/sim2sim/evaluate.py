@@ -38,7 +38,7 @@ from pi_wbc.sim2sim.commands import (  # noqa: F401  (SCENARIOS: re-exported)
     scenarios_for,
 )
 from pi_wbc.sim2sim.gait import METRICS, GaitRecorder
-from pi_wbc.sim2sim.mujoco_g1 import G1MujocoSim, PolicyIO, build_model
+from pi_wbc.sim2sim.mujoco_g1 import G1MujocoSim, PolicyIO, build_model, contact_settings
 from pi_wbc.stats import wilson_interval
 
 FALL_HEIGHT = 0.35  # m, pelvis height
@@ -190,6 +190,20 @@ def _mean(values: list[float]) -> float | None:
     return statistics.fmean(values) if values else None
 
 
+def kick_counts(episodes: list[dict[str, Any]], push_times: list[float]) -> tuple[int, int]:
+    """(falls, kicks given) over the episodes of a kick run, as saved in its result file.
+
+    A kick is given if the robot was still up when it came: before the fall time. A fall
+    recorded at the kick's own time happened in the step before it, so that kick never came.
+    Times are multiples of the policy step, so a 1 µs margin tells "at" from "after".
+    """
+    falls = sum(bool(e["fell"]) for e in episodes)
+    given = sum(
+        sum(1 for t in push_times if not e["fell"] or t < e["fall_time_s"] - 1e-6) for e in episodes
+    )
+    return falls, given
+
+
 def summarize(episodes: list[Episode]) -> list[dict[str, Any]]:
     """Per (model, scenario): fall rate with a 95% Wilson interval, mean tracking errors."""
     order = list(ALL_SCENARIOS)
@@ -326,7 +340,12 @@ def main(argv: list[str] | None = None) -> None:
         default=0,
         help="first seed: 0-99 are for development, 1000-1199 for the final test",
     )
-    parser.add_argument("--duration-s", type=float, default=20.0)
+    parser.add_argument(
+        "--duration-s",
+        type=float,
+        default=None,
+        help="episode length (default: the condition's, 20 s or 23 s with kicks)",
+    )
     parser.add_argument("--scenario", action="append", choices=list(ALL_SCENARIOS), default=None)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--label", default=None, help="name of this policy in comparisons")
@@ -359,6 +378,8 @@ def main(argv: list[str] | None = None) -> None:
     episodes: list[Episode] = []
     model_info: dict[str, Any] = {}
     condition = CONDITIONS[args.condition]
+    if args.duration_s is None:
+        args.duration_s = condition.episode_s
     if condition.noise and not io.obs_noise:
         print("[sim2sim] this export records no noise ranges: using the base task's", flush=True)
     for spec in args.model:
@@ -411,6 +432,7 @@ def main(argv: list[str] | None = None) -> None:
             "path": path,
             "total_mass_kg": float(model.body_mass.sum()),
             "timestep_s": float(model.opt.timestep),
+            "contacts": contact_settings(model),
             "wall_s": round(time.monotonic() - start, 1),
         }
         print(f"[sim2sim] {name}: {len(scenarios) * args.seeds} episodes done", flush=True)
