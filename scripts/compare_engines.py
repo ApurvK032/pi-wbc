@@ -1,11 +1,15 @@
-"""Tables for results/stage1/README.md step 7: the B2 students on Newton, PhysX and MuJoCo.
+"""Tables for results/stage1/README.md: students on Newton, PhysX and MuJoCo (step 7 and D-028).
 
-    python3 scripts/compare_engines.py
+    python3 scripts/compare_engines.py                   # the B2 students (step 7)
+    python3 scripts/compare_engines.py --prefix long \
+        --mujoco 'results/stage1/full_range_long/full-range-long-s{s}-nominal.json'
 
-Reads the Isaac Lab evaluations in results/stage1/physx/ (50 robots per command; nominal and
-with kicks) and the MuJoCo bench's development-seed results in results/stage1/speed_fix/.
+Reads the Isaac Lab evaluations in results/stage1/physx/ (<prefix>-s<seed>-<engine>-<run>.json;
+50 robots per command, nominal and with kicks) and the MuJoCo bench's development-seed results
+(--mujoco, `{s}` for the seed; the B2 students' in results/stage1/speed_fix/ by default).
 """
 
+import argparse
 import json
 import math
 
@@ -35,7 +39,14 @@ def by_scenario(path: str, model: str | None = None) -> dict:
     return {r["scenario"]: r for r in rows if model is None or r["model"] == model}
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    global IL, MJ
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--prefix", default="b2", help="label prefix of the Isaac Lab results")
+    parser.add_argument("--mujoco", default=MJ, help="MuJoCo bench results, {s} for the seed")
+    args = parser.parse_args(argv)
+    IL = f"results/stage1/physx/{args.prefix}-s{{s}}-{{e}}-{{c}}.json"
+    MJ = args.mujoco
     cols = [
         ("Isaac Lab, Newton", lambda s: by_scenario(IL.format(s=s, e="newton", c="50"))),
         ("Isaac Sim, PhysX", lambda s: by_scenario(IL.format(s=s, e="isaacsim", c="50"))),
