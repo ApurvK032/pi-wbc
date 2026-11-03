@@ -131,7 +131,7 @@ Files: [nvidia_wbc/all-arms-default-heel-0.05.json](nvidia_wbc/all-arms-default-
 [heel/](heel/). Our controller, trained on the short heel, is unchanged on the longer one apart
 from turning in place a little more slowly; it was already tested on Menagerie's longer heel in
 MuJoCo in stage 1. So the stage 3 scenes are proposed to use the URDF's heel for every
-controller (D-038, proposed), which also makes NVIDIA's controller usable for recording
+controller (D-038), which also makes NVIDIA's controller usable for recording
 demonstrations.
 
 Not checked: which heel position matches the real robot's sole (Unitree's URDF is the closest

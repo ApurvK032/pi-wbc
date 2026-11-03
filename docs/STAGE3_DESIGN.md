@@ -1,8 +1,9 @@
 # Stage 3 design: the pick-and-place task, the scripted expert and the demonstrations
 
-**Status: proposed (2026-11-03).** Sections 1-2 and the decisions marked accepted in section 13
-were agreed with Apurv on 2026-11-03 (D-030 to D-033 in [DECISIONS.md](DECISIONS.md)); the
-rest waits for his OK. Results so far: [results/stage3](../results/stage3/README.md).
+**Status: accepted (2026-11-03).** All decisions of section 13 were accepted by Apurv on
+2026-11-03 and are recorded as D-030 to D-038 in [DECISIONS.md](DECISIONS.md). Where the work
+changes a detail below, the change is logged there. Results:
+[results/stage3](../results/stage3/README.md).
 
 Stage 1 left a controller that walks, turns, crouches, leans and keeps its balance while the
 arms move, driven through NVIDIA's command interface (D-012, D-028, D-029). Stage 3 builds the
@@ -52,7 +53,7 @@ spheres sit 3 cm further forward than in Unitree's URDF, NVIDIA's models and MuJ
 (x = -0.02 against -0.05 m). With the heel moved to -0.05 m, NVIDIA's controller never fell in
 any of the 11 test commands and stands still; ours is unchanged (no falls in 1,100 robots, 550
 more with kicks) except for turning in place a little more slowly (0.64 against 0.70 rad/s).
-So the scenes use the URDF's heel for every controller (D-038, proposed).
+So the scenes use the URDF's heel for every controller (D-038).
 
 ## 3. The scene
 
@@ -230,7 +231,7 @@ parallel). Long unattended runs on the workstation still need Apurv's OK.
 
 ## 13. Decisions
 
-Accepted by Apurv on 2026-11-03:
+All accepted by Apurv on 2026-11-03:
 
 - **D-030**: stage 3 now, stage 2 (motion imitation) later, alongside it on MSI.
 - **D-031**: Newton's renderer for the dataset and for closed-loop testing; states recorded
@@ -240,8 +241,6 @@ Accepted by Apurv on 2026-11-03:
   it stands (it does with the URDF's heel, D-038).
 - **D-033**: Dex3 hands confirmed for GR00T N1.6 (its G1 joint space has 7 joints per hand with
   Dex3's names); the hands move between open and closed poses.
-
-Proposed, for Apurv's OK:
 
 - **D-034** (grasp): side grasp from above, round objects only, fingers and thumb closing
   together, torso lean 0.25 rad at a 0.75 m table, 4 physics substeps (after step 1's check).

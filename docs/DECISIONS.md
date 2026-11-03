@@ -41,6 +41,11 @@ items at the [end](#open-items)):
 | [D-031](#d-031-newtons-renderer-for-the-demonstrations-recorded-as-states-and-rendered-afterwards-2026-11-03) | Newton's renderer for the demonstrations, recorded as states and rendered afterwards | 2026-11-03 |
 | [D-032](#d-032-the-perfect-layer-grid-for-stage-5-and-demonstrations-recorded-with-our-controller-2026-11-03) | The perfect-layer grid for stage 5, and demonstrations recorded with our controller | 2026-11-03 |
 | [D-033](#d-033-dex3-confirmed-for-gr00t-n16-hands-move-between-open-and-closed-poses-2026-11-03) | Dex3 confirmed for GR00T N1.6; hands move between open and closed poses | 2026-11-03 |
+| [D-034](#d-034-the-grasp-a-side-grasp-from-above-round-objects-4-physics-substeps-2026-11-03) | The grasp: a side grasp from above, round objects, 4 physics substeps | 2026-11-03 |
+| [D-035](#d-035-the-task-one-table-three-round-objects-two-bins-frozen-seed-ranges-2026-11-03) | The task: one table, three round objects, two bins, frozen seed ranges | 2026-11-03 |
+| [D-036](#d-036-the-scripted-expert-a-state-machine-over-the-true-state-no-retries-2026-11-03) | The scripted expert: a state machine over the true state, no retries | 2026-11-03 |
+| [D-037](#d-037-the-dataset-1000-episodes-per-controller-head-camera-replay-check-2026-11-03) | The dataset: 1,000 episodes per controller, head camera, replay check | 2026-11-03 |
+| [D-038](#d-038-the-g1s-heel-contact-spheres-at-unitrees-urdf-position-from-stage-3-on-2026-11-03) | The G1's heel contact spheres at Unitree's URDF position from stage 3 on | 2026-11-03 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -755,6 +760,69 @@ items at the [end](#open-items)):
   says the hand "is controlled by binary signals like a gripper"; NVIDIA's teleoperation also
   switches between fixed open and closed poses.
 - **Cost:** no finger-level dexterity.
+
+## D-034: The grasp: a side grasp from above, round objects, 4 physics substeps (2026-11-03)
+
+- **What:** the right hand's palm faces the object from the side, fingers forward, and comes
+  straight down beside it; fingers and thumb close together. The grasp point is 8.5 cm along the
+  fingers and 6.2 cm out from the palm frame's origin; the torso leans 0.25 rad to reach the
+  0.75 m table. The arm's path is solved on Newton's model of the robot, inside the controller's
+  trained arm ranges. Stage 3 scenes run Newton at 4 substeps (800 Hz), if step 1's check of
+  the controller passes.
+- **Why:** in the grasp test ([results/stage3](../results/stage3/README.md)) a can and a bottle
+  are held 27 of 27 times with the object up to 1 cm off, at 0.1-0.5 kg. Square objects are
+  pinched off-centre (3/27, 1/27); closing the fingers first fails (0/27); at 2 substeps 24/27
+  hold and the object slides 4.4 cm in the hand instead of 1.7. Upright, the grasp is out of
+  reach.
+- **Cost:** round objects only, about 1 cm of tolerance, and physics twice as slow as
+  training's, at a substep count the controller was not trained with.
+
+## D-035: The task: one table, three round objects, two bins, frozen seed ranges (2026-11-03)
+
+- **What:** the scene of [STAGE3_DESIGN.md](STAGE3_DESIGN.md), section 3: a 0.75 m table, three
+  of five round objects told apart by colour and kind, two bins at the table's ends, the robot
+  starting 1.5-3 m away within 90 degrees of facing it, about ten instruction templates, right
+  hand only in version 1. Layout seeds: train 0-49,999, development 50,000-50,999, test
+  60,000-60,999 (used once, for the reported numbers).
+- **Why:** it is the project's task (walk to a table, pick the named object, put it in the named
+  bin) within the reach and grasp the tests allow.
+- **Cost:** no left-hand grasps, no square objects, one table.
+
+## D-036: The scripted expert: a state machine over the true state, no retries (2026-11-03)
+
+- **What:** walk to the stance, settle, reach (lean, raise the hand, over the object), grasp
+  (correcting the hand on the measured palm-object offset), lift, carry (straighten, side-step
+  or turn to the bin), release, retract. Seven failure labels from simulator state: fell,
+  knocked, missed grasp, dropped, wrong object, wrong bin, timed out. The ideal body separates
+  the expert's own failures from the controller's.
+- **Why:** an expert without retries gives an honest success rate through each controller, and
+  its labels are stage 5's failure attribution.
+- **Cost:** the demonstrations contain no recoveries, so the VLA never sees one.
+
+## D-037: The dataset: 1,000 episodes per controller, head camera, replay check (2026-11-03)
+
+- **What:** 1,000 training episodes through our controller (seed 1) and a matched set through
+  NVIDIA's over the same layouts (D-032); head camera, 640 x 480 at 25 frames per second;
+  states recorded every control step and rendered afterwards (D-031). Replay check: written-back
+  states render exactly, and re-running the recorded commands must give the same outcome.
+  Exported to GR00T N1.6's format (LeRobot v2 with `modality.json`, `NEW_EMBODIMENT`) and
+  LeRobot's current format for π0.5, with a manifest.
+- **Why:** a size in line with GR00T and π0.5 fine-tuning practice, to be revised in stage 4;
+  Newton on the GPU does not repeat runs exactly, so a re-run can only reproduce outcomes.
+- **Cost:** two data loaders to install for the load tests (asked first).
+
+## D-038: The G1's heel contact spheres at Unitree's URDF position from stage 3 on (2026-11-03)
+
+- **What:** in every stage 3 scene and later evaluation, the feet's heel contact spheres sit at
+  x = -0.05 m on the ankle-roll link, where Unitree's URDF has them, instead of Isaac Lab's
+  asset's -0.02 m, for every controller (`pi_wbc.stage3.feet.set_heel_x`).
+- **Why:** Unitree's URDF (NVIDIA's copy), NVIDIA's MuJoCo models and MuJoCo Menagerie agree on
+  -0.05 m. On the asset's shorter heel NVIDIA's controller drifts backwards at 0.25-0.4 m/s
+  standing and falls; on the URDF's it never fell in 220 robots and stands still. Ours is
+  unchanged there: no falls in 1,100 robots, none in 550 with 1 m/s kicks.
+- **Cost:** our controller runs on a foot it was not trained on: it turns in place a little
+  more slowly (0.64 against 0.70 rad/s for 0.8). Stage 1's Newton numbers were taken on the
+  asset's heel. Which position matches the real robot's sole was not checked.
 
 ## Open items
 
