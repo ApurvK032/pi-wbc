@@ -1,7 +1,119 @@
-# Stage 1 results
+# Stage 1 results: the whole-body controller
 
-Design: [docs/STAGE1_DESIGN.md](../../docs/STAGE1_DESIGN.md). This page grows as the steps of
-its section 12 are done.
+The stage 1 controller is a student policy that sees only proprioception (the IMU and joint
+encoders over the last 0.5 s), distilled from a PPO teacher with privileged state. Its teacher
+trains 3000 iterations under the curriculum and then 7000 more at the full command ranges
+(D-022, D-024, D-026, D-028); three training seeds. This page first gives its final numbers on
+the frozen test seeds, then the record of how it got there, step by step, in the order of the
+[design](../../docs/STAGE1_DESIGN.md)'s section 12. Every number links to raw data in this
+folder, and every result file records the commit, package versions and GPU it came from.
+
+**Contents**
+
+- [Final result: the stage 1 controller on the test seeds](#final-result-the-stage-1-controller-on-the-test-seeds)
+- [Step 1: gait](#step-1-gait): a gait clock and Unitree's G1 rewards turn a shuffle into a walk
+- [Step 2: body pose and moving arms](#step-2-body-pose-and-moving-arms): height, torso and arm commands
+- [Step 3: domain randomization](#step-3-domain-randomization): six groups, each checked in a running simulation
+- [Step 4: teacher and student](#step-4-teacher-and-student): distillation, then the fixes that led to the final recipe:
+  [warm-up (D-021)](#student-recipe-held-level-or-warm-up-d-021),
+  [speed (D-022)](#speed-fix-a-narrow-speed-reward-d-022),
+  [full ranges and history (D-024, D-026)](#full-command-ranges-and-a-25-step-student-d-024-d-026),
+  [a turning reward that failed (D-027)](#a-narrow-turning-reward-does-not-fix-turning-d-027),
+  [longer teacher training (D-028)](#longer-full-range-training-brings-turning-back-d-028),
+  [PhysX check](#the-stage-1-controller-on-isaac-sims-physx)
+- [Step 5: test conditions in the MuJoCo bench](#step-5-test-conditions-in-the-mujoco-bench)
+- [Step 6: ablation](#step-6-ablation): every randomization group, the curriculum and the teacher switched off in turn
+- [Step 7: the controller in Isaac Sim's PhysX](#step-7-the-controller-in-isaac-sims-physx)
+
+## Final result: the stage 1 controller on the test seeds
+
+The three students of D-028 (training seeds 1-3) on the frozen MuJoCo test seeds 1000-1199,
+used here for the first time: every command (11) from 200 starts on both robot models, 4400
+episodes per seed and condition, each episode 20 s; and the kick sweep (kicks of 0.5-3 m/s at 3,
+7, 11, 15 and 19 s while standing, walking at 0.5 and 1 m/s, turning in place and moving the
+arms; 2000 episodes per seed and kick). Tables from `scripts/finish_line.py
+results/stage1/full_range_long_test full-range-long`. The same students in Isaac Lab and on
+Isaac Sim's PhysX: [below](#the-stage-1-controller-on-isaac-sims-physx).
+
+**The design's finish line** (section 1); each cell is Menagerie / Newton model:
+
+| Measure | Target | Seed 1 | Seed 2 | Seed 3 | Met |
+|---|---|---|---|---|---|
+| Falls, all commands, both models | upper 95% bound below 5% | 0/4400 | 0/4400 | 0/4400 | yes: 0 of 13,200 (0.00%-0.03%) |
+| Speed error, walking 1 m/s | at most 0.15 m/s | 0.12 / 0.11 | 0.10 / 0.09 | 0.05 / 0.04 | yes |
+| Speed error, walking 0.5 m/s | at most 0.15 m/s | 0.05 / 0.04 | 0.05 / 0.04 | 0.04 / 0.04 | yes |
+| Speed error, sideways 0.3 m/s | at most 0.15 m/s | 0.07 / 0.08 | 0.08 / 0.10 | 0.05 / 0.07 | yes |
+| Turn-rate error, 0.8 rad/s in place | at most 0.2 rad/s | 0.19 / 0.19 | 0.25 / 0.24 | 0.22 / 0.22 | seed 1 (D-029) |
+| Step rate at 1 m/s | 1.5-3 steps/s | 2.4 / 2.4 | 2.5 / 2.5 | 2.4 / 2.4 | yes |
+| Step length at 1 m/s | at least 0.3 m | 37 cm / 38 cm | 37 cm / 38 cm | 40 cm / 41 cm | yes |
+| Foot lift at 1 m/s | at least 5 cm | 7.1 cm / 7.3 cm | 7.3 cm / 7.5 cm | 6.8 cm / 6.9 cm | yes |
+| Slip at the sole, 1 m/s (D-016) | at most 0.1 m/s | 0.04 / 0.02 | 0.05 / 0.01 | 0.05 / 0.02 | yes |
+| Arm joint error, walking with the arms moving | report | 0.039 / 0.033 rad | 0.039 / 0.033 rad | 0.038 / 0.033 rad | - |
+| Kicks survived at 2.0 / 2.5 m/s | report the largest kick survived 95% of the time | 99.8% / 99.3% | 99.9% / 99.2% | 99.9% / 98.0% | 2.5 m/s on every seed |
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../figures/falls-dark.png">
+  <img src="../figures/falls-light.png" alt="Falls under each test condition with 95% intervals, three generations of students" width="720">
+</picture>
+</p>
+
+**Falls per test condition**, per training seed 1 / 2 / 3 and pooled with 95% Wilson intervals
+(13,200 episodes per condition), against the warm-up students (D-021) and the B2 students
+(D-022) on the same seeds:
+
+| Condition | Warm-up (D-021) | B2 (D-022) | Stage 1 controller (D-028) |
+|---|---|---|---|
+| nominal | 1 / 5 / 0 (6: 0.02%-0.10%) | 39 / 6 / 1 (46: 0.26%-0.46%) | 0 / 0 / 0 (0: 0.00%-0.03%) |
+| floor friction 0.4 | 1 / 21 / 5 (27: 0.14%-0.30%) | 28 / 2 / 2 (32: 0.17%-0.34%) | 0 / 0 / 0 (0: 0.00%-0.03%) |
+| 1 kg in each hand | 4 / 16 / 3 (23: 0.12%-0.26%) | 58 / 14 / 16 (88: 0.54%-0.82%) | 0 / 0 / 0 (0: 0.00%-0.03%) |
+| 20 ms extra delay | 0 / 2 / 0 (2: 0.00%-0.06%) | 19 / 3 / 0 (22: 0.11%-0.25%) | 0 / 0 / 0 (0: 0.00%-0.03%) |
+| sensor noise | 1 / 6 / 0 (7: 0.03%-0.11%) | 9 / 0 / 2 (11: 0.05%-0.15%) | 0 / 0 / 0 (0: 0.00%-0.03%) |
+| 1 m/s kicks every 4 s | 84 / 106 / 66 (256: 1.72%-2.19%) | 50 / 59 / 33 (142: 0.91%-1.27%) | 3 / 7 / 1 (11: 0.05%-0.15%) |
+| 2 m/s kicks every 4 s | 254 / 298 / 241 (793: 5.61%-6.43%) | 227 / 259 / 168 (654: 4.60%-5.34%) | 27 / 30 / 17 (74: 0.45%-0.70%) |
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../figures/kicks-dark.png">
+  <img src="../figures/kicks-light.png" alt="Share of kicks survived against kick speed" width="640">
+</picture>
+</p>
+
+**Kick sweep** (the design's push-recovery measure), 2000 episodes per seed and kick:
+
+| Kick | Episodes that fell (seeds 1 / 2 / 3) | Pooled, 95% | Kicks survived |
+|---|---|---|---|
+| 0.5 m/s | 30 / 0 / 0 | 0.35%-0.71% | 99.7% / 100.0% / 100.0% |
+| 1.0 m/s | 0 / 2 / 0 | 0.01%-0.12% | 100.0% / 100.0% / 100.0% |
+| 1.5 m/s | 2 / 1 / 1 | 0.03%-0.17% | 100.0% / 100.0% / 100.0% |
+| 2.0 m/s | 23 / 9 / 6 | 0.46%-0.87% | 99.8% / 99.9% / 99.9% |
+| 2.5 m/s | 71 / 80 / 195 | 5.20%-6.39% | 99.3% / 99.2% / 98.0% |
+| 3.0 m/s | 540 / 524 / 1089 | 34.68%-37.11% | 93.8% / 94.0% / 84.9% |
+
+- **No falls without kicks: 0 in 66,000 episodes** (five conditions, three seeds), where the B2
+  students fell 199 times and the warm-up students 65. The B2 students' weakness, standing with
+  the arms moving, is gone.
+- **About a tenth of the earlier falls under kicks:** 11 and 74 of 13,200 episodes with 1 and
+  2 m/s kicks, against 142 and 654 for B2. The largest kick survived 95% of the time is now
+  2.5 m/s on every seed (B2: 2.0 m/s).
+- **Every finish-line target is met on every seed except turning in place:** seed 1 meets it
+  (0.19 rad/s), seeds 2 and 3 miss by 0.02-0.05 rad/s. Stage 1 closes with this as a known limit
+  (D-029).
+- **The test seeds repeat the development seeds** to within 0.01 m/s and 0.01 rad/s on every
+  tracking error.
+- **One weakness the test seeds showed:** walking at 0.5 m/s on Menagerie's model, seed 1 falls
+  1.5-2 s after a gentle 0.5 m/s kick in 30 of 200 episodes, but never after a 1 m/s kick there.
+  Larger kicks seem to trigger a recovery step that small ones don't; not investigated.
+
+Raw data: [`full_range_long_test/`](full_range_long_test/) (labels `full-range-long-s{1,2,3}`,
+the kick sweep in `push/`); the command-tracking runs of the front page in
+[`full_range_long/`](full_range_long/) (`tracking_trace_s*.json.gz`,
+`scripts/tracking_trace.py`) and the teachers' training curves there too
+(`teacher_training.json.gz`, `scripts/teacher_curves.py`).
+
+## How it got here
+
+The working record, step by step: what was tried, what was found and what changed.
 
 ## Step 1: gait
 
@@ -142,7 +254,7 @@ than stage 0's run-to-run spread (D-011) are not evidence.
   iterations it fell short of 1 m/s, with its training curves still improving; 3000 iterations
   closed the gap (result above).
 
-## Step 2: body pose and moving arms (in progress)
+## Step 2: body pose and moving arms
 
 **In short:** the task works end to end. After five development runs, the current policy
 stands, walks, crouches to 0.60 m (within 2-4 cm), leans its torso forward and keeps its balance
@@ -296,7 +408,7 @@ Cluster runs: jobs 5204130 and 5204131, commit `810d67f`, one A40 each, about 1 
   the time). Step 1's version measured the offset from the default pose, so the two values
   don't compare.
 
-## Step 3: domain randomization (in progress)
+## Step 3: domain randomization
 
 Task: `PiWbc-G1-Robust` (`src/pi_wbc/tasks/g1_robust.py`, D-018), the body task plus six
 randomization groups, each removable for the ablation by the config overrides in
@@ -344,7 +456,7 @@ randomization groups, each removable for the ablation by the config overrides in
   draws and stayed near the middle of the range (0.43-0.94 over 16 robots). The task's own
   event gives all of a robot's shapes one value: 0.10-1.24 over 256 robots.
 
-## Step 4: teacher and student (in progress)
+## Step 4: teacher and student
 
 `src/pi_wbc/tasks/g1_student.py`: one environment, the robust task of step 3, with two
 observation groups:
@@ -826,7 +938,107 @@ Raw data: [`turn_fine/`](turn_fine/) (MuJoCo, labels `turn-fine-s{1,2,3}`; the t
 `turn_sweep/`) and [`arm_level/`](arm_level/) (Isaac Lab, `turn-fine-s*` for the students,
 `turn-fine-teacher-s*` for the teachers).
 
-## Step 5: test conditions in the MuJoCo bench (in progress)
+### Longer full-range training brings turning back (D-028)
+
+The teachers of the 25-step students trained 7000 iterations at the full ranges instead of
+1000 (on MSI, an L40S per seed, about 2 h each; seed 1 was resumed from iteration 5000 after its
+first job stopped on NaN observations at 5432), then the same 3000-iteration distillation.
+Isaac Lab, the same tests (seeds 1 / 2 / 3):
+
+| Controller | Falls, nominal robot | Falls, randomized robot | Speed asked 1.0 m/s | Turn rate asked 0.8 rad/s | Turn rate asked 0.5 rad/s while walking at 0.6 m/s |
+|---|---|---|---|---|---|
+| teacher, 1000 iterations (D-024) | 3 / 0 / 0 (3: 0.01%-0.09%) | 6 / 1 / 10 (17: 0.11%-0.27%) | 0.96 / 0.91 / 0.98 | 0.60 / 0.40 / 0.59 | 0.26 / 0.28 / 0.55 |
+| teacher, 7000 iterations | 0 / 0 / 2 (2: 0.01%-0.07%) | 0 / 0 / 9 (9: 0.05%-0.17%) | 0.96 / 0.93 / 0.96 | 0.75 / 0.73 / 0.65 | 0.49 / 0.45 / 0.41 |
+| student, 1000-iteration teacher (D-026) | 5 / 1 / 0 (6: 0.03%-0.13%) | 24 / 36 / 24 (84: 0.69%-1.05%) | 1.00 / 0.91 / 0.98 | 0.47 / 0.31 / 0.45 | 0.17 / 0.25 / 0.45 |
+| student, 7000-iteration teacher | 0 / 0 / 0 (0: 0.00%-0.04%) | 17 / 41 / 52 (110: 0.92%-1.34%) | 0.92 / 0.92 / 0.98 | 0.70 / 0.57 / 0.64 | 0.52 / 0.51 / 0.39 |
+| B2 student (D-022), for reference | 38 / 6 / 9 | 98 / 111 / 76 | 0.90 / 1.02 / 0.91 | 0.64 / 0.59 / 0.67 | 0.29 / 0.30 / 0.47 |
+
+The teacher's turning along the way, asked 0.8 rad/s in place, nominal robot (checkpoints every
+1000 iterations from the start of the full-range training):
+
+| Seed | +1000 | +2000 | +3000 | +4000 | +5000 | +6000 | +7000 |
+|---|---|---|---|---|---|---|---|
+| 1 | 0.52 | 0.72 | 0.56 | 0.64 | 0.54 | 0.80 | 0.75 |
+| 2 | 0.45 | 0.39 | 0.70 | 0.66 | 0.71 | 0.66 | 0.73 |
+| 3 | 0.60 | 1.00 | 0.59 | 0.28 | 0.80 | 0.77 | 0.65 |
+
+MuJoCo (development seeds 0-9, both robot models, seeds 1-3 pooled; students of the
+7000-iteration teachers against those of the 1000-iteration ones): no falls without kicks for
+either (3300 episodes each); with 1 m/s kicks 1 against 2 of 660; with 2 m/s kicks 2 against 4
+of 660. Speed error walking at 1 m/s 0.11 / 0.09 / 0.04 against 0.07 / 0.09 / 0.08 m/s; yaw-rate
+error walking straight at 1 m/s 0.22 / 0.21 / 0.17 against 0.17 / 0.31 / 0.26 rad/s; turn-rate
+error asked 0.8 rad/s in place 0.19 / 0.24 / 0.22 against 0.32 / 0.49 / 0.35 rad/s. Turn sweep
+(mean of both models), asked to turn in place:
+
+| Asked | 1000-iteration teacher's student | 7000-iteration teacher's student |
+|---|---|---|
+| 0.4 rad/s | 0.24 / 0.15 / 0.19 | 0.37 / 0.31 / 0.36 |
+| 0.8 rad/s | 0.49 / 0.31 / 0.46 (steps 2.5 / 1.7 / 2.5 per second) | 0.73 / 0.59 / 0.65 (steps 2.5 / 2.5 / 2.5 per second) |
+| 1.0 rad/s | 0.57 / 0.43 / 0.55 | 0.89 / 0.73 / 0.83 |
+
+- **Turning comes back on every seed.** Asked to turn at 0.8 rad/s in place, the students turn
+  at 0.70 / 0.57 / 0.64 rad/s in Isaac Lab (0.47 / 0.31 / 0.45 before) and 0.73 / 0.59 / 0.65 in
+  MuJoCo, back to the B2 students' 0.64 / 0.59 / 0.67 but now at the full ranges. Walking at 0.6
+  m/s while turning at 0.5 rad/s they reach 0.52 / 0.51 / 0.39 (0.17 / 0.25 / 0.45). All three
+  now step around when turning in place, seed 2 included. The MuJoCo turn-rate error in place,
+  0.19-0.24 rad/s, is near the design's 0.2 target; seed 1 meets it.
+- **The teachers were undertrained at the full ranges.** Their turning in place ends at 0.75 /
+  0.73 / 0.65 rad/s against 0.60 / 0.40 / 0.59 after 1000 iterations, but swings between
+  checkpoints 1000 iterations apart (seed 3: 0.28 to 1.00); the last checkpoint is used, never a
+  chosen one.
+- **Falls stay low.** None on the nominal robot in Isaac Lab (6 of 9900 before) or in MuJoCo
+  without kicks, and fewer under MuJoCo kicks (3 against 6 of 1320). On the randomized robot in
+  Isaac Lab a few more: 110 against 84 of 9900 (0.92%-1.34% against 0.69%-1.05%, overlapping);
+  fewer on seed 1 (17 against 24), more on seeds 2 and 3; about half of them while walking at 1
+  m/s (53 against 36).
+- **What it costs:** seed 1 walks a little slower (0.92 m/s asked 1.0 in Isaac Lab; speed error
+  0.11 m/s in MuJoCo against 0.07, still inside the 0.15 target), and drifts a little more
+  walking straight; seeds 2 and 3 walk as before or better and drift less.
+- These three students are the stage 1 controller (D-028). Their final numbers on the test seeds
+  are at the [top of this page](#final-result-the-stage-1-controller-on-the-test-seeds).
+
+Raw data: [`full_range_long/`](full_range_long/) (MuJoCo, labels `full-range-long-s{1,2,3}`; the
+turn sweeps in `turn_sweep/`) and [`arm_level/`](arm_level/) (Isaac Lab, `long-s*` for the
+students, `long-teacher-s*-it*` for the teacher checkpoints).
+
+### The stage 1 controller on Isaac Sim's PhysX
+
+The same check as step 7, on the three students of D-028: Isaac Lab's task on Newton
+(training's engine) and on Isaac Sim 6.2's PhysX, 50 robots per command (550 per run), each
+command held for 20 s, reset seed 0; the MuJoCo columns are the bench's development seeds above.
+Each cell is training seeds 1 / 2 / 3 (mean):
+
+| Measure | Isaac Lab, Newton (training) | Isaac Sim, PhysX | MuJoCo, Menagerie | MuJoCo, Newton's model |
+|---|---|---|---|---|
+| Speed error, 0.5 m/s | 0.04 / 0.04 / 0.04 (0.04) | 0.04 / 0.05 / 0.04 (0.04) | 0.05 / 0.05 / 0.04 (0.04) | 0.04 / 0.04 / 0.04 (0.04) |
+| Speed error, 1 m/s | 0.10 / 0.09 / 0.04 (0.08) | 0.11 / 0.12 / 0.05 (0.09) | 0.12 / 0.10 / 0.05 (0.09) | 0.11 / 0.09 / 0.04 (0.08) |
+| Sideways error, 0.3 m/s | 0.08 / 0.10 / 0.06 (0.08) | 0.09 / 0.11 / 0.08 (0.09) | 0.07 / 0.08 / 0.05 (0.07) | 0.08 / 0.10 / 0.06 (0.08) |
+| Turn-rate error, 0.8 rad/s | 0.19 / 0.26 / 0.22 (0.22) | 0.23 / 0.30 / 0.21 (0.25) | 0.19 / 0.25 / 0.22 (0.22) | 0.19 / 0.24 / 0.22 (0.22) |
+| Crouch error, cm | 1.2 / 1.8 / 0.3 (1.1) | 1.3 / 1.9 / 0.4 (1.2) | 1.6 / 1.9 / 0.4 (1.3) | 1.4 / 1.8 / 0.3 (1.2) |
+| Falls | 0 / 0 / 0 of 550 | 0 / 0 / 0 of 550 | 0 / 0 / 0 of 110 | 0 / 0 / 0 of 110 |
+
+Kicks (as in step 7: all 11 commands, 550 robots per seed), falls per seed and pooled with 95%
+intervals, against the B2 students of step 7:
+
+| Kicks | Isaac Lab, Newton | Isaac Sim, PhysX | B2 on Newton | B2 on PhysX |
+|---|---|---|---|---|
+| 1 m/s | 0 / 0 / 0 (0: 0.0%-0.2%) | 2 / 0 / 3 (5: 0.1%-0.7%) | 20: 0.8%-1.9% | 54: 2.5%-4.2% |
+| 2 m/s | 1 / 1 / 2 (4: 0.1%-0.6%) | 25 / 38 / 22 (85: 4.2%-6.3%) | 76: 3.7%-5.7% | 246: 13.3%-16.7% |
+
+- **No falls anywhere without kicks**, on any engine (the B2 students: 8 on Newton, 15 on PhysX,
+  all with the arms moving). Speed, sideways and crouch errors agree within 0.03 m/s and 0.1 cm
+  across the four columns.
+- **Turning is again slightly worse on PhysX** on two seeds of three (0.25 against 0.22 rad/s
+  mean), as with B2.
+- **Kick recovery on PhysX is three times better than B2's** (85 against 246 falls of 1650 at 2
+  m/s), but the robots still fall far more often there than on Newton (85 against 4): the gap
+  between the engines remains.
+
+Raw data: [`physx/`](physx/) (`long-s{1,2,3}-{newton,isaacsim}-50.json`, `-push1.0`,
+`-push2.0`); tables from `scripts/compare_engines.py --prefix long --mujoco
+'results/stage1/full_range_long/full-range-long-s{s}-nominal.json'`.
+
+## Step 5: test conditions in the MuJoCo bench
 
 `pi-wbc-sim2sim --condition` (`src/pi_wbc/sim2sim/commands.py`), the conditions of design
 section 9 that the bench can apply:
@@ -841,8 +1053,8 @@ section 9 that the bench can apply:
 
 On the step 2 v7 policy (3 starts each, Menagerie model) every condition runs; 1 m/s kicks
 knock it down in 2 of 3 standing episodes, as expected of a policy trained with ±0.5 m/s
-pushes. The step 3-4 policies train with pushes growing to 1.5 m/s. The Isaac Lab side of the
-evaluation protocol (the same commands and seeds in Isaac Lab) is still to do.
+pushes. The step 3-4 policies train with pushes growing to 1.5 m/s. The same commands run in
+Isaac Lab too (`pi-wbc-isaac-eval`, from step 4 on), on Newton or on PhysX (step 7).
 
 ## Step 6: ablation
 
@@ -993,7 +1205,9 @@ intervals, against the full student (also first protocol):
 Sim 6.2's PhysX, a different physics engine, through the same Isaac Lab task. Walking speed and
 crouch height match Newton and the MuJoCo bench within about 0.03; turning is slightly worse
 on every seed. Kick recovery is weaker: 2 m/s kicks make the robots fall three times as often as
-on Newton. All transfer here is sim-to-sim.
+on Newton. All transfer here is sim-to-sim. The stage 1 controller (D-028) was checked the same
+way later and does better on PhysX
+([The stage 1 controller on Isaac Sim's PhysX](#the-stage-1-controller-on-isaac-sims-physx)).
 
 <p align="center">
   <img src="b2_s1_kicks_walk_0.5_rtx.gif" alt="G1 walking at 0.5 m/s and kicked sideways at 2 m/s" width="400"><br>

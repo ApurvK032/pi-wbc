@@ -3,6 +3,41 @@
 Each entry says what was decided, why, and what it costs. Entries are numbered D-NNN and never
 deleted; a later entry that replaces one says so, and the old one is marked superseded.
 
+**Index** (stage 0: D-001 to D-011; stage 1: D-012 onwards; open items at the
+[end](#open-items)):
+
+| Decision | What | Date |
+|---|---|---|
+| [D-001](#d-001-robot-is-the-unitree-g1-29-dof-2026-10-28) | Robot is the Unitree G1, 29 DoF | 2026-10-28 |
+| [D-002](#d-002-train-in-isaac-lab-30-newton-backend-check-transfer-in-mujoco-2026-10-28) | Train in Isaac Lab 3.0 (Newton backend), check transfer in MuJoCo | 2026-10-28 |
+| [D-003](#d-003-tooling-is-uv-python-312-ruff-pytest-pre-commit-2026-10-28) | Tooling is uv, Python 3.12, ruff, pytest, pre-commit | 2026-10-28 |
+| [D-004](#d-004-nvidias-gr00t-whole-body-controller-is-the-baseline-2026-10-28) | NVIDIA's GR00T whole-body controller is the baseline | 2026-10-28 |
+| [D-005](#d-005-every-result-file-carries-provenance-2026-10-28) | Every result file carries provenance | 2026-10-28 |
+| [D-006](#d-006-isaac-lab-is-installed-as-a-wheel-into-the-project-environment-2026-10-28) | Isaac Lab is installed as a wheel into the project environment | 2026-10-28 |
+| [D-007](#d-007-stage-0-bench-policy-uses-the-29-dof-g1-with-dex3-hands-2026-10-28) | Stage 0 bench policy uses the 29-DoF G1 with Dex3 hands | 2026-10-28 |
+| [D-008](#d-008-sim-to-sim-protocol-2026-10-28) | Sim-to-sim protocol | 2026-10-28 |
+| [D-009](#d-009-cluster-runs-use-an-apptainer-container-and-the-workstations-lockfile-2026-10-28) | Cluster runs use an Apptainer container and the workstation's lockfile | 2026-10-28 |
+| [D-010](#d-010-gait-measures-in-the-mujoco-evaluation-2026-10-28) | Gait measures in the MuJoCo evaluation | 2026-10-28 |
+| [D-011](#d-011-training-changes-are-compared-against-the-run-to-run-spread-2026-10-28) | Training changes are compared against the run-to-run spread | 2026-10-28 |
+| [D-012](#d-012-stage-1-controller-interface-follows-nvidias-decoupled-wbc-2026-10-29) | Stage 1 controller interface follows NVIDIA's Decoupled WBC | 2026-10-29 |
+| [D-013](#d-013-hands-are-dex3-2026-10-29) | Hands are Dex3 | 2026-10-29 |
+| [D-014](#d-014-gr00t-n16-for-stage-4-2026-10-29) | GR00T N1.6 for stage 4 | 2026-10-29 |
+| [D-015](#d-015-stage-1-scope-and-compute-2026-10-29) | Stage 1 scope and compute | 2026-10-29 |
+| [D-016](#d-016-slip-is-measured-at-the-soles-floor-contacts-2026-10-29) | Slip is measured at the sole's floor contacts | 2026-10-29 |
+| [D-017](#d-017-how-step-2-carries-out-the-body-and-arm-commands-2026-10-30) | How step 2 carries out the body and arm commands | 2026-10-30 |
+| [D-018](#d-018-how-step-3-randomizes-and-how-its-groups-are-switched-off-2026-10-30) | How step 3 randomizes, and how its groups are switched off | 2026-10-30 |
+| [D-019](#d-019-the-student-trains-at-its-teachers-curriculum-level-held-fixed-2026-10-31) | The student trains at its teacher's curriculum level, held fixed (warm-up added by D-021) | 2026-10-31 |
+| [D-020](#d-020-the-two-ablation-configurations-that-are-not-randomization-2026-10-31) | The two ablation configurations that are not randomization | 2026-10-31 |
+| [D-021](#d-021-the-student-warms-up-to-its-teachers-level-over-300-iterations-2026-10-31) | The student warms up to its teacher's level over 300 iterations | 2026-10-31 |
+| [D-022](#d-022-a-narrow-speed-tracking-reward-at-weight-05-fixes-the-speed-miss-2026-11-01) | A narrow speed-tracking reward at weight 0.5 fixes the speed miss | 2026-11-01 |
+| [D-023](#d-023-test-the-controller-on-isaac-sims-physx-as-a-second-physics-engine-2026-11-01) | Test the controller on Isaac Sim's PhysX as a second physics engine | 2026-11-01 |
+| [D-024](#d-024-take-the-b2-teachers-on-to-the-full-command-ranges-before-distilling-2026-11-01) | Take the B2 teachers on to the full command ranges before distilling (lengthened by D-028) | 2026-11-01 |
+| [D-025](#d-025-all-rights-reserved-and-a-map-for-the-old-commit-hashes-2026-11-01) | All rights reserved, and a map for the old commit hashes | 2026-11-01 |
+| [D-026](#d-026-the-student-sees-the-last-25-control-steps-05-s-2026-11-02) | The student sees the last 25 control steps (0.5 s) | 2026-11-02 |
+| [D-027](#d-027-the-narrow-turning-reward-stays-off-2026-11-02) | The narrow turning reward stays off | 2026-11-02 |
+| [D-028](#d-028-train-the-full-range-teachers-7000-iterations-instead-of-1000-2026-11-03) | Train the full-range teachers 7000 iterations instead of 1000 | 2026-11-03 |
+| [D-029](#d-029-stage-1-closes-with-the-turning-target-met-on-one-seed-of-three-2026-11-03) | Stage 1 closes with the turning target met on one seed of three | 2026-11-03 |
+
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
 - **What:** a Unitree G1 with 29 body joints. Hands default to Dex3 (three fingers); the final
@@ -506,7 +541,7 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   (`scripts/isaacsim_env.sh`: `isaaclab[isaacsim,ov]==3.0.0` with Isaac Lab's tested
   overrides; about 9.5 GB to download, 27 GB on disk), so the training environment and
   `uv.lock` don't change. Its Newton, Warp, MuJoCo, PyTorch and NumPy versions are the
-  training environment's. Apurv accepted the NVIDIA Omniverse License Agreement for these runs.
+  training environment's. The NVIDIA Omniverse License Agreement was accepted for these runs.
 - **Why:** Newton's solver is MuJoCo-Warp, so the Newton → MuJoCo check (D-002) is the easy
   direction of transfer. PhysX has its own contact model and solver; with the Menagerie model
   (another robot description in MuJoCo) the two checks cover both a new engine and a new model.
@@ -613,6 +648,52 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
   on MSI); the full-range recipe of D-024 and D-026 stays the controller. Next for turning: a
   longer teacher training at the full ranges (is the teacher undertrained there?), then more
   robots turning in place during training (10% now).
+
+## D-028: Train the full-range teachers 7000 iterations instead of 1000 (2026-11-03)
+
+- **What:** each B2 teacher is resumed at the full command ranges as in D-024, but for 7000 PPO
+  iterations instead of 1000 (to iteration 9998); the 25-step student (D-026) is then distilled
+  from its last checkpoint for 3000 iterations. Trained on MSI, one L40S per seed. Seed 1's
+  first job stopped at iteration 5432 when the simulation returned NaN observations; it was
+  resumed from its iteration-5000 checkpoint for the remaining 4999 iterations, so it ends at
+  the same iteration.
+- **Why:** the full-range teachers had lost turning (0.60 / 0.40 / 0.59 rad/s when asked for
+  0.8; the B2 teachers they started from, 0.64 and 0.78 on seeds 1 and 2), and neither a longer
+  history (D-026) nor a narrow turning reward (D-027) brought it back. The training log's
+  turn-rate error was still falling after 1000 iterations: on seed 2 it rose from 0.77 to 0.97
+  as the ranges grew to full, was 0.94 at 1000 iterations and 0.71 at 7000. Asked to turn at 0.8
+  rad/s in place, the students now turn at 0.70 / 0.57 / 0.64 rad/s in Isaac Lab (seeds 1 / 2 /
+  3; 0.47 / 0.31 / 0.45 after 1000 iterations, B2 0.64 / 0.59 / 0.67) and 0.73 / 0.59 / 0.65 in
+  MuJoCo, and all three step around instead of twisting on their feet. They never fell on the
+  nominal robot in Isaac Lab (6 of 9900 before) or in MuJoCo without kicks, and fell less under
+  MuJoCo kicks (3 against 6 of 1320); on the randomized robot in Isaac Lab a few more (110
+  against 84 of 9900, intervals overlapping). Seed 1 walks a little slower (speed error at 1
+  m/s 0.11 against 0.07 m/s in MuJoCo). These students are the stage 1 controller. On the
+  test seeds (1000-1199) they fell in none of 66,000 episodes without kicks and in 74 of 13,200
+  with 2 m/s kicks (B2: 199 and 654).
+- **Cost:** 1 h 43 min of teacher training per seed on an L40S instead of about 17 min (about
+  3.2 GPU-hours per seed for the whole recipe). Turning in place swings between checkpoints 1000
+  iterations apart (seed 3: 0.28 to 1.00 rad/s, and one of them fell in 51 of the 300 episodes
+  standing with the arms moving), so the last checkpoint is used, never a chosen one.
+
+## D-029: Stage 1 closes with the turning target met on one seed of three (2026-11-03)
+
+- **What:** stage 1 is done with the controller of D-028. Of the design's finish line
+  ([STAGE1_DESIGN.md](STAGE1_DESIGN.md), section 1), every target is met on every training seed
+  on the test seeds except the turn-rate error turning in place at 0.8 rad/s (at most
+  0.2 rad/s): 0.19 on seed 1, 0.24-0.25 on seed 2 and 0.22 on seed 3. It is recorded as a known
+  limit, and stage 3 starts.
+- **Why:** the miss is 0.02-0.05 rad/s, and three changes aimed at turning have been tried: a
+  longer history (D-026), a narrow turning reward (D-027, no gain) and longer teacher training
+  (D-028, which brought turning in place from 0.31-0.47 to 0.57-0.73 rad/s). Everything else
+  holds with margin: no falls in 66,000 test episodes without kicks, kicks of 2.5 m/s survived
+  98-99% of the time, and speed errors at most 0.12 m/s against 0.15. The pick-and-place task
+  of stage 3 turns the robot under a closed loop (the expert's or the VLA's commands), which
+  corrects a turn rate that falls short. The next thing to try, if stage 3 or 5 needs sharper
+  turning, is a larger share of training robots asked to turn in place (10% now).
+- **Cost:** in place, the controller turns at 70-90% of the commanded rate, so stage 3's
+  expert and the VLA see a slower turn than they ask for; the stage 5 comparison with NVIDIA's
+  controller reports turning as it is.
 
 ## Open items
 
