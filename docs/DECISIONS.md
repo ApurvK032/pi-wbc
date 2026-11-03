@@ -3,8 +3,8 @@
 Each entry says what was decided, why, and what it costs. Entries are numbered D-NNN and never
 deleted; a later entry that replaces one says so, and the old one is marked superseded.
 
-**Index** (stage 0: D-001 to D-011; stage 1: D-012 onwards; open items at the
-[end](#open-items)):
+**Index** (stage 0: D-001 to D-011; stage 1: D-012 to D-029; stage 3: D-030 onwards; open
+items at the [end](#open-items)):
 
 | Decision | What | Date |
 |---|---|---|
@@ -37,6 +37,10 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 | [D-027](#d-027-the-narrow-turning-reward-stays-off-2026-11-02) | The narrow turning reward stays off | 2026-11-02 |
 | [D-028](#d-028-train-the-full-range-teachers-7000-iterations-instead-of-1000-2026-11-03) | Train the full-range teachers 7000 iterations instead of 1000 | 2026-11-03 |
 | [D-029](#d-029-stage-1-closes-with-the-turning-target-met-on-one-seed-of-three-2026-11-03) | Stage 1 closes with the turning target met on one seed of three | 2026-11-03 |
+| [D-030](#d-030-stage-3-before-stage-2-2026-11-03) | Stage 3 before stage 2 | 2026-11-03 |
+| [D-031](#d-031-newtons-renderer-for-the-demonstrations-recorded-as-states-and-rendered-afterwards-2026-11-03) | Newton's renderer for the demonstrations, recorded as states and rendered afterwards | 2026-11-03 |
+| [D-032](#d-032-the-perfect-layer-grid-for-stage-5-and-demonstrations-recorded-with-our-controller-2026-11-03) | The perfect-layer grid for stage 5, and demonstrations recorded with our controller | 2026-11-03 |
+| [D-033](#d-033-dex3-confirmed-for-gr00t-n16-hands-move-between-open-and-closed-poses-2026-11-03) | Dex3 confirmed for GR00T N1.6; hands move between open and closed poses | 2026-11-03 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -694,6 +698,58 @@ deleted; a later entry that replaces one says so, and the old one is marked supe
 - **Cost:** in place, the controller turns at 70-90% of the commanded rate, so stage 3's
   expert and the VLA see a slower turn than they ask for; the stage 5 comparison with NVIDIA's
   controller reports turning as it is.
+
+## D-030: Stage 3 before stage 2 (2026-11-03)
+
+- **What:** stage 3 (the pick-and-place task, the scripted expert and the demonstrations) comes
+  next; stage 2 (human motion imitation) later, running on MSI alongside it.
+- **Why:** stage 3 is on the way to the VLA (stage 4) and the study (stage 5), which hold the
+  project's research question; stage 2 stands on its own and needs mostly cluster time.
+- **Cost:** the motion-imitation results and the many-robot training GIF come later.
+
+## D-031: Newton's renderer for the demonstrations, recorded as states and rendered afterwards (2026-11-03)
+
+- **What:** the dataset's images and the closed-loop tests of stages 4-5 use Newton's own
+  renderer (with Newton physics). Demonstrations are recorded as simulator states and rendered
+  in a separate pass. OVRTX re-renders a few episodes for the front page.
+- **Why:** the VLA must be tested with the renderer it was trained on, over thousands of
+  closed-loop episodes. Newton's renderer needs 0.4 GB of GPU memory (leaving room for GR00T on
+  the workstation's 12 GB card), runs on any GPU, including MSI's A100 and H100 and its
+  current container, and is about ten times faster than OVRTX (1,558 against 162 frames per
+  second for 16 robots, 640 x 480). OVRTX and Isaac Sim's RTX renderer need RT cores and are
+  not set up on MSI; Isaac Sim's also brings PhysX, where the controller recovers three times
+  worse from kicks (D-023). Recording states first keeps the choice reversible: the same
+  episodes can be rendered again with OVRTX.
+- **Cost:** plainer images, further from those GR00T was pretrained on; one extra pass.
+  Design: [STAGE3_DESIGN.md](STAGE3_DESIGN.md), section 8.
+
+## D-032: The perfect-layer grid for stage 5, and demonstrations recorded with our controller (2026-11-03)
+
+- **What:** stage 5 crosses the high level (the VLA, the scripted expert) with the low level
+  (an ideal body that does exactly what it is told, our controller, ours without randomization
+  and curriculum, NVIDIA's); the stage 3 task environment takes any of them under the same
+  commands. Demonstrations are recorded with the stage 1 controller, seed 1. NVIDIA's controller
+  records a second set over the same layouts only if its standing drift gets fixed.
+- **Why:** the grid gives each layer's share of the failures from success rates, not only from
+  failure labels. A VLA trained only on demonstrations through our controller may do worse on
+  NVIDIA's for that reason alone; recording through both would let stage 4 measure or remove
+  that confound. NVIDIA's controller was therefore tried in Newton first
+  ([nvidia_wbc_test.py](../scripts/nvidia_wbc_test.py)): it walks (0.44 m/s for 0.5) and turns
+  in place better than ours (0.77-0.79 rad/s for 0.8), but standing still its "Balance" policy
+  drifts backwards at 0.25-0.4 m/s and, with some arm poses and height commands, falls (9 of 10
+  with stage 1's hanging arms at its nominal height); the task is mostly standing at a table.
+- **Cost:** an ideal-body mode to build. If NVIDIA's standing is not fixed, the comparison
+  carries the confound, and only the expert's rows of the grid show its size.
+
+## D-033: Dex3 confirmed for GR00T N1.6; hands move between open and closed poses (2026-11-03)
+
+- **What:** D-013 holds. The hands move between an open and a closed pose; the dataset stores
+  their 7 joint targets each.
+- **Why:** GR00T N1.6's G1 setup in IsaacLab-Arena (`gr00t_43dof_joint_space.yaml`) is 29 body
+  joints plus 7 per hand with Dex3's joint names; Isaac-GR00T's `unitree_g1` configuration
+  says the hand "is controlled by binary signals like a gripper"; NVIDIA's teleoperation also
+  switches between fixed open and closed poses.
+- **Cost:** no finger-level dexterity.
 
 ## Open items
 

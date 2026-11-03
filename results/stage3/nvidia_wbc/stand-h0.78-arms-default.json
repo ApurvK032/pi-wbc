@@ -1,0 +1,108 @@
+{
+  "controller": "NVIDIA Decoupled WBC (GR00T-WholeBodyControl, Balance + Walk)",
+  "policy_commit": "1e1ec4f5f27e6c3e03048f693bd7c60cce04afda",
+  "physics": "newton_mjwarp",
+  "substeps": 1,
+  "seeds_per_scenario": 10,
+  "seed": 0,
+  "duration_s": 20.0,
+  "settle_s": 2.0,
+  "nominal_height_command": 0.78,
+  "arms": "default",
+  "summary": [
+    {
+      "scenario": "stand",
+      "episodes": 10,
+      "falls": 9,
+      "fall_rate_ci95": [
+        0.5958499704752279,
+        0.982123787103926
+      ],
+      "lin_err_mean": 0.007012996849589399,
+      "ang_err_mean": 0.0035844908587084018,
+      "velocity_mean": [
+        0.0024274971621295865,
+        0.00043391742471221226,
+        0.0022697297400352708
+      ],
+      "pelvis_z_mean": 0.762773368689749,
+      "command": {
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "height": 0.7799999713897705,
+        "rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "arm_motion": false
+      }
+    },
+    {
+      "scenario": "arms_stand",
+      "episodes": 10,
+      "falls": 1,
+      "fall_rate_ci95": [
+        0.017876212896073995,
+        0.4041500295247722
+      ],
+      "lin_err_mean": 0.011518572145237774,
+      "ang_err_mean": 0.01358633468567545,
+      "velocity_mean": [
+        0.00012137961213438537,
+        0.00021128937180914825,
+        -0.0005341804325678508
+      ],
+      "pelvis_z_mean": 0.7626579562455047,
+      "command": {
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "height": 0.7799999713897705,
+        "rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "arm_motion": true
+      }
+    }
+  ],
+  "provenance": {
+    "time_utc": "2026-11-03T12:51:11+00:00",
+    "git": {
+      "commit": "f9096e009ad509c0604f98119aa10dc6945ed2cf",
+      "dirty": true,
+      "changes": [
+        "docs/STAGE3_DESIGN.md"
+      ]
+    },
+    "python": "3.12.3",
+    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+    "host": "godzilla",
+    "packages": {
+      "pi-wbc": "0.0.1",
+      "isaaclab": "3.0.0",
+      "newton": "1.6.1",
+      "warp-lang": "1.17.0",
+      "torch": "2.11.0+cu130",
+      "rsl-rl-lib": "5.5.1",
+      "mujoco": "3.12.0",
+      "onnxruntime": "1.31.1",
+      "numpy": "2.5.4"
+    },
+    "torch_cuda": "13.0",
+    "gpus": [
+      {
+        "name": "NVIDIA GeForce RTX 4070",
+        "driver": "595.99.02",
+        "memory_mib": "12282"
+      }
+    ]
+  }
+}

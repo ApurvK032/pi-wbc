@@ -8,6 +8,7 @@ records the commit, package versions and GPU it came from.
 **Contents**
 
 - [Grasp test: can the Dex3 hand hold the task's objects in Newton?](#grasp-test-can-the-dex3-hand-hold-the-tasks-objects-in-newton)
+- [NVIDIA's controller on our G1 in Newton](#nvidias-controller-on-our-g1-in-newton)
 
 ## Grasp test: can the Dex3 hand hold the task's objects in Newton?
 
@@ -71,3 +72,38 @@ run of the same commit and settings, the box 2/27. The demonstration replay chec
 finish line) must allow for this: it can replay recorded states exactly for rendering, but a
 physics re-run of recorded commands can only be expected to reproduce the outcome, not every
 state.
+
+## NVIDIA's controller on our G1 in Newton
+
+NVIDIA's Decoupled WBC (the baseline, D-004) was tried in Newton before deciding which
+controller records the demonstrations (D-032). Its two released policies, "Balance" (velocity
+command below 0.05) and "Walk", ran on our G1 through the same commands
+([scripts/nvidia_wbc_test.py](../../scripts/nvidia_wbc_test.py), fetched by
+[scripts/fetch_nvidia_wbc.sh](../../scripts/fetch_nvidia_wbc.sh)), with its observation built as
+in NVIDIA's code; our G1 already uses its PD gains and default leg pose (D-012). The bench's
+commands, 10 robots each for 20 s, flat ground, friction 1.0:
+
+| Command | Falls, arms hanging (stage 1's default) | Falls, arms at zero (NVIDIA's script) | Achieved (arms at zero) |
+|---|---:|---:|---|
+| stand | 10/10 | 0/10 | drifts back at 0.33 m/s |
+| walk 0.5 m/s | 0/10 | 0/10 | 0.44 m/s |
+| walk 1.0 m/s | 0/10 | 0/10 | 0.93 m/s |
+| sideways 0.3 m/s | 0/10 | 0/10 | 0.20 m/s |
+| turn in place 0.8 rad/s | 0/10 | 0/10 | 0.79 rad/s |
+| walk 0.6 m/s and turn 0.5 rad/s | 0/10 | 0/10 | 0.55 m/s, 0.47 rad/s |
+| crouch to 0.6 m | 0/10 | 0/10 | 0.58 m |
+| walk 0.5 m/s at 0.65 m | 0/10 | 0/10 | 0.42 m/s, 0.64 m |
+| lean 0.4 rad | 0/10 | 0/10 | still |
+| stand, arms moving | 3/10 | 3/10 | drifts back at 0.31 m/s |
+| walk 0.5 m/s, arms moving | 0/10 | 0/10 | 0.43 m/s |
+
+Files: [all-arms-default.json](nvidia_wbc/all-arms-default.json),
+[all-arms-zero.json](nvidia_wbc/all-arms-zero.json). Walking is solid, and turning in place
+tracks better than our controller (0.77-0.79 against its 0.57-0.73 rad/s, D-029). Standing still
+is not: over height commands from 0.70 to 0.78 m (its nominal is 0.74) it falls in 7-10 of 10
+with the arms hanging, and with the arms at zero either drifts backwards at 0.26-0.32 m/s or, at
+0.78 m, falls every time (files `stand-h*.json`). Yet crouching and leaning, which also run the
+Balance policy, stay still. Whether the drift is in the policy or in our model and physics
+(NVIDIA trained and tested in MuJoCo, on a model whose feet touch the floor through four small
+spheres each) is the next check. Since the task is mostly standing at a table, the
+demonstrations are recorded with our controller (D-032).
