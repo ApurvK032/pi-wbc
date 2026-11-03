@@ -749,7 +749,7 @@ items at the [end](#open-items)):
   contact spheres sit 3 cm further forward than in Unitree's URDF (x = -0.02 against -0.05 m).
   With the URDF's heel, NVIDIA's controller never fell in the 11 test commands and stands still
   ([results/stage3](../results/stage3/README.md)), so the second demonstration set is planned
-  (proposed as D-038 with the foot geometry; [STAGE3_DESIGN.md](STAGE3_DESIGN.md), section 6).
+  (D-038, with the foot geometry; [STAGE3_DESIGN.md](STAGE3_DESIGN.md), section 6).
 
 ## D-033: Dex3 confirmed for GR00T N1.6; hands move between open and closed poses (2026-11-03)
 
