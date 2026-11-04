@@ -3,8 +3,8 @@
 Each entry says what was decided, why, and what it costs. Entries are numbered D-NNN and never
 deleted; a later entry that replaces one says so, and the old one is marked superseded.
 
-**Index** (stage 0: D-001 to D-011; stage 1: D-012 to D-029; stage 3: D-030 onwards; open
-items at the [end](#open-items)):
+**Index** (stage 0: D-001 to D-011; stage 1: D-012 to D-029; stage 3: D-030 onwards, with
+D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open-items)):
 
 | Decision | What | Date |
 |---|---|---|
@@ -15,7 +15,7 @@ items at the [end](#open-items)):
 | [D-005](#d-005-every-result-file-carries-provenance-2026-10-28) | Every result file carries provenance | 2026-10-28 |
 | [D-006](#d-006-isaac-lab-is-installed-as-a-wheel-into-the-project-environment-2026-10-28) | Isaac Lab is installed as a wheel into the project environment | 2026-10-28 |
 | [D-007](#d-007-stage-0-bench-policy-uses-the-29-dof-g1-with-dex3-hands-2026-10-28) | Stage 0 bench policy uses the 29-DoF G1 with Dex3 hands | 2026-10-28 |
-| [D-008](#d-008-sim-to-sim-protocol-2026-10-28) | Sim-to-sim protocol | 2026-10-28 |
+| [D-008](#d-008-sim-to-sim-protocol-2026-10-28) | Sim-to-sim protocol (amended by D-040) | 2026-10-28 |
 | [D-009](#d-009-cluster-runs-use-an-apptainer-container-and-the-workstations-lockfile-2026-10-28) | Cluster runs use an Apptainer container and the workstation's lockfile | 2026-10-28 |
 | [D-010](#d-010-gait-measures-in-the-mujoco-evaluation-2026-10-28) | Gait measures in the MuJoCo evaluation | 2026-10-28 |
 | [D-011](#d-011-training-changes-are-compared-against-the-run-to-run-spread-2026-10-28) | Training changes are compared against the run-to-run spread | 2026-10-28 |
@@ -36,7 +36,7 @@ items at the [end](#open-items)):
 | [D-026](#d-026-the-student-sees-the-last-25-control-steps-05-s-2026-11-02) | The student sees the last 25 control steps (0.5 s) | 2026-11-02 |
 | [D-027](#d-027-the-narrow-turning-reward-stays-off-2026-11-02) | The narrow turning reward stays off | 2026-11-02 |
 | [D-028](#d-028-train-the-full-range-teachers-7000-iterations-instead-of-1000-2026-11-03) | Train the full-range teachers 7000 iterations instead of 1000 | 2026-11-03 |
-| [D-029](#d-029-stage-1-closes-with-the-turning-target-met-on-one-seed-of-three-2026-11-03) | Stage 1 closes with the turning target met on one seed of three | 2026-11-03 |
+| [D-029](#d-029-stage-1-closes-with-the-turning-target-met-on-one-seed-of-three-2026-11-03) | Stage 1 closes with the turning target met on one seed of three (amended by D-040: met on none) | 2026-11-03 |
 | [D-030](#d-030-stage-3-before-stage-2-2026-11-03) | Stage 3 before stage 2 | 2026-11-03 |
 | [D-031](#d-031-newtons-renderer-for-the-demonstrations-recorded-as-states-and-rendered-afterwards-2026-11-03) | Newton's renderer for the demonstrations, recorded as states and rendered afterwards | 2026-11-03 |
 | [D-032](#d-032-the-perfect-layer-grid-for-stage-5-and-demonstrations-recorded-with-our-controller-2026-11-03) | The perfect-layer grid for stage 5, and demonstrations recorded with our controller | 2026-11-03 |
@@ -46,7 +46,8 @@ items at the [end](#open-items)):
 | [D-036](#d-036-the-scripted-expert-a-state-machine-over-the-true-state-no-retries-2026-11-03) | The scripted expert: a state machine over the true state, no retries | 2026-11-03 |
 | [D-037](#d-037-the-dataset-1000-episodes-per-controller-head-camera-replay-check-2026-11-03) | The dataset: 1,000 episodes per controller, head camera, replay check | 2026-11-03 |
 | [D-038](#d-038-the-g1s-heel-contact-spheres-at-unitrees-urdf-position-from-stage-3-on-2026-11-03) | The G1's heel contact spheres at Unitree's URDF position from stage 3 on | 2026-11-03 |
-| [D-039](#d-039-erratum-on-menageries-model-the-mujoco-benchs-feet-stood-on-friction-06-2026-11-03) | Erratum: on Menagerie's model the MuJoCo bench's feet stood on friction 0.6 | 2026-11-03 |
+| [D-039](#d-039-erratum-on-menageries-model-the-mujoco-benchs-feet-stood-on-friction-06-2026-11-03) | Erratum: on Menagerie's model the MuJoCo bench's feet stood on friction 0.6 (amended by D-040) | 2026-11-03 |
+| [D-040](#d-040-seven-more-mujoco-bench-fixes-and-stage-1s-bench-numbers-rerun-on-the-fixed-bench-2026-11-04) | Seven more MuJoCo-bench fixes, and stage 1's bench numbers rerun on the fixed bench | 2026-11-04 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -154,6 +155,9 @@ items at the [end](#open-items)):
   velocity in the pelvis frame, quaternion order, projected gravity, action mapping).
 - **Cost:** MuJoCo has no joint velocity limits, so those are not enforced on the MuJoCo side.
   No sensor noise, delay or pushes yet; stage 1 adds them.
+- **Amended by D-040 (2026-11-04):** the bench reads the end of each policy step (`mj_forward`
+  after the physics steps), every geom has contact priority 0 as in Newton's training model,
+  episodes with kicks run 23 s, and the 20 ms delay holds only the joints the policy drives.
 
 ## Findings (stage 0)
 
@@ -525,16 +529,18 @@ items at the [end](#open-items)):
   conflict. It was not tried: one seed in three can't show that it fixes anything (D-011), and
   stage 3's walking is mostly at 0.5 m/s or less. Asked for 1.0 m/s, seeds 1 and 3 walk at
   0.89-0.93 m/s, inside the target, and seed 2 at 1.01-1.04.
-- **Test seeds (added the same day):** on seeds 1000-1199 (4400 episodes per seed and
-  condition) walking repeats the development seeds within 0.01 m/s, and all three seeds meet the
-  speed targets at 1 and 0.5 m/s and sideways. Kick falls are lower than the warm-up students' on
-  every seed (1 m/s: 142 against 256 pooled; 2 m/s: 654 against 793). Falls without kicks are
-  higher, nearly all while standing with the arms moving: seed 1 falls in 30 of 200 nominal
-  episodes of that command on the Newton model (15%; warm-up: none), seed 3 more with 1 kg in the
-  hands (14 against 1), seed 2 mixed (2 against 21 at friction 0.4). Pooled, nominal falls are
-  46 of 13200 (0.26%-0.46%), within the target, but stage 3 is standing at a table and moving the
+- **Test seeds (added the same day; numbers on the fixed bench of D-040):** on seeds 1000-1199
+  (4400 episodes per seed and condition) walking repeats the development seeds within 0.01 m/s,
+  and all three seeds meet the speed targets at 1 and 0.5 m/s; sideways, seed 1 is just over on
+  Menagerie's model (0.152; 0.11 before D-040). Kick falls are lower than the warm-up students'
+  at 1 m/s on every seed (244 against 321 pooled) and at 2 m/s on seeds 1 and 3 (738 against 806
+  pooled). Falls without kicks are higher on seed 1, nearly all while standing with the arms
+  moving: it falls in 38 of 200 nominal episodes of that command on the Newton model (19%;
+  warm-up: none); seeds 2 and 3 fall less than their warm-up students. Pooled, nominal falls are
+  54 of 13,200 (0.31%-0.53%), within the target, but stage 3 is standing at a table and moving the
   arms, so this was checked (same day): the falls come from arm motions wider than training
-  covered. The tests move the arms over the full joint ranges (curriculum level 1); B2's
+  covered. The tests move the arms over the full training ranges (`ARM_RANGES`, curriculum level
+  1); B2's
   teachers stopped at levels 0.70, 0.80 and 0.75. With the arm range set to its training level,
   seed 1 falls in 0 of 300 episodes of that command (Isaac Lab, Newton), against 36 of 300 at the
   full range; seeds 2 and 3 fall 1 and 0 of 50 at the full range. The warm-up students (levels
@@ -596,12 +602,12 @@ items at the [end](#open-items)):
   iterations, then stays at 1, whatever the falls and rewards (`upper_body_level(...,
   ramp_from=...)`; `scripts/teacher_student_local.sh` with `CONTINUE_FROM`). A new student is
   then distilled from it with the warm-up of D-021, which now climbs to level 1.
-- **Why:** the tests move the arms over the full joint ranges, but the curriculum waits for the
-  turning reward and B2's teachers stopped at levels 0.70, 0.80 and 0.75. Seed 1's student falls
-  in 36 of 300 episodes while standing with the arms moving over the full range, and in none of
-  300 within the range it trained on (D-022). Stage 3 stands the robot at a table and moves its
-  arms; a controller with an untrained part of the arm range is a hidden risk there and in the
-  controller-swap study (stage 5).
+- **Why:** the tests move the arms over the full training ranges (`ARM_RANGES`), but the
+  curriculum waits for the turning reward and B2's teachers stopped at levels 0.70, 0.80 and 0.75.
+  Seed 1's student falls in 36 of 300 episodes while standing with the arms moving over the full
+  range, and in none of 300 within the range it trained on (D-022). Stage 3 stands the robot at a
+  table and moves its arms; a controller with an untrained part of the arm range is a hidden risk
+  there and in the controller-swap study (stage 5).
 - **Cost:** per seed about 25 min of teacher training, 20 min of distillation and the usual
   tests. Seed 1 first, on the workstation; seeds 2 and 3 after its result.
 - **Result (three seeds):** the teachers hardly fall with the arms over the full range (3 of
@@ -652,7 +658,7 @@ items at the [end](#open-items)):
   kicks, against 4 without it. The wide turning reward still pays 85% of its maximum at 0.2
   rad/s off, but a narrow one barely pays at the 0.3-0.5 rad/s shortfall in place, so it
   rewards turning faster only once the robot is already close to the command. The turn rate in place follows the gait instead:
-  students that step around while turning reach 0.46-0.49 rad/s, students that twist on their
+  students that step around while turning reach 0.44-0.49 rad/s, students that twist on their
   feet with fewer steps 0.31-0.37, and which gait a seed learns did not follow the reward.
 - **Cost:** about 2 h per seed of training and tests (seeds 1 and 2 on the workstation, seed 3
   on MSI); the full-range recipe of D-024 and D-026 stays the controller. Next for turning: a
@@ -667,24 +673,26 @@ items at the [end](#open-items)):
   first job stopped at iteration 5432 when the simulation returned NaN observations; it was
   resumed from its iteration-5000 checkpoint for the remaining 4999 iterations, so it ends at
   the same iteration.
-- **Why:** the full-range teachers had lost turning (0.60 / 0.40 / 0.59 rad/s when asked for
-  0.8; the B2 teachers they started from, 0.64 and 0.78 on seeds 1 and 2), and neither a longer
-  history (D-026) nor a narrow turning reward (D-027) brought it back. The training log's
-  turn-rate error was still falling after 1000 iterations: on seed 2 it rose from 0.77 to 0.97
-  as the ranges grew to full, was 0.94 at 1000 iterations and 0.71 at 7000. Asked to turn at 0.8
-  rad/s in place, the students now turn at 0.70 / 0.57 / 0.64 rad/s in Isaac Lab (seeds 1 / 2 /
-  3; 0.47 / 0.31 / 0.45 after 1000 iterations, B2 0.64 / 0.59 / 0.67) and 0.73 / 0.59 / 0.65 in
-  MuJoCo, and all three step around instead of twisting on their feet. They never fell on the
-  nominal robot in Isaac Lab (6 of 9900 before) or in MuJoCo without kicks, and fell less under
-  MuJoCo kicks (3 against 6 of 1320); on the randomized robot in Isaac Lab a few more (110
-  against 84 of 9900, intervals overlapping). Seed 1 walks a little slower (speed error at 1
-  m/s 0.11 against 0.07 m/s in MuJoCo). These students are the stage 1 controller. On the
-  test seeds (1000-1199) they fell in none of 66,000 episodes without kicks and in 74 of 13,200
-  with 2 m/s kicks (B2: 199 and 654).
-- **Cost:** 1 h 43 min of teacher training per seed on an L40S instead of about 17 min (about
-  3.2 GPU-hours per seed for the whole recipe). Turning in place swings between checkpoints 1000
-  iterations apart (seed 3: 0.28 to 1.00 rad/s, and one of them fell in 51 of the 300 episodes
-  standing with the arms moving), so the last checkpoint is used, never a chosen one.
+- **Why:** the full-range teachers had lost turning (0.60 / 0.40 / 0.59 rad/s when asked for 0.8;
+  the B2 teachers they started from, 0.64 and 0.78 on seeds 1 and 2), and neither a longer history
+  (D-026) nor a narrow turning reward (D-027) brought it back. The training log's turn-rate error
+  was still falling after 1000 iterations: on seed 2 it rose from 0.77 to 0.97 as the ranges grew
+  to full, was 0.94 at 1000 iterations and 0.71 at 7000. Asked to turn at 0.8 rad/s in place, the
+  students now turn at 0.70 / 0.57 / 0.64 rad/s in Isaac Lab (seeds 1 / 2 / 3; 0.47 / 0.31 / 0.45
+  after 1000 iterations, B2 0.64 / 0.59 / 0.67) and 0.72 / 0.56 / 0.65 in MuJoCo (on the fixed
+  bench, D-040; 0.73 / 0.59 / 0.65 before), and all three step around instead of twisting on their
+  feet. They never fell on the nominal robot in Isaac Lab (6 of 9900 before) or in MuJoCo without
+  kicks, and fell less under MuJoCo kicks (3 against 13 of 1320 on the fixed bench); on the
+  randomized robot in Isaac Lab a few more (110 against 84 of 9900, intervals overlapping). Seed 1
+  walks a little slower (speed error at 1 m/s 0.10 against 0.07 m/s in MuJoCo). These students are
+  the stage 1 controller. On the test seeds (1000-1199), on the fixed bench (D-040), they fell in
+  1 of 66,000 episodes without kicks and in 38 of 13,200 with 2 m/s kicks (B2: 203 and 738).
+- **Cost:** 1 h 43 min of teacher training per seed on an L40S instead of about 17 min. The whole
+  recipe took 3.2 h for seed 3 on one L40S (B2 teacher 43 min, this teacher 1 h 44 min, student 42
+  min, from the job logs); seeds 1 and 2 trained their first 3000 teacher iterations on the
+  workstation. Turning in place swings between checkpoints 1000 iterations apart (seed 3: 0.28 to
+  1.00 rad/s, and one of them fell in 51 of the 300 episodes standing with the arms moving), so
+  the last checkpoint is used, never a chosen one.
 
 ## D-029: Stage 1 closes with the turning target met on one seed of three (2026-11-03)
 
@@ -704,6 +712,12 @@ items at the [end](#open-items)):
 - **Cost:** in place, the controller turns at 70-90% of the commanded rate, so stage 3's
   expert and the VLA see a slower turn than they ask for; the stage 5 comparison with NVIDIA's
   controller reports turning as it is.
+- **Amended by D-040 (2026-11-04):** on the fixed bench no seed meets the turning target on both
+  robot models: 0.21 / 0.19 rad/s on seed 1 (Menagerie / Newton's model), 0.29 / 0.26 on seed 2
+  and 0.24 / 0.22 on seed 3, a miss of 0.01-0.09 rad/s; in place the students turn at 0.72 /
+  0.56 / 0.65 rad/s (MuJoCo, 0.8 asked). The other numbers above become 1 fall in 66,000 test
+  episodes without kicks, kicks of 2.5 m/s survived 98.6%-99.4% of the time and speed errors at
+  most 0.10 m/s. The decision stands: stage 1 closes with turning as a known limit.
 
 ## D-030: Stage 3 before stage 2 (2026-11-03)
 
@@ -853,6 +867,96 @@ items at the [end](#open-items)):
 - **Cost:** stage 0 and stage 1 Menagerie results are not re-run (the test seeds take several
   hours); their result files record `floor_friction: 1.0` although the feet had 0.6, and later
   Menagerie results are not directly comparable with them.
+- **Amended by D-040 (2026-11-04):** the numbers above come from the bench before D-040's
+  fixes. Two of its statements do not hold:
+  - "Every finish-line target was met" was wrong before this erratum too: turning in place was
+    missed by seeds 2 and 3 (D-029). With the corrected floor seed 1 missed it as well on
+    Menagerie's model (0.214 rad/s on the development seeds), and on the fixed bench every seed
+    misses it.
+  - The 0.5 m/s kick trips did not come from the floor alone: on the fixed bench, with the
+    corrected floor, seed 1 falls in 5 of 100 of those development episodes (2%-11%) and in 10
+    of 200 on the test seeds (30 before).
+  - Stage 1's published bench numbers are now rerun on the fixed bench (D-040); stage 0's are
+    not.
+
+## D-040: Seven more MuJoCo-bench fixes, and stage 1's bench numbers rerun on the fixed bench (2026-11-04)
+
+- **What:** an audit of the MuJoCo bench after D-039 found seven more faults. Each is fixed in
+  commit `5ea97c6`, with a test that fails on the code before it:
+  1. **Stale readings.** After `mj_step`, MuJoCo's body orientations, velocities and contacts
+     describe the start of the last 2.5 ms physics step, so the policy's IMU readings were one
+     step old. The bench now calls `mj_forward` after each policy step and reads the end of the
+     step, as Newton's state does; the physics is unchanged.
+  2. **Kick episodes too short.** Episodes ran 20 s with the last kick at 19 s, and a kicked
+     robot falls up to about 2.4 s after a kick (90th percentile), so falls from that kick were
+     mostly missed. Kick episodes now run 23 s. The Isaac Lab test had the same fault (fixed in
+     `a4a9da6`).
+  3. **Delay on the wrong joints.** `delay_20ms` held every PD target, arms and hands included;
+     training's delay holds only the joints the policy drives. Now only those.
+  4. **A kick at the moment of a fall.** The kick count behind "kicks survived" counted a kick
+     due at the fall's own time as received; it no longer does (no published number changed).
+  5. **Contact priority.** Every geom now has priority 0, as every shape in Newton's training
+     model, so MuJoCo combines two touching geoms as Newton does (the larger friction; solref
+     and solimp mixed by solmix). For Menagerie's feet on the floor this is D-039's fix; it also
+     covers other geoms touching the floor.
+  6. **Shared random stream.** The arm-motion targets drew from the same random stream as the
+     starts and kicks; they now have their own, so a change to the arm motion cannot change the
+     starts or the kicks.
+  7. **Provenance.** Result files now record each model's contact and solver settings, the
+     Isaac Sim version and a SHA-256 of the source code.
+- **Rerun:** every MuJoCo-bench result the stage 1 pages give as a final or comparison number
+  was run again from a worktree of `5ea97c6`, both robot models:
+  - on MSI's CPUs (309 one-CPU jobs, about 430 CPU-hours; 16 of them also on the workstation,
+    with the same falls and fall times): the final controller's test and development seeds and
+    kick sweep, the warm-up and B2 students' test seeds and B2's kick sweep, and the three-seed
+    ablation;
+  - a second MSI batch (81 jobs): the older test-seed sets of step 4 (first protocol, held
+    level, full-size kicks) and the first-protocol and held-level ablation runs;
+  - on the workstation: the turn sweeps (now with provenance, `9416351`), the development seeds
+    of D-028's comparison and of step 7's B2 columns, seed 1's corrected-floor checks, the
+    tracking traces and the front page's GIFs; and the 24 Isaac Lab and PhysX kick runs at 23 s
+    (`a4a9da6`).
+
+  The development-seed tables of the earlier steps are kept as measured, as the record of the
+  choices made then, and the stage 1 page says which numbers are which.
+- **What changes** (final controller, test seeds, Menagerie / Newton's model):
+  - **Turning in place now misses on every seed:** turn-rate error at 0.8 rad/s 0.21 / 0.19 rad/s
+    on seed 1 (0.19 / 0.19 before), 0.29 / 0.26 on seed 2 (0.25 / 0.24), 0.24 / 0.22 on seed 3
+    (0.22 / 0.22). D-029 is amended. In place the students turn at 0.72 / 0.56 / 0.65 rad/s (0.73
+    / 0.59 / 0.65).
+  - **Falls without kicks: 1 in 66,000** (0 before): seed 1 under sensor noise, walking while
+    turning on Menagerie's model.
+  - **Kicks:** 21 and 38 falls in 13,200 episodes with 1 and 2 m/s kicks (11 and 74 before;
+    21 and 33 in the first 20 s, so the longer watch adds 0-5 and the other fixes move the rest
+    both ways). The largest kick survived 95% of the time stays 2.5 m/s on every seed
+    (98.6%-99.4% of kicks).
+  - **Seed 1's trips over 0.5 m/s kicks** while walking at 0.5 m/s on Menagerie's model: 10 of
+    200 test episodes (30 before) and 5 of 100 development episodes on the corrected floor (none
+    on the old bench). D-039 is amended.
+  - Other finish-line measures move by at most about 0.02 m/s and 1 cm; the speed error at
+    1 m/s drops a little (seed 1: 0.12 / 0.11 to 0.10 / 0.10).
+  - Earlier recipes on the test seeds: falls without kicks 70 for the warm-up students (65) and
+    203 for B2 (199); with 1 and 2 m/s kicks 321 and 806 (256 and 793) and 244 and 738 (142 and
+    654). B2's seed 1 now just misses the sideways target (0.152) and its seed 2 the step length
+    (28 cm on Menagerie's model).
+  - Ablation: the claims made on all three seeds hold with new numbers, except two the audit
+    had questioned: PPO alone does not turn worst on every seed (it turns about twice as badly
+    as the full student, as does the run without a curriculum), and the student trained without
+    sensor noise falls more to noise than the full students (48 against 6 of 13,200). New on
+    every seed: without actuator randomization, more falls to 2 m/s kicks.
+  - Isaac Lab and PhysX, kicks at 23 s: the final controller falls 7 and 88 times in 1650
+    episodes with 2 m/s kicks (4 and 85 at 20 s), B2 99 and 265 (76 and 246). The engine gap
+    stands.
+- **Why:** D-039 and this audit showed the bench was not the one D-008 describes, so every
+  published bench number is redone on the bench as described.
+- **Also corrected on the pages:** the test seeds 1000-1199 were run for every candidate recipe
+  from step 4 on, and one problem first seen there led to D-024; "full range" for the arms means
+  the full training ranges (`g1_body.ARM_RANGES`), narrower than the joints' limits; Isaac
+  Lab's fall test is the torso link touching the ground.
+- **Cost:** about 430 CPU-hours on MSI for the first batch and less than a third of that for
+  the second, about half an hour of the workstation's GPU and an hour of its CPUs. The
+  development record of steps 1-4 stays on the old bench, so its numbers and the final result's
+  are not directly comparable.
 
 ## Open items
 
