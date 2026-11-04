@@ -32,6 +32,13 @@ parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
 parser.add_argument("--policy", choices=["replay", "groot"], required=True)
 parser.add_argument("--recordings", type=Path, default=None, help="replay: recorded episodes")
 parser.add_argument("--replay-rate", type=int, choices=[25, 50], default=25)
+parser.add_argument(
+    "--between",
+    choices=["hold", "mean"],
+    default="hold",
+    help="25 Hz policies: the second control step of a frame repeats its command (hold) or "
+    "takes the mean of it and the next one (mean)",
+)
 parser.add_argument("--host", default="localhost")
 parser.add_argument("--port", type=int, default=5555)
 parser.add_argument("--seeds", required=True, help="layout seeds: a-b (inclusive) or a,b,c")
@@ -283,7 +290,7 @@ def main() -> None:
                         images = rgb.cpu().numpy()
                         state = tt(robot.data.joint_pos)[:, joint_ids].cpu().numpy()
                         tc = time.perf_counter()
-                        chunk = policy.act(images, state, texts, k, args.execute)
+                        chunk = policy.act(images, state, texts, k, args.execute + 1)
                         call_s += time.perf_counter() - tc
                         calls += 1
                         if args.gif is not None:
@@ -291,12 +298,14 @@ def main() -> None:
                                 if not done[i]:
                                     gif_frames.setdefault(seeds[i], []).append(images[i, ::2, ::2])
                     for sub in range(FRAME_STEP):
-                        j = (
-                            (k % args.execute) * FRAME_STEP + sub
-                            if policy.per_step
-                            else k % args.execute
-                        )
-                        a = torch.as_tensor(chunk[:, j], device=dev)
+                        i = k % args.execute
+                        if policy.per_step:
+                            a = chunk[:, i * FRAME_STEP + sub]
+                        elif sub == 1 and args.between == "mean":  # halfway to the next command
+                            a = 0.5 * (chunk[:, i] + chunk[:, i + 1])
+                        else:
+                            a = chunk[:, i]
+                        a = torch.as_tensor(a, device=dev)
                         hl.arm_hand[:, arm_hand_cols] = a[:, :28]
                         hl.body_goal[:] = torch.cat([a[:, 31:32], a[:, 28:31]], dim=1)
                         hl.velocity[:] = a[:, 32:35]
@@ -343,6 +352,7 @@ def main() -> None:
         provenance.save_json(args.out, {
             "policy": args.policy, "recordings": str(args.recordings),
             "replay_rate": args.replay_rate if args.policy == "replay" else None,
+            "between": args.between,
             "server": None if args.policy == "replay" else f"{args.host}:{args.port}",
             "controller_run": str(args.run), "execute_frames": args.execute,
             "max_s": args.max_s, "hold_s": args.hold_s, "knock_dist": args.knock_dist,
