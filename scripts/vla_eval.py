@@ -1,7 +1,8 @@
 """Closed-loop evaluation of a VLA in the pick-place task (stage 4 draft, design section 6).
 
 The stage 1 controller keeps the robot balanced (as for the expert); a policy sends the task's
-commands. Every `--execute` frames (25 per second) the head camera is rendered live with each
+commands. Every `--execute` frames (`--fps`: 25 or 50 per second, D-048) the head camera is
+rendered live with each
 episode's look (pi_wbc.stage3.appearance: colours, patterns, light, camera mount; the sun's
 direction is global per batch, since live physics can't turn the scene as rendering did), and
 the policy gets the image, the 43 joint positions and the instruction and returns a chunk of
@@ -31,7 +32,10 @@ from isaaclab.app import add_launcher_args, launch_simulation
 parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
 parser.add_argument("--policy", choices=["replay", "groot"], required=True)
 parser.add_argument("--recordings", type=Path, default=None, help="replay: recorded episodes")
-parser.add_argument("--replay-rate", type=int, choices=[25, 50], default=25)
+parser.add_argument("--fps", type=int, choices=[25, 50], default=25, help="the policy's rate")
+parser.add_argument(
+    "--replay-rate", type=int, choices=[25, 50], default=25, help="at 25 fps: also each step's"
+)
 parser.add_argument(
     "--between",
     choices=["hold", "mean"],
@@ -83,7 +87,8 @@ from pi_wbc.stats import wilson_interval  # noqa: E402
 from pi_wbc.tasks.g1_pick_place import HighLevel  # noqa: E402
 
 TASK = "PiWbc-G1-PickPlace"
-FRAME_STEP = 2
+FPS = args.fps
+FRAME_STEP = 50 // FPS  # control steps per frame (50 Hz control)
 FALL_Z = 0.45  # pelvis height (m) below which the robot has fallen
 
 
@@ -105,7 +110,7 @@ class ReplayPolicy:
 
     def __init__(self, folder: Path, rate: int):
         self.folder = folder
-        self.per_step = rate == 50
+        self.per_step = rate == 50 and FRAME_STEP == 2
 
     def reset(self, seeds: list[int]) -> None:
         self.actions = []
@@ -114,7 +119,7 @@ class ReplayPolicy:
             meta = json.loads(str(d["meta"]))
             ep = {k: d[k] for k in ("phase", "joint_pos", "cmd_body", "cmd_arm_hand",
                                      "cmd_velocity")}  # fmt: skip
-            even = E.episode_arrays(ep, meta)[1]  # control steps 0, 2, 4, ...
+            even = E.episode_arrays(ep, meta, FRAME_STEP)[1]  # one row per frame
             if self.per_step:  # the same rows for steps 1, 3, 5, ... (the arrays shifted by one)
                 odd = E.episode_arrays({k: v[1:] for k, v in ep.items()}, meta)[1]
                 full = np.empty((len(even) + len(odd), even.shape[1]), dtype=np.float32)
@@ -226,8 +231,8 @@ def main() -> None:
         looks_out.install_textures()
         origins = base.scene.env_origins
         unit = torch.tensor([0.0, 0.0, 0.0, 1.0], device=dev)
-        max_frames = round(args.max_s * 25)
-        hold = round(args.hold_s * 25)
+        max_frames = round(args.max_s * FPS)
+        hold = round(args.hold_s * FPS)
         t0 = time.perf_counter()
         for start in range(0, len(seeds_all), n):
             seeds = seeds_all[start : start + n]
@@ -285,7 +290,7 @@ def main() -> None:
                         quat_t = tt(robot.data.body_quat_w)[:, torso]
                         pos, quat = A.camera_poses(root[:, torso], quat_t, shift, tilt)
                         cam.set_world_poses(pos, quat, convention="world")
-                        cam.update(0.04, force_recompute=True)
+                        cam.update(1.0 / FPS, force_recompute=True)
                         rgb = A.apply_light(tt(cam.data.output["rgb"])[..., :3], gain, tint)
                         images = rgb.cpu().numpy()
                         state = tt(robot.data.joint_pos)[:, joint_ids].cpu().numpy()
@@ -337,7 +342,7 @@ def main() -> None:
             for i in range(m):
                 results.append({
                     "seed": seeds[i], "instruction": texts[i], "label": label[i],
-                    "time_s": round(float(end_frame[i] + 1) / 25, 2), "fell": bool(fell[i]),
+                    "time_s": round(float(end_frame[i] + 1) / FPS, 2), "fell": bool(fell[i]),
                 })  # fmt: skip
                 print(f"[vla] seed {seeds[i]}: {label[i]:13s} at {results[-1]['time_s']:5.1f} s "
                       f"'{texts[i]}'", flush=True)  # fmt: skip
@@ -351,7 +356,7 @@ def main() -> None:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         provenance.save_json(args.out, {
             "policy": args.policy, "recordings": str(args.recordings),
-            "replay_rate": args.replay_rate if args.policy == "replay" else None,
+            "fps": FPS, "replay_rate": args.replay_rate if args.policy == "replay" else None,
             "between": args.between,
             "server": None if args.policy == "replay" else f"{args.host}:{args.port}",
             "controller_run": str(args.run), "execute_frames": args.execute,
@@ -366,7 +371,7 @@ def main() -> None:
             for s, frames in gif_frames.items():
                 imgs = [Image.fromarray(f) for f in frames]
                 imgs[0].save(args.gif / f"{s}.gif", save_all=True, append_images=imgs[1:],
-                             duration=40 * args.execute, loop=0)  # fmt: skip
+                             duration=1000 // FPS * args.execute, loop=0)  # fmt: skip
         env.close()
 
 
