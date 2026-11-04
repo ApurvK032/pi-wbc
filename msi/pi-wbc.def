@@ -25,9 +25,10 @@ From: ubuntu:24.04
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
     # Python, git and certificates; the X11/GL libraries are loaded by some Isaac Lab
-    # dependencies (open3d, pyglet, imgui) even when training headless.
+    # dependencies (open3d, pyglet, imgui) even when training headless. FFmpeg (6.1, as on
+    # the workstation) for GR00T's video decoder, torchcodec, which needs its shared libraries.
     apt-get install -y --no-install-recommends \
-        python3.12 git curl ca-certificates \
+        python3.12 git curl ca-certificates ffmpeg \
         libgl1 libegl1 libglu1-mesa libglib2.0-0 libgomp1 \
         libx11-6 libxext6 libxrender1 libxi6 libxrandr2 libxinerama1 libxcursor1 \
         libxkbcommon0 libsm6 libice6

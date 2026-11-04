@@ -44,4 +44,8 @@ export HF_HUB_OFFLINE=1  # the base model is downloaded on a login node first (s
 echo "code $(git rev-parse --short HEAD); GR00T $(git -C "${GROOT}" rev-parse --short HEAD);" \
     "node $(hostname -s); $(date '+%F %T')"
 nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
+# GR00T decodes the videos with torchcodec, which needs FFmpeg's libraries in the image; without
+# them it falls back to a backend its frame reader lacks and fails in the first batch
+apptainer exec "${SIF}" "${GROOT}/.venv/bin/python" -c "import torchcodec.decoders" \
+    || { echo "torchcodec can't load FFmpeg in ${SIF}: rebuild it from msi/pi-wbc.def"; exit 1; }
 apptainer exec --nv "${SIF}" "${GROOT}/.venv/bin/python" scripts/groot_finetune.py "$@"
