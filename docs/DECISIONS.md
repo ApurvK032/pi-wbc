@@ -1182,7 +1182,9 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   95.1-97.4%), against 1,010 (92.8%, 91.1-94.2%) through ours. On the same layouts 986 succeed
   with both, 63 only with NVIDIA's, 24 only with ours, 15 with neither (p = 3.5e-5). The gap is
   other objects pushed during the retract: 45 episodes with ours, 4 with NVIDIA's (the cause is
-  not traced yet; a stage 5 lead). Every recording passes the replay check's first second, and
+  not traced yet; a stage 5 lead). Run again through ours, 8 of those layouts (ones NVIDIA's
+  controller passed) gave 6 successes and 2 pushes in the retract: these failures are mostly
+  chance, which fits ours repeating runs less well (below). Every recording passes the replay check's first second, and
   974 of the 1,000 chosen episodes also succeed when their commands are replayed open loop
   (97.4%), against 695 of 1,000 with ours (D-042): small differences between runs grow far less
   under NVIDIA's controller. **NVIDIA's training set v1** = the first 1,000 qualifying episodes

@@ -21,6 +21,7 @@ image must match the reference video's frame (and not a neighbouring one).
 
 import argparse
 import json
+import multiprocessing
 import subprocess
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -128,7 +129,9 @@ def main() -> None:
         ds = LeRobotDataset(REPO_ID, root=args.dataset)
         if not has_quantile_stats(ds.meta.stats):
             fn = _episode_stats_lerobot if args.lerobot_sampler else _episode_stats
-            init = {"initializer": _init_worker,
+            # fresh worker processes: forking one that already runs threads (LeRobot's dataset,
+            # torch) deadlocked a run of 2,000 episodes on a lock
+            init = {"initializer": _init_worker, "mp_context": multiprocessing.get_context("spawn"),
                     "initargs": (str(args.dataset), str(args.reference))}  # fmt: skip
             with ProcessPoolExecutor(args.workers, **init) as pool:
                 episode_stats = list(pool.map(fn, range(ds.num_episodes), chunksize=8))
