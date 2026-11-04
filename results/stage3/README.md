@@ -287,6 +287,11 @@ bin colours stay fixed, since the instructions name them.
 
 (12 training episodes, each half a second after the hand starts lifting the object.)
 
+![The head camera in training episode 10,060: the green can into the purple bin](render/head_camera_10060.gif)
+
+(Training episode 10,060, "grab the green can and place it in the purple bin": from raising the
+arm to the release, 20 s, every third frame at 288 x 216.)
+
 | | |
 |---|---|
 | Videos | 1,000, one per episode: H.264, 640 x 480, 25 frames per second |
