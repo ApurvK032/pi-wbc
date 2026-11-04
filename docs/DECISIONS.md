@@ -441,26 +441,28 @@ its MuJoCo bench; D-030 to D-038 are stage 3's and arrive with it; open items at
   choice rests on the warm-up matching the first protocol, having no seed as bad as the held
   recipe's seed 2, and being the same for every configuration. None of the three meets the
   1 m/s target (0.15 or less), so the recipe does not fix the speed miss.
-- **Test seeds (added the same day):** on test seeds 1000-1199 (4400 episodes per seed and
-  condition) every recipe's walking repeats its development seeds within 0.01, but the warm-up
-  students fall more to kicks on two of the three seeds. Falls with 1 m/s kicks, seeds 1 / 2 /
-  3: first protocol 23 / 53 / 78, held 16 / 30 / 85, warm-up 84 / 106 / 66; with 2 m/s kicks:
-  113 / 255 / 288, 94 / 181 / 258, 254 / 298 / 241 (pooled: 1.2%, 1.0% and 1.9% of episodes at
-  1 m/s; 5.0%, 4.0% and 6.0% at 2 m/s). Seed 3's warm-up student falls least of its three, so
-  three seeds don't settle this either. A likely cause, not checked: the kicks' top speed follows
-  the level, so the warm-up student meets its teacher's full kicks (1.30-1.35 m/s) only from
-  iteration 300 and trains 700 iterations at them instead of 1000. Without kicks the recipes
-  fall 60, 14 and 65 times in 66000 episodes, nearly all on seed 2's arm commands under the
-  first protocol and the warm-up. The ablation keeps the warm-up, so its configurations stay
-  comparable to each other.
+- **Test seeds (added the same day; numbers on the fixed bench of D-040):** on test seeds
+  1000-1199 (4400 episodes per seed and condition) every recipe's walking repeats its
+  development seeds within 0.02 m/s, but the warm-up students fall more to kicks on seed 1, and
+  at 1 m/s on seed 2. Falls with 1 m/s kicks, seeds 1 / 2 / 3: first protocol 40 / 113 / 93,
+  held 14 / 39 / 116, warm-up 90 / 146 / 85; with 2 m/s kicks: 80 / 342 / 227, 49 / 236 / 263,
+  254 / 317 / 235 (pooled: 1.9%, 1.3% and 2.4% of episodes at 1 m/s; 4.9%, 4.2% and 6.1% at
+  2 m/s). Seed 3's warm-up student falls least of its three at 1 m/s, so three seeds don't
+  settle this either. A likely cause, not checked: the kicks' top speed follows the level, so
+  the warm-up student meets its teacher's full kicks (1.30-1.35 m/s) only from iteration 300
+  and trains 700 iterations at them instead of 1000. Without kicks the recipes fall 92, 16 and
+  70 times in 66000 episodes, nearly all with the arms moving, and most of them on seed 2 under
+  the first protocol and the warm-up. The ablation keeps the warm-up, so its configurations
+  stay comparable to each other.
 - **Kicks at full size from the start (tried the same day, seed 1, not adopted):**
   `upper_body_level(..., ramp_pushes=False)` warms up the command ranges only and sets the kicks
   to the teacher's size from the first step (off by default). Seed 1's student, distilled again
-  from the same teacher, on the test seeds: falls with 1 m/s kicks 42 (warm-up 84, held 16), with
-  2 m/s kicks 147 (254, 94), without kicks 3 of 22000. So the kick ramp explains part of the
-  warm-up's kick weakness, not all of it. It walked worst of the four recipes on seed 1: 0.35 m/s
-  off at 1 m/s (warm-up 0.17, held 0.26), 0.19 at 0.5 m/s, 0.33 rad/s turning (0.20, 0.18), with
-  the same final level and distillation loss as the warm-up student. One seed can't show that it
+  from the same teacher, on the test seeds (fixed bench): falls with 1 m/s kicks 62 (warm-up 90,
+  held 14), with 2 m/s kicks 147 (254, 49), without kicks 12 of 22000 (6, 5). So the kick ramp
+  explains part of the warm-up's kick weakness, not all of it. It walked worst of the four
+  recipes on seed 1: 0.36 m/s off at 1 m/s (warm-up 0.16, held 0.27), 0.19 at 0.5 m/s,
+  0.34 rad/s turning (0.22, 0.19), with the same final level and distillation loss as the
+  warm-up student. One seed can't show that it
   walks worse in general (the held recipe's seed 2 was as far off), but it gives no reason to
   redo the students; the warm-up stays. Cost: 21 min of training and 1.5 h of MuJoCo tests on
   the workstation. Results: `results/stage1/student_ramp_kick/`,
@@ -781,8 +783,9 @@ its MuJoCo bench; D-030 to D-038 are stage 3's and arrive with it; open items at
     with the same falls and fall times): the final controller's test and development seeds and
     kick sweep, the warm-up and B2 students' test seeds and B2's kick sweep, and the three-seed
     ablation;
-  - a second MSI batch (81 jobs): the older test-seed sets of step 4 (first protocol, held
-    level, full-size kicks) and the first-protocol and held-level ablation runs;
+  - a second batch of 81 jobs: the older test-seed sets of step 4 (first protocol, held level,
+    full-size kicks) and the first-protocol and held-level ablation runs (79 on MSI; the 2 that
+    stopped there with a bus error ran on the workstation);
   - on the workstation: the turn sweeps (now with provenance, `9416351`), the development seeds
     of D-028's comparison and of step 7's B2 columns, seed 1's corrected-floor checks, the
     tracking traces and the front page's GIFs; and the 24 Isaac Lab and PhysX kick runs at 23 s
@@ -811,6 +814,17 @@ its MuJoCo bench; D-030 to D-038 are stage 3's and arrive with it; open items at
     203 for B2 (199); with 1 and 2 m/s kicks 321 and 806 (256 and 793) and 244 and 738 (142 and
     654). B2's seed 1 now just misses the sideways target (0.152) and its seed 2 the step length
     (28 cm on Menagerie's model).
+  - Step 4's older recipes on the test seeds (first protocol, held level, and seed 1's full-size
+    kicks): falls without kicks 92, 16 and 12 (60, 14 and 3 before); with 1 m/s kicks 246, 169
+    and 62 (154, 131 and 42); with 2 m/s kicks 649, 548 and 147 (656, 533 and 147). The
+    first-protocol students no longer meet the turning target on any seed (seeds 1 and 3 did),
+    and their kick sweep still puts every seed's 95% point between 2.0 and 2.5 m/s. D-021's
+    findings hold: the warm-up students fall most to kicks on seed 1, three seeds don't rank
+    the recipes, and on seed 1 the full-size kicks cut the warm-up's kick falls without
+    reaching the held level's.
+  - The first-protocol student trained without randomization (seed 1) still falls to sensor
+    noise and kicks: 749 and 1790 of 4400 episodes (789 and 1650 before), and now 42 with a
+    20 ms delay (15).
   - Ablation: the claims made on all three seeds hold with new numbers, except two the audit
     had questioned: PPO alone does not turn worst on every seed (it turns about twice as badly
     as the full student, as does the run without a curriculum), and the student trained without
@@ -825,8 +839,9 @@ its MuJoCo bench; D-030 to D-038 are stage 3's and arrive with it; open items at
   from step 4 on, and one problem first seen there led to D-024; "full range" for the arms means
   the full training ranges (`g1_body.ARM_RANGES`), narrower than the joints' limits; Isaac
   Lab's fall test is the torso link touching the ground.
-- **Cost:** about 430 CPU-hours on MSI for the first batch and less than a third of that for
-  the second, about half an hour of the workstation's GPU and an hour of its CPUs. The
+- **Cost:** about 430 CPU-hours on MSI for the first batch and 110 for the second, about half
+  an hour of the workstation's GPU and an hour of its CPUs, and about an hour of one CPU for the
+  second batch's two jobs. The
   development record of steps 1-4 stays on the old bench, so its numbers and the final result's
   are not directly comparable.
 
