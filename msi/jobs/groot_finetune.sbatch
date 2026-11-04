@@ -38,6 +38,7 @@ set -uo pipefail
 SIF=${PIWBC_SIF:-$HOME/containers/pi-wbc.sif}
 GROOT=third_party/Isaac-GR00T-n1d6
 cd "${SLURM_SUBMIT_DIR}" || exit 1
+export HF_HUB_OFFLINE=1  # the base model is downloaded on a login node first (see above)
 [ -x "${GROOT}/.venv/bin/python" ] || { echo "no GR00T environment at ${GROOT}/.venv"; exit 1; }
 echo "code $(git rev-parse --short HEAD); GR00T $(git -C "${GROOT}" rev-parse --short HEAD);" \
     "node $(hostname -s); $(date '+%F %T')"
