@@ -16,6 +16,10 @@ GitHub's light and dark themes):
   scripts/teacher_curves.py).
 - engines: tracking errors of the stage 1 controller on Newton, PhysX and the two MuJoCo models.
 - falls: falls per test condition on the MuJoCo test seeds, three generations of students.
+- stage3: the scripted expert through our controller and NVIDIA's: failures on the matched
+  layouts (D-046), and its commands replayed open loop at 50 and 25 Hz (D-048).
+
+    .venv/bin/python scripts/figures.py stage3   (only the named figures)
 """
 
 from __future__ import annotations
@@ -684,17 +688,92 @@ def falls(t, mode):
     plt.close(fig)
 
 
+R3 = Path("results/stage3")
+
+
+def stage3(t, mode):
+    from pi_wbc.stats import wilson_interval
+
+    def manifest(name):
+        eps = load_json(R3 / "dataset" / f"{name}-manifest.json")["episodes"]
+        n = len(eps)
+        retract = sum(e["label"] == "knocked_other" and e["failed_in"] == "retract" for e in eps)
+        other = sum(e["label"] != "success" for e in eps) - retract
+        return [(retract, n), (other, n)]
+
+    def replay(name):
+        d = load_json(R3 / "eval" / f"{name}.json")
+        n = d["episodes"]
+        return d["success"], len(n) if isinstance(n, list) else n
+
+    series = (
+        ("ours (stage 1 controller)", "after",
+         manifest("train-v1"), [replay("replay50-val-v1"), replay("replay25-val-v1")]),
+        ("NVIDIA's Decoupled WBC", "before",
+         manifest("train-v1-nvidia"),
+         [replay("nv-replay50-train-v1"), replay("nv-replay25-train-v1")]),
+    )  # fmt: skip
+    panels = (
+        ("Failed episodes on the same 1,088 layouts",
+         ["pushed another object\nas the arm withdraws", "every other failure"],
+         2, (0, 7), [0, 2, 4, 6], "% of layouts (line: 95% Wilson interval)"),
+        ("Expert's commands replayed open loop",
+         ["every control step's\n(50 Hz)", "each held for two\nsteps (25 Hz)"],
+         3, (40, 100), [40, 60, 80, 100], "% of episodes that succeed (241 each)"),
+    )  # fmt: skip
+    fig, axes = plt.subplots(1, 2, figsize=(9.6, 3.9), dpi=150)
+    h = 0.16
+    for ax, (title, rows, col, xlim, ticks, xlabel) in zip(axes, panels, strict=True):
+        style(ax, t)
+        ax.grid(axis="y", visible=False)
+        for i, s in enumerate(series):
+            label, key = s[0], s[1]
+            for j, (k, n) in enumerate(s[col]):
+                y = j + (i - 0.5) * 2 * h
+                lo, hi = (100 * v for v in wilson_interval(k, n))
+                ax.plot([lo, hi], [y, y], color=t[key], linewidth=1.2, zorder=3)
+                ax.scatter([100 * k / n], [y], s=30, color=t[key], zorder=4, linewidths=0,
+                           label=label if j == 0 and ax is axes[0] else None)  # fmt: skip
+                pad = (xlim[1] - xlim[0]) * 0.015
+                right = hi + pad < xlim[1] - 8 * pad  # else label to the left of the interval
+                ax.text(hi + pad if right else lo - pad, y, f"{100 * k / n:.1f}%",
+                        color=t["ink2"], fontsize=8, va="center",
+                        ha="left" if right else "right")  # fmt: skip
+        ax.set_xlim(*xlim)
+        ax.set_xticks(ticks, [f"{v}%" for v in ticks])
+        ax.set_ylim(len(rows) - 0.5, -0.5)
+        ax.set_yticks(range(len(rows)), rows)
+        ax.set_xlabel(xlabel, color=t["ink2"], fontsize=8.5)
+        ax.set_title(title, loc="left", color=t["ink"], fontsize=10, pad=8)
+    fig.text(0.015, 0.975, "The scripted expert through two controllers", color=t["ink"],
+             fontsize=12, fontweight="bold", va="top")  # fmt: skip
+    fig.text(0.015, 0.905,
+             "Left: the expert in closed loop on training layouts 10,000-11,087 (D-046).\n"
+             "Right: ours on the 241 validation episodes, NVIDIA's on 241 of its own, "
+             "judged by the evaluation loop's rule (D-048, D-051).",
+             color=t["ink2"], fontsize=8, va="top", linespacing=1.5)  # fmt: skip
+    leg = fig.legend(loc="lower center", ncol=2, frameon=False, fontsize=8.5,
+                     bbox_to_anchor=(0.5, 0.0))  # fmt: skip
+    plt.setp(leg.get_texts(), color=t["ink"])
+    fig.patch.set_alpha(0)
+    fig.subplots_adjust(left=0.19, right=0.97, top=0.7, bottom=0.25, wspace=0.6)
+    fig.savefig(OUT / f"stage3-{mode}.png", transparent=True)
+    plt.close(fig)
+
+
+FIGURES = {f.__name__: f for f in (turning, kicks, ablation, tracking, training, engines, falls,
+                                    stage3)}  # fmt: skip
+
+
 def main() -> None:
+    import sys
+
     OUT.mkdir(parents=True, exist_ok=True)
+    names = sys.argv[1:] or list(FIGURES)
     for mode, t in THEMES.items():
-        turning(t, mode)
-        kicks(t, mode)
-        ablation(t, mode)
-        tracking(t, mode)
-        training(t, mode)
-        engines(t, mode)
-        falls(t, mode)
-    print("wrote", ", ".join(sorted(p.name for p in OUT.glob("*.png"))))
+        for name in names:
+            FIGURES[name](t, mode)
+    print("wrote", ", ".join(f"{n}-{m}.png" for n in names for m in THEMES))
 
 
 if __name__ == "__main__":
