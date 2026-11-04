@@ -1175,7 +1175,7 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   Manifests: results/stage3/dataset/train-v2-manifest.json, val-v1-manifest.json.
 - **Why:** stage 4 can then measure what the second 1,000 episodes add, and track a validation
   loss on layouts it never trains on; test layouts stay for closed-loop success only.
-- **Cost:** about 1.5 GPU-hours of recording and replay. The new runs' result files say commit
+- **Cost:** 71 minutes of GPU time for the recording and replay checks (05:17-06:28). The new runs' result files say commit
   eae88f1, but provenance stamps the commit when a file is saved: the runs started at 5d1eecd,
   and the commits between them added only export code they never import (the package's source
   hash is the same, e354b5f5d565). Two replay files say "dirty" for the same reason: two

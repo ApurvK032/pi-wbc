@@ -20,7 +20,7 @@ keeps the robot balanced. Stage 4 is done when:
 | Training data | v1: 1,000 episodes (790,046 frames); v2: 2,000 (contains v1); validation: 241, from layouts never trained on (D-047) |
 | Formats | GR00T-flavoured LeRobot v2.1 with GR00T's `unitree_g1` names; LeRobot v3.0 with quantile statistics (D-045) |
 | Loader checks | GR00T's loader on all 1,000 v1 episodes; LeRobot's `LeRobotDataset` (D-045) |
-| GR00T on this PC | N1.6 environment (`third_party/Isaac-GR00T-n1d6`, branch n1d6); NVIDIA's G1 checkpoint runs on our observations: 6.8 GB of GPU memory, 79 ms per call at batch 1, 377 ms at batch 8 (GPU shared with other jobs while measured) |
+| GR00T on this PC | N1.6 environment (`third_party/Isaac-GR00T-n1d6`, branch n1d6); NVIDIA's G1 checkpoint runs on our observations: 6,830 MiB of GPU memory at batch 1 (7,154 at batch 8), 79 ms per call at batch 1, 377 ms at batch 8 (GPU shared with other jobs while measured) |
 | Matched set | the same layouts through NVIDIA's controller (D-046), for the controller swap of stage 5 |
 | Expert reference | 94.8% on test layouts 60384-60767 (D-041) |
 
