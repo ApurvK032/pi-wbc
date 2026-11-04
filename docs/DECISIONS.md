@@ -50,6 +50,7 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 | [D-040](#d-040-seven-more-mujoco-bench-fixes-and-stage-1s-bench-numbers-rerun-on-the-fixed-bench-2026-11-04) | Seven more MuJoCo-bench fixes, and stage 1's bench numbers rerun on the fixed bench | 2026-11-04 |
 | [D-041](#d-041-the-experts-hand-choice-retract-and-success-rule-and-its-official-test-range-2026-11-04) | The expert's hand choice, retract and success rule, and its official test range | 2026-11-04 |
 | [D-042](#d-042-the-replay-check-tests-each-episodes-first-second-and-the-training-sets-seeds-2026-11-04) | The replay check tests each episode's first second, and the training set's seeds | 2026-11-04 |
+| [D-043](#d-043-how-the-head-camera-video-is-rendered-and-randomized-2026-11-04) | How the head-camera video is rendered and randomized | 2026-11-04 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -1016,6 +1017,36 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   share that does. The reset change came after D-041's official number; the expert's logic is
   unchanged (31 of 32 training episodes succeeded after it), and the next official number comes
   from fresh test seeds.
+
+## D-043: How the head-camera video is rendered and randomized (2026-11-04)
+
+- **What:** `scripts/render_episodes.py` renders each recorded episode with Newton's renderer
+  (D-031), in a copy of the pick-place scene that runs no physics: every second control step,
+  the recorded pelvis pose, joint positions and object poses are written in, giving 25 frames
+  per second (frame k shows the state control step 2k's command was applied to). The head
+  camera is design section 3's, 640 x 480. Each episode's look comes from its layout seed
+  (`pi_wbc/stage3/appearance.py`, render seed 0), so any episode re-renders the same:
+  - floor, table and walls: muted colours (saturation at most 0.2; the table's brightness
+    0.3-0.8, so the white bottle and the black bin stand out on it) and patterns (plain a
+    quarter of the time, else checker, tiles, planks, speckle or stripes at two scales each);
+    a wall 0.3-1.5 m behind the table and walls 2-3.5 m to each side;
+  - the sun: one of six heights (30-80 degrees), from any direction relative to the scene;
+    shadows on;
+  - the light's brightness (x0.7-1.3) and colour (red and blue up to 10% apart, green 3%);
+  - the camera's mount: up to 1 cm and 1 degree off on each axis.
+
+  Object and bin colours never change. Videos are H.264 (libx264, quality 20, a key frame every
+  25 frames, yuv420p), one per episode, with a manifest of each episode's look, frame count
+  and file hash.
+- **Why:** Newton's renderer has one white sun of fixed strength for all environments and a
+  fixed ambient term. So the sun's direction relative to a scene comes from turning the whole
+  scene (robot, table, objects, bins, floor, walls) about its origin, which changes nothing
+  else in the image. Episodes with the same sun height render together. Brightness and colour
+  are a gain on the image in linear colour, which is what a brighter or warmer light does to
+  diffuse surfaces. H.264 because every video decoder reads it; the export step can re-encode.
+- **Cost:** the lighting is plainer than RTX: one light, no coloured shadows, no reflections.
+  Patterns are generated greys, not photographs. The renderer's speed on the RTX 4070 is about
+  660 frames per second for 32 episodes at once.
 
 ## Open items
 
