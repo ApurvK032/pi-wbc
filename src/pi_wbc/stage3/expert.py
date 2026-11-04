@@ -100,7 +100,7 @@ class ExpertParams:
     ik_w_rot: float = 0.3  # IK weight of the palm's orientation against its position
     # the controller tips the pelvis back as the arm reaches, and episodes whose pelvis stays
     # within 0.04 rad nearly always succeed (logs/expert/dev-v25-tilt). Two ways to tip it less:
-    tilt_pause: float = 0.0  # >0: hold the hand's path while the pelvis tips back more than this
+    tilt_pause: float = 0.05  # >0: hold the hand's path while the pelvis tips back more than this
     tilt_pause_max_s: float = 2.0  # at most this long per phase
     counter_arm: float = 0.0  # swing the left arm back by this (shoulder pitch, rad) while leaning
     counter_rate: float = 1.0  # rad/s
