@@ -87,3 +87,23 @@ def test_matches_the_task_configs() -> None:
     for task, substeps in (("PiWbc-G1-Student", 2), ("PiWbc-G1-PickPlace", 4)):
         cfg = parse_env_cfg(task, device="cpu", num_envs=1).sim.physics
         assert _settings(cfg) == _settings(bench_physics.newton(substeps)), task
+
+
+def test_task_scripts_keep_the_task_physics() -> None:
+    """The task scripts (expert, replay check, render, evaluation loop) select the preset with the
+    Hydra override `physics=newton_mjwarp`, which keeps the task's settings (unlike the launcher
+    argument); the launcher argument stays unset."""
+    from isaaclab_tasks.utils import resolve_task_config
+
+    import pi_wbc.tasks  # noqa: F401  (registers the tasks)
+
+    env_cfg, _ = resolve_task_config(
+        "PiWbc-G1-PickPlace", "rsl_rl_cfg_entry_point", overrides=["physics=newton_mjwarp"]
+    )
+    parser = argparse.ArgumentParser()
+    add_launcher_args(parser)
+    args = vars(parser.parse_args([]))
+    assert args.get("physics") is None
+    launcher = sys.modules[launch_simulation.__wrapped__.__module__]
+    scan, _ = launcher.validate_launch(env_cfg, args)
+    assert _settings(scan.resolved_physics_cfg) == _settings(bench_physics.newton(4))
