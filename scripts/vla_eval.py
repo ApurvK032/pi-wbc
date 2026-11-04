@@ -54,6 +54,9 @@ parser.add_argument("--knock-dist", type=float, default=0.02)
 parser.add_argument("--render-seed", type=int, default=0)
 parser.add_argument("--gif", type=Path, default=None, help="save each episode's head camera here")
 RUN = "logs/rsl_rl/pi_wbc_g1_student/slurm-5628865-full-range-long-r"
+parser.add_argument("--low-level", choices=["ours", "nvidia"], default="ours",
+                    help="the controller under the policy's commands (D-046)")  # fmt: skip
+parser.add_argument("--nvidia-policy-dir", type=Path, default=Path("third_party/gr00t_wbc/policy"))
 parser.add_argument("--run", type=Path, default=Path(RUN), help="controller run folder")
 parser.add_argument("--out", type=Path, required=True)
 add_launcher_args(parser)
@@ -221,6 +224,11 @@ def main() -> None:
         base = venv.unwrapped
         dev = base.device
         hl = HighLevel(env)
+        nv = None
+        if args.low_level == "nvidia":
+            from pi_wbc.stage3.nvidia_wbc import NvidiaLowLevel
+
+            nv = NvidiaLowLevel(env, args.nvidia_policy_dir)
         robot, cam = base.scene["robot"], base.scene["head_cam"]
         objects = [base.scene[f"obj_{name}"] for name in L.OBJECT_NAMES]
         torso = robot.body_names.index("torso_link")
@@ -242,6 +250,8 @@ def main() -> None:
             base.pick_place_layouts = lays
             base.reset()
             hl.reset(list(range(n)))
+            if nv is not None:
+                nv.reset()
             policy.reset(seeds_p)
             looks = [A.sample_look(s, args.render_seed) for s in seeds_p]
             looks_out.set_looks(looks)
@@ -315,7 +325,7 @@ def main() -> None:
                         hl.body_goal[:] = torch.cat([a[:, 31:32], a[:, 28:31]], dim=1)
                         hl.velocity[:] = a[:, 32:35]
                         hl.apply()
-                        obs, _, _, _ = venv.step(controller(obs))
+                        obs, _, _, _ = venv.step(controller(obs) if nv is None else nv.act())
                     # judge
                     every = torch.stack([tt(o.data.root_pos_w) for o in objects], dim=1)
                     every = (every - origins[:, None]).cpu().numpy()
@@ -359,7 +369,8 @@ def main() -> None:
             "fps": FPS, "replay_rate": args.replay_rate if args.policy == "replay" else None,
             "between": args.between,
             "server": None if args.policy == "replay" else f"{args.host}:{args.port}",
-            "controller_run": str(args.run), "execute_frames": args.execute,
+            "controller_run": str(args.run), "low_level": args.low_level,
+            "execute_frames": args.execute,
             "max_s": args.max_s, "hold_s": args.hold_s, "knock_dist": args.knock_dist,
             "render_seed": args.render_seed, "episodes": len(results), "success": ok,
             "success_ci95": [lo, hi], "labels": labels, "results": results,
