@@ -62,7 +62,7 @@ def check_export_episode(job: dict) -> tuple[int, str | None]:
     d = np.load(io.BytesIO(read_from_disk(Path(job["recording"]))))
     meta = json.loads(str(d["meta"]))
     ep = {k: d[k] for k in ("phase", "joint_pos", "cmd_body", "cmd_arm_hand", "cmd_velocity")}
-    state, action = E.episode_arrays(ep, meta)
+    state, action = E.episode_arrays(ep, meta, job["frame_step"])
     table = pq.read_table(io.BytesIO(read_from_disk(Path(job["parquet"]))))
     got_s = np.stack(table.column("observation.state").to_numpy(zero_copy_only=False))
     got_a = np.stack(table.column("action").to_numpy(zero_copy_only=False))
@@ -107,6 +107,7 @@ def main() -> None:
             rec = Path(pw["recordings"])
             jobs = [{
                 "episode_index": e["episode_index"], "video_sha256": e["video_sha256"],
+                "frame_step": pw["frame_step"],
                 "recording": str(rec / f"{e['seed']}.npz"),
                 "parquet": str(d / info["data_path"].format(
                     episode_chunk=e["episode_index"] // info["chunks_size"],
