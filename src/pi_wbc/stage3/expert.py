@@ -98,6 +98,12 @@ class ExpertParams:
     # hand (and not short of it), without waiting for the palm (the grasp target follows the
     # object, so a palm that pushes it would keep pushing)
     ik_w_rot: float = 0.3  # IK weight of the palm's orientation against its position
+    # the controller tips the pelvis back as the arm reaches, and episodes whose pelvis stays
+    # within 0.04 rad nearly always succeed (logs/expert/dev-v25-tilt). Two ways to tip it less:
+    tilt_pause: float = 0.0  # >0: hold the hand's path while the pelvis tips back more than this
+    tilt_pause_max_s: float = 2.0  # at most this long per phase
+    counter_arm: float = 0.0  # swing the left arm back by this (shoulder pitch, rad) while leaning
+    counter_rate: float = 1.0  # rad/s
     tilt_gain: float = 0.0  # >0: while the arm works at the table, lean the waist further by
     # this share of the pelvis's backward tilt (the controller tips it back as the arm reaches)
     release_away: float = 0.04  # after opening over the bin, move the palm this far off the
@@ -153,6 +159,8 @@ class Expert:
         self.q_hang = np.array([float(high_level.upper.default[high_level.index([j])[0]])
                                 for j in RIGHT_ARM])  # fmt: skip
         self.nominal_height = float(high_level.body.nominal[0])
+        self.left_pitch_slot = high_level.index(["left_shoulder_pitch_joint"])[0]
+        self.left_pitch_default = float(high_level.upper.default[self.left_pitch_slot])
         n = self.n
         self.phase = np.full(n, P["walk_obj"])
         self.t = np.zeros(n, dtype=int)  # steps in the current phase
@@ -168,6 +176,8 @@ class Expert:
         self.obj_in_palm = [np.zeros(3) for _ in range(n)]
         self.target_k = np.zeros(n, dtype=int)
         self.tries = np.zeros(n, dtype=int)
+        self.paused = np.zeros(n, dtype=int)  # steps the hand's path has been held in this phase
+        self.left_back = np.zeros(n)  # the left arm's current counterbalance (rad)
         self.notes: list[dict] = [{} for _ in range(n)]  # measurements for failure analysis
         # the last 2 s of each episode, saved in its notes when it fails: phase, steps in it,
         # object in the heading frame from the palm (cm), object moved (cm), waist pitch,
@@ -215,6 +225,8 @@ class Expert:
             self.hand[i] = HAND_OPEN
             self.plan[i] = {}
             self.tries[i] = 0
+            self.paused[i] = 0
+            self.left_back[i] = 0.0
             self.notes[i] = {}
             self.trace[i].clear()
             self.target_k[i] = L.OBJECT_NAMES.index(lay.target_object)
@@ -353,6 +365,7 @@ class Expert:
     def _go(self, i: int, phase: str) -> None:
         self.phase[i] = P[phase]
         self.t[i] = 0
+        self.paused[i] = 0
 
     def _fail(self, i: int, label: str) -> None:
         self.label[i] = label
@@ -368,6 +381,8 @@ class Expert:
         pose = self._base_pose()
         z = self.robot.data.root_pos_w.torch[:, 2] - self.base.scene.env_origins[:, 2]
         tilt = self.robot.data.projected_gravity_b.torch[:, 2]
+        g3 = self.robot.data.projected_gravity_b.torch
+        back = torch.atan2(-g3[:, 0], -g3[:, 2]).cpu().numpy()  # pelvis tipped back (rad)
         fell = ((z < 0.45) | (tilt > -0.5)).cpu().numpy()
         obj = self._target_obj_pos()
         palm_pos, palm_quat = self._palm_pose()
@@ -457,6 +472,13 @@ class Expert:
                 }[ph]
                 ra, rb = {"reach": ("start", "pre"), "lower": ("pre", "out"),
                           "slide": ("out", "grasp"), "lift": ("grasp", "lift")}[ph]  # fmt: skip
+                held = self.paused[i] * dt < p.tilt_pause_max_s
+                if p.tilt_pause > 0 and ph != "lift" and back[i] > p.tilt_pause and held:
+                    self.t[i] -= 1  # hold the path here until the pelvis comes back
+                    k = self.t[i]
+                    self.paused[i] += 1
+                    note = self.notes[i]
+                    note["paused_s"] = round(note.get("paused_s", 0.0) + dt, 2)
                 s_ = _smooth(k * dt / dur)
                 target = a + s_ * (b - a)
                 q_rest = pl["q_plan"][ra] + s_ * (pl["q_plan"][rb] - pl["q_plan"][ra])
@@ -580,6 +602,16 @@ class Expert:
                 if P["raise"] <= self.phase[i] <= P["lift"]:
                     extra = p.tilt_gain * min(max(float(back[i]), 0.0), 0.15)
                     hl.body_goal[i, 3] = min(p.lean + extra, 0.45)
+        if p.counter_arm:  # the left arm swung back while leaning, against the reaching right arm
+            for i in range(self.n):
+                ph = self.phase[i]
+                lean = P["lean_obj"] <= ph <= P["lift"] or P["lean_bin"] <= ph <= P["release"]
+                want = p.counter_arm if lean else 0.0
+                rate = p.counter_rate * dt
+                self.left_back[i] += min(max(want - self.left_back[i], -rate), rate)
+                hl.arm_hand[i, self.left_pitch_slot] = min(
+                    self.left_pitch_default + float(self.left_back[i]), 1.0
+                )  # the trained range ends at 1.0
         self._record(pose, obj, palm_pos, moved, targets)
         # palm height above the table at each bin phase's end (failure analysis)
         for i in range(self.n):
