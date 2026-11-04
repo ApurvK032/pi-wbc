@@ -4,6 +4,9 @@ Batches of `--num-envs` layouts (consecutive seeds from `--first-seed`) run unti
 has ended; the next batch follows until `--episodes` are done. Prints a table of outcomes
 (success, or the failure label and the phase it happened in) with a 95% Wilson interval for
 the success rate, and writes them to `--out`. `--gif` records robot 0 of the first batch.
+The shared judge (pi_wbc.stage3.judge, D-052) watches every episode beside the expert's own
+labels, without changing what the expert does; a batch runs on (the robots standing) until the
+judge has ended each episode, and both verdicts are reported.
 
     uv run python scripts/expert_rollout.py --episodes 16 --num-envs 8 \
         --out logs/expert/dev.json --viz none
@@ -84,6 +87,7 @@ import pi_wbc.tasks  # noqa: E402, F401
 from pi_wbc import provenance  # noqa: E402
 from pi_wbc.stage3 import layout as L  # noqa: E402
 from pi_wbc.stage3.expert import PHASES, Expert, ExpertParams  # noqa: E402
+from pi_wbc.stage3.judge import Judge, JudgeParams  # noqa: E402
 from pi_wbc.stats import wilson_interval  # noqa: E402
 from pi_wbc.tasks.g1_pick_place import HighLevel  # noqa: E402
 
@@ -190,6 +194,19 @@ def main() -> None:
             rec = EpisodeRecorder(env, hl, expert, args.record, run_info)
         dt = base.step_dt
         results, frames = [], []
+        robot = base.scene["robot"]
+        objects = [base.scene[f"obj_{name}"] for name in L.OBJECT_NAMES]
+        palm_ids = [robot.body_names.index(f"{s}_hand_palm_link") for s in ("left", "right")]
+        judge_params = JudgeParams(max_s=expert.p.episode_timeout_s)
+
+        def state():
+            o = base.scene.env_origins
+            every = torch.stack([tt(x.data.root_pos_w) for x in objects], dim=1) - o[:, None]
+            palms = tt(robot.data.body_link_pos_w)[:, palm_ids] - o[:, None]
+            z = tt(robot.data.root_pos_w)[:, 2] - o[:, 2]
+            up = -tt(robot.data.projected_gravity_b)[:, 2]
+            return z.cpu().numpy(), up.cpu().numpy(), every.cpu().numpy(), palms.cpu().numpy()
+
         seed = args.first_seed
         t0 = time.perf_counter()
         sim_steps = 0
@@ -213,6 +230,7 @@ def main() -> None:
             clips = [collections.deque(maxlen=150) for _ in range(n)]
             saved = set()
             max_steps = round(expert.p.episode_timeout_s / dt) + 10
+            judge = Judge(base.pick_place_layouts, state()[2], judge_params)
             # no_grad, not inference_mode: tensors made in inference mode (also inside the
             # environment's action term) can't be changed by the next batch's reset
             with torch.no_grad():
@@ -223,6 +241,7 @@ def main() -> None:
                         rec.record(in_batch & ~expert.finished())
                     obs, _, _, _ = venv.step(policy(obs) if nv is None else nv.act())
                     sim_steps += 1
+                    judge.step((k + 1) * dt, *state())
                     if args.fail_gifs is not None and k % 3 == 0:
                         rgb = tt(base.scene["debug_cam"].data.output["rgb"])[..., :3]
                         rgb = rgb.clamp(0, 255).to(torch.uint8).cpu().numpy()
@@ -237,38 +256,48 @@ def main() -> None:
                     if args.gif is not None and not results and k % 3 == 0:
                         rgb = tt(base.scene["debug_cam"].data.output["rgb"])[args.gif_env, ..., :3]
                         frames.append(rgb.clamp(0, 255).to(torch.uint8).cpu().numpy())
-                    if expert.finished()[:m].all():
+                    if expert.finished()[:m].all() and judge.done[:m].all():
                         break
+            judge.finish((k + 1) * dt, "time limit")
             for i in range(m):
                 lay = base.pick_place_layouts[i]
                 label = expert.label[i] or "timed_out"
+                verdict = judge.result(i)
                 results.append({
                     "seed": lay.seed, "instruction": lay.instruction, "label": label,
                     "phase": PHASES[expert.phase[i]], "failed_in": expert.failed_in[i],
-                    "time_s": round(expert.age[i] * dt, 2), "notes": expert.notes[i],
+                    "time_s": round(expert.age[i] * dt, 2), "judge": verdict,
+                    "notes": expert.notes[i],
                 })  # fmt: skip
                 print(f"[expert] seed {lay.seed}: {label:12s} (in {expert.failed_in[i]}) "
-                      f"after {expert.age[i] * dt:5.1f} s  '{lay.instruction}'")  # fmt: skip
+                      f"after {expert.age[i] * dt:5.1f} s, judge {verdict['label']}  "
+                      f"'{lay.instruction}'")  # fmt: skip
                 if expert.notes[i]:
                     print(f"         {expert.notes[i]}")
                 if rec is not None:
                     rec.save(i, {"label": label, "failed_in": expert.failed_in[i],
                                  "time_s": round(expert.age[i] * dt, 2),
-                                 "hand": expert.side[i]})  # fmt: skip
+                                 "hand": expert.side[i], "judge": verdict})  # fmt: skip
         wall = time.perf_counter() - t0
         counts = collections.Counter(r["label"] for r in results)
         ok = counts.get("success", 0)
         lo, hi = wilson_interval(ok, len(results))
+        judged = collections.Counter(r["judge"]["label"] for r in results)
+        j_ok = judged.get("success", 0)
+        j_lo, j_hi = wilson_interval(j_ok, len(results))
         print(f"[expert] success {ok}/{len(results)} ({ok / len(results):.0%}, 95% CI "
               f"{lo:.0%}-{hi:.0%}); labels {dict(counts)}; {wall:.0f} s wall, "
               f"{sim_steps * n * dt / wall:.1f}x real time summed over robots")  # fmt: skip
+        print(f"[expert] shared judge: success {j_ok}/{len(results)} ({j_lo:.0%}-{j_hi:.0%}); "
+              f"labels {dict(judged)}")  # fmt: skip
         args.out.parent.mkdir(parents=True, exist_ok=True)
         provenance.save_json(args.out, {
             "controller_run": str(args.run), "low_level": args.low_level,
             "nvidia_policy_commit": None if nv is None else nv.policy_commit,
             "first_seed": args.first_seed,
             "episodes": len(results), "success": ok, "success_ci95": [lo, hi],
-            "labels": dict(counts), "results": results,
+            "labels": dict(counts), "judge": judge_params.__dict__, "judge_success": j_ok,
+            "judge_success_ci95": [j_lo, j_hi], "judge_labels": dict(judged), "results": results,
             "expert_params": {k: (vars(v) if hasattr(v, "__dataclass_fields__") else v)
                               for k, v in vars(expert.p).items()},
         })  # fmt: skip

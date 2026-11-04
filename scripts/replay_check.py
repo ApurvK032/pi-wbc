@@ -4,8 +4,9 @@ Each episode's layout is reset as recorded, and its recorded commands go step by
 the same path the expert's did (`HighLevel` -> the stage 1 controller -> the physics). Newton
 on the GPU does not repeat a run bit for bit (D-041: identical expert runs end differently in
 about 8% of episodes), so the check measures how far each replay drifts from its recording
-(pelvis and target object, every step) and whether it ends the same way (the expert's placement
-judge, and no other object pushed more than 2 cm), instead of demanding equality.
+(pelvis and target object, every step) and whether it ends the same way, instead of demanding
+equality. How it ends is the shared judge's verdict (pi_wbc.stage3.judge, D-052), every control
+step; after a recording's last command the replay holds it until the judge has ended the episode.
 
 An episode passes when its replay stays within `--max-early-drift-mm` of the recording over the
 first second: a recording whose commands and states don't belong together drifts at once (17-124
@@ -28,7 +29,6 @@ parser.add_argument("--episodes", type=Path, required=True, help="folder of reco
 parser.add_argument("--num-envs", type=int, default=32)
 parser.add_argument("--limit", type=int, default=None, help="replay only the first N episodes")
 parser.add_argument("--run", type=Path, default=Path(DEFAULT_RUN), help="controller run folder")
-parser.add_argument("--other-knock-dist", type=float, default=0.02)
 parser.add_argument("--max-early-drift-mm", type=float, default=10.0)
 parser.add_argument("--low-level", choices=["ours", "nvidia"], default="ours",
                     help="the controller the episodes were recorded with (D-046)")  # fmt: skip
@@ -54,7 +54,7 @@ from isaaclab_tasks.utils import resolve_task_config  # noqa: E402
 import pi_wbc.tasks  # noqa: E402, F401
 from pi_wbc import provenance  # noqa: E402
 from pi_wbc.stage3 import layout as L  # noqa: E402
-from pi_wbc.stage3.expert import placement_label  # noqa: E402
+from pi_wbc.stage3.judge import Judge, JudgeParams  # noqa: E402
 from pi_wbc.stats import wilson_interval  # noqa: E402
 from pi_wbc.tasks.g1_pick_place import HighLevel  # noqa: E402
 
@@ -103,6 +103,10 @@ def main() -> None:
             nv = NvidiaLowLevel(env, args.nvidia_policy_dir)
         robot = base.scene["robot"]
         objects = [base.scene[f"obj_{name}"] for name in L.OBJECT_NAMES]
+        palm_ids = [robot.body_names.index(f"{s}_hand_palm_link") for s in ("left", "right")]
+        params = JudgeParams()
+        dt = 1.0 / 50  # control step
+        settle = int(np.ceil(params.settle_s / dt)) + 2
         results = []
         for start in range(0, len(files), n):
             batch = [load(f) for f in files[start : start + n]]
@@ -129,12 +133,22 @@ def main() -> None:
                  if name in ep["layout"].objects and name != ep["layout"].target_object]
                 for ep in eps
             ]  # fmt: skip
+            judge = None
+            last = min(int(steps.max()) + settle, round(params.max_s / dt))
             with torch.no_grad():
-                for t in range(int(steps.max()) + 1):
+                for t in range(last + 1):
                     origins = base.scene.env_origins
                     root = (tt(robot.data.root_pos_w) - origins).cpu().numpy()
                     every = torch.stack([tt(o.data.root_pos_w) for o in objects], dim=1)
                     every = (every - origins[:, None]).cpu().numpy()
+                    palms = tt(robot.data.body_link_pos_w)[:, palm_ids] - origins[:, None]
+                    up = -tt(robot.data.projected_gravity_b)[:, 2].cpu().numpy()
+                    if judge is None:  # the state the first command is applied to
+                        judge = Judge([ep["layout"] for ep in eps], every, params)
+                    else:  # after t control steps
+                        judge.step(t * dt, root[:, 2], up, every, palms.cpu().numpy())
+                    if t > steps.max() and judge.done[:m].all():
+                        break
                     for i, ep in enumerate(eps):
                         k = min(t, steps[i] - 1)
                         if t < steps[i]:  # the state each recorded command was applied to
@@ -164,18 +178,18 @@ def main() -> None:
                             )
                             if t <= steps[i]:
                                 pushed[i] = max(pushed[i], moved.max())
-                        if t == steps[i]:  # where the recording ends
+                        if t == steps[i] - 1:  # the recording's last state
                             final[i] = every[i, targets[i]].copy()
                         hl.velocity[i] = torch.as_tensor(ep["cmd_velocity"][k], device=base.device)
                         hl.body_goal[i] = torch.as_tensor(ep["cmd_body"][k], device=base.device)
                         hl.arm_hand[i] = torch.as_tensor(ep["cmd_arm_hand"][k], device=base.device)
                     hl.apply()
                     obs, _, _, _ = venv.step(policy(obs) if nv is None else nv.act())
+            judge.finish(t * dt, "time limit")
             for i, ep in enumerate(batch):
                 meta, lay = ep["meta"], ep["layout"]
-                label = placement_label(lay, final[i])
-                if label == "success" and pushed[i] > args.other_knock_dist:
-                    label = "knocked_other"
+                verdict = judge.result(i)
+                label = verdict["label"]
                 rec_label = meta["outcome"]["label"]
                 rec_final = ep["object_pose"][-1, targets[i], :3]
                 gap = float(np.linalg.norm(final[i] - rec_final))
@@ -183,6 +197,7 @@ def main() -> None:
                     "seed": lay.seed, "recorded": rec_label, "replayed": label,
                     "same_outcome": (rec_label == "success") == (label == "success"),
                     "steps": int(steps[i]), "hand": meta["outcome"].get("hand"),
+                    "judged_s": verdict["time_s"], "ended_by": verdict["ended_by"],
                     "max_root_drift_cm": round(float(drift_root[i]) * 100, 1),
                     "max_object_drift_cm": round(float(drift_obj[i]) * 100, 1),
                     "final_object_gap_cm": round(gap * 100, 1),
@@ -212,7 +227,8 @@ def main() -> None:
             "episodes_dir": str(args.episodes), "controller_run": str(args.run),
             "low_level": args.low_level,
             "replayed": len(results), "passed": passed,
-            "max_early_drift_mm": args.max_early_drift_mm, "recorded_successes": len(ok),
+            "max_early_drift_mm": args.max_early_drift_mm, "judge": params.__dict__,
+            "recorded_successes": len(ok),
             "successes_kept": kept, "kept_ci95": [lo, hi], "results": results,
         })  # fmt: skip
         env.close()
