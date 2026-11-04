@@ -1260,13 +1260,13 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   - **The dataset:** manifests with the layout seeds, split, commits, package versions, GPU and
     checksums (SHA-256 of every recording, and of every video in its render manifest); the
     replay check on every recorded episode (D-042); training set v1 (1,000 episodes), v2 (2,000),
-    a validation set (241) and NVIDIA's matched set (1,000), at 25 frames per second, and v1 and
-    the validation set also at 50 (D-047, D-048).
+    a validation set (241) and NVIDIA's matched set (1,000), at 25 frames per second, and ours
+    also at 50 (D-047, D-048).
   - **The loaders:** GR00T N1.6's `LeRobotEpisodeLoader` loads every episode of training set v1
     (25 and 50 fps), v2, the validation set (25 and 50 fps) and NVIDIA's set, 5,482 episodes;
-    LeRobot's `LeRobotDataset` loads the v3.0 copies of v1 and the validation set (25 and 50 fps)
-    and NVIDIA's set (12 episodes each, compared row by row). v2's LeRobot copy was still being
-    checked when this was written (D-045).
+    LeRobot's `LeRobotDataset` loads the v3.0 copies of v1 and the validation set (25 and 50 fps),
+    v2 and NVIDIA's set (12 episodes each, compared row by row) (D-045). v2 at 50 fps, finished
+    later, was checked with GR00T's loader on a sample of 12 episodes and from disk in full.
 - **Beyond the finish line:** NVIDIA's controller as the task's low level and the matched set
   (D-046), the closed-loop evaluation loop and the command-rate test (D-048), a GR00T fine-tune
   launcher, configs and cluster job for stage 4 (draft: [STAGE4_DESIGN.md](STAGE4_DESIGN.md)).
