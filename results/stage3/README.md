@@ -10,7 +10,10 @@ records the commit, package versions and GPU it came from.
 - [Grasp test: can the Dex3 hand hold the task's objects in Newton?](#grasp-test-can-the-dex3-hand-hold-the-tasks-objects-in-newton)
 - [NVIDIA's controller on our G1 in Newton](#nvidias-controller-on-our-g1-in-newton)
 - [Step 1: the controller at 4 physics substeps](#step-1-the-controller-at-4-physics-substeps)
-- [Steps 2-3 (in progress): the task and the expert](#steps-2-3-in-progress-the-task-and-the-expert)
+- [The task and the scripted expert](#the-task-and-the-scripted-expert)
+- [The demonstrations](#the-demonstrations)
+- [Rendering the head camera](#rendering-the-head-camera)
+- [Still to do in stage 3](#still-to-do-in-stage-3)
 
 ## Grasp test: can the Dex3 hand hold the task's objects in Newton?
 
@@ -164,30 +167,38 @@ none of 110 robots with either arm pose, tracking as at 2
 [nvidia_wbc/all-arms-zero-heel-0.05-sub4.json](nvidia_wbc/all-arms-zero-heel-0.05-sub4.json)).
 So the stage 3 scenes run at 4 substeps.
 
-## Steps 2-3 (in progress): the task and the expert
+## The task and the scripted expert
 
 The task environment (`PiWbc-G1-PickPlace`,
 [src/pi_wbc/tasks/g1_pick_place.py](../../src/pi_wbc/tasks/g1_pick_place.py)) puts the stage 1
 controller (seed 1) in the loop with a table, three of five round objects, two bins and seeded
 layouts ([src/pi_wbc/stage3/layout.py](../../src/pi_wbc/stage3/layout.py)). The scripted expert
 ([src/pi_wbc/stage3/expert.py](../../src/pi_wbc/stage3/expert.py)) reads the true state and
-sends only the controller's commands. On development layouts 50,000-50,095
-([scripts/expert_rollout.py](../../scripts/expert_rollout.py)):
+sends only the controller's commands: base velocity, body height and lean, and arm and hand
+joint targets ([scripts/expert_rollout.py](../../scripts/expert_rollout.py)).
 
 ![The expert picks the red can and puts it in the purple bin](expert/expert_dev_50000.gif)
 
+(An earlier version of the expert, on development layout 50,000.)
+
+On unused test layouts 60,384-60,767, run once (D-041):
+
 | | Episodes |
 |---|---:|
-| Success | 78 of 96 (81%; 95% CI 72-88%) |
-| Knocked the object before closing the hand | 11 |
-| Missed the grasp | 5 |
-| Object not in the bin | 2 |
+| Success | 364 of 384 (94.8%; 95% CI 92.1-96.6%) |
+| Pushed another object more than 2 cm | 16 (7 while the hand came down, 6 while it pulled back, 3 while carrying) |
+| Missed the grasp | 3 |
+| Dropped the object on the way | 1 |
 | Robot fell | 0 |
 
-File: [expert/dev-50000-50095.json](expert/dev-50000-50095.json). An identical earlier run gave
-80 of 96; single episodes change outcome between runs (Newton is not repeatable). The target is
-95% (D-036), so the expert is not finished. What it took to get here, each found from the
-measured state of failed episodes:
+Files: [expert/test-60384-60767.json](expert/test-60384-60767.json); fresh training layouts
+1,000-1,383 give 361 of 384 (94.0%, [expert/train-1000-1383.json](expert/train-1000-1383.json)).
+Success is judged when the episode ends, with the object resting in the named bin and no other
+object moved more than 2 cm. The right hand did 294 of the test episodes (277 succeeded), the
+left 90 (87). A successful episode takes 24-37 s (median 31 s). Test layouts 60,000-60,383 were
+used while fixing the success rule and are retired.
+
+What it took, each step found from the measured state of failed episodes:
 
 - **Contact budget.** With the bins' kinematic boxes touching each other, the scene needed
   more contacts than the 120 per robot allowed; the rest were dropped and the objects tipped
@@ -207,6 +218,87 @@ measured state of failed episodes:
   the robot straightens and walks (which raises the object clear of the others), the reach
   over the bin goes in joint space to a solution found beforehand, and an IK step that misses
   by more than 3 cm is not taken.
+- **Which hand.** The right hand alone succeeded on 50-64% of layouts with under 10 cm of room
+  to the target's right (another object or the right-hand bin's wall) and on 95-99% of the
+  rest. The expert now uses the left hand, with every motion mirrored, when the right side
+  has under 12 cm and the left side has more.
+- **Pull back before lowering.** Lowering the arm from over the table after the release swung
+  the hand through the other objects, and knocked 26 of 176 placed objects back out of the bin
+  on development layouts. The hand now first moves back to the table's front edge.
+- **Judged at the end.** Success used to be judged when the hand opened, which hid those
+  knocks (earlier rates were about 13 points too high); pushing another object is now a
+  failure of its own.
 
-The remaining knocks happen while the hand waits beside the object: there the torso sways by
-up to 0.1 rad (the controller balances the arm's weight held forward), moving the hand 2-4 cm.
+## The demonstrations
+
+The expert recorded every episode from training seed 10,000 on: per control step (50 Hz) the
+commands it sent, the robot's pelvis pose and velocity, all 43 joint positions and velocities,
+the five objects' poses and the expert's phase, plus the layout, instruction and outcome
+([src/pi_wbc/stage3/recorder.py](../../src/pi_wbc/stage3/recorder.py)). The training set is the
+first 1,000 successes in seed order whose replay passes the check below (D-042):
+
+| | Episodes |
+|---|---:|
+| Recorded (seeds 10,000-11,087) | 1,088 |
+| Successful | 1,010 |
+| Failed (kept, labelled, for stage 5) | 78: 66 pushed another object, 7 missed grasps, 3 drops, 2 knocked the target |
+| Failed the replay check | 2 |
+| In the training set (seeds 10,000-11,079) | 1,000: right hand 733, left 267 |
+
+File: [dataset/train-v1-manifest.json](dataset/train-v1-manifest.json). **Replay check**
+([scripts/replay_check.py](../../scripts/replay_check.py)): each episode's recorded commands go
+through the controller and the physics again, without the expert. Newton on the GPU does not
+repeat runs exactly, so an episode passes when its replay stays within 1 cm of the recording
+over the first second, which separates recordings that belong to their commands (at most
+2.7 mm) from mismatched ones (17-124 mm). Over the whole set, 695 of the 1,000 also succeed when
+replayed open loop to the end (69.5%, 95% CI 66.6-72.3%): the expert corrects small
+differences as it goes, a replay of its commands can't.
+
+## Rendering the head camera
+
+[scripts/render_episodes.py](../../scripts/render_episodes.py) renders each training episode
+from the head camera with Newton's renderer (D-043): the recorded states are written into a
+copy of the scene that runs no physics, every second control step, giving 640 x 480 video at 25
+frames per second. Each episode has its own look, drawn from its seed
+([src/pi_wbc/stage3/appearance.py](../../src/pi_wbc/stage3/appearance.py)): floor, table and
+wall colours and patterns, the room's size, the sun's height and direction, the light's
+brightness and colour, and up to 1 cm and 1 degree of error in the camera's mount. Object and
+bin colours stay fixed, since the instructions name them.
+
+![The head camera half a second into the lift, in 12 training episodes](render/head_camera_lift.jpg)
+
+(12 training episodes, each half a second after the hand starts lifting the object.)
+
+| | |
+|---|---|
+| Videos | 1,000, one per episode: H.264, 640 x 480, 25 frames per second |
+| Frames | 790,046 (599-1,003 per episode, median 788) |
+| Size | 3.0 GB (median 3 MB per episode) |
+| Time | 21 min on the RTX 4070, about 650 frames per second for 32 episodes at once |
+| Sun height | 30, 40, 50, 60, 70, 80 degrees: 163, 169, 170, 176, 171, 151 episodes |
+
+Every video's frame count was checked against its recording. Each episode's look, frame count
+and file hash: [render/train-v1-render.json.gz](render/train-v1-render.json.gz).
+
+**The lens is 87 degrees across** (D-044). The first render used Isaac Lab's default, 60.4
+degrees, and lost the held object: the expert carries it beside the body.
+[scripts/camera_view_check.py](../../scripts/camera_view_check.py) projects the target object
+and the working palm into the camera for every frame of the 1,000 episodes. Share of frames
+with the object in the picture ([render/view_check.json](render/view_check.json)):
+
+| Lens (across) | Reach and grasp | Carry | Place | Palm, while carrying |
+|---|---:|---:|---:|---:|
+| 60.4 degrees (Isaac Lab's default) | 88.0% | 12.9% | 51.1% | 0.0% |
+| 69.4 (the D435's colour camera) | 97.5% | 57.6% | 84.5% | 0.6% |
+| 80 | 100.0% | 98.0% | 98.5% | 23.3% |
+| **87 (the D435's depth cameras)** | **100.0%** | **99.9%** | **99.8%** | **67.5%** |
+| 90 | 100.0% | 100.0% | 99.9% | 84.7% |
+
+The colour image is therefore wider than the real D435's colour camera; that would matter on
+the real robot, which this project doesn't claim.
+
+## Still to do in stage 3
+
+- Export to the formats GR00T N1.6 (LeRobot v2 with GR00T's `modality.json`) and LeRobot's
+  current `pi05` policy read, checked with each one's own loader.
+- The matched demonstration set through NVIDIA's controller (D-032), for stage 5.
