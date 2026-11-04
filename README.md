@@ -198,8 +198,9 @@ The largest kick survived at least 95% of the time is 2.5 m/s on every seed (98.
 kicks survived at 2.5 m/s, 87%-95% at 3 m/s); the B2 students' was 2.0 m/s (91%-94% at 2.5).
 Episodes with kicks run 23 s, so the last kick, at 19 s, is watched for 4 s like the others.
 One weakness: walking at 0.5 m/s on Menagerie's model, seed 1 trips over gentle 0.5 m/s kicks
-in 10 of 200 episodes, though never over 1 m/s kicks there (30 of 200 before the bench fixes;
-the cause of the rest is not known).
+in 10 of 200 episodes, though never over 1 m/s kicks there. Before the bench fixes it was 30;
+the corrected floor friction accounts for about two thirds of that drop, and the cause of the
+remaining 10 is not known.
 
 ### One policy, three simulators
 

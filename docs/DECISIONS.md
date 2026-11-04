@@ -875,7 +875,9 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
     misses it.
   - The 0.5 m/s kick trips did not come from the floor alone: on the fixed bench, with the
     corrected floor, seed 1 falls in 5 of 100 of those development episodes (2%-11%) and in 10
-    of 200 on the test seeds (30 before).
+    of 200 on the test seeds (30 before); with the old floor on the fixed bench (this entry's
+    script, restoring the file's own contact priorities), in 14 of 100 and 23 of 200. The floor
+    accounts for about two thirds of the drop from 30, the other fixes for the rest.
   - Stage 1's published bench numbers are now rerun on the fixed bench (D-040); stage 0's are
     not.
 
@@ -932,7 +934,8 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
     (98.6%-99.4% of kicks).
   - **Seed 1's trips over 0.5 m/s kicks** while walking at 0.5 m/s on Menagerie's model: 10 of
     200 test episodes (30 before) and 5 of 100 development episodes on the corrected floor (none
-    on the old bench). D-039 is amended.
+    on the old bench); with the old floor on the fixed bench 23 of 200 and 14 of 100. D-039 is
+    amended.
   - Other finish-line measures move by at most about 0.02 m/s and 1 cm; the speed error at
     1 m/s drops a little (seed 1: 0.12 / 0.11 to 0.10 / 0.10).
   - Earlier recipes on the test seeds: falls without kicks 70 for the warm-up students (65) and

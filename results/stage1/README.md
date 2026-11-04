@@ -118,9 +118,11 @@ survived:
   1.4-1.8 s after a gentle 0.5 m/s kick in 10 of 200 episodes, but never after 1 m/s kicks
   there. Before the bench fixes it was 30 of 200, which D-039 put down to the 0.6 floor (on the
   old bench, development seeds 0-99: 16 of 100 on that floor, none on the corrected one). On the
-  fixed bench it falls in 5 of 100 of those development seeds (2%-11%,
-  [foot_friction/fixed_bench/](foot_friction/fixed_bench/)): the corrected floor and the other
-  fixes together cut it to a third, but it is not gone.
+  fixed bench the old floor still trips it more often: 23 of 200 test episodes against 10
+  (development seeds 0-99: 14 of 100 against 5;
+  [foot_friction/fixed_bench/](foot_friction/fixed_bench/)). So the floor accounts for about two
+  thirds of the drop from 30, the other fixes for the rest, and the remaining 10 have no known
+  cause.
 
 Raw data: [`full_range_long_test/`](full_range_long_test/) (labels `full-range-long-s{1,2,3}`,
 the kick sweep in `push/`); the command-tracking runs of the front page in
