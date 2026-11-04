@@ -1220,7 +1220,9 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   of that; a VLA re-plans every few frames, so its loss is smaller, but it has the same handicap.
   At 50 fps GR00T's own `unitree_g1` config (30-step chunks, 0.6 s) fits as NVIDIA trained it.
   The 50 Hz replay here (71%) agrees with the replay check's 162 of 241 (67%, D-042), so the loop
-  itself adds no loss.
+  itself adds no loss. The loss is not our controller's alone: NVIDIA's recorded commands (D-046), on
+  241 of its matched set's episodes, succeed on 233 (96.7%, 93.6-98.3%) at 50 Hz and 173 (71.8%,
+  65.8-77.1%) at 25 Hz held (66 against 6 episodes, p = 7e-14).
 - **Cost:** twice the rendering (about 40 minutes per 1,000 episodes on the RTX 4070) and twice
   the video storage (about 6 GB per 1,000 episodes); twice the policy calls in closed loop if a
   50 fps model re-plans as often in frames.

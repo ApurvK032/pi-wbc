@@ -407,7 +407,9 @@ expert's own commands open loop through it, on the 241 validation episodes (D-04
 | the 25 fps dataset's, the second step the mean of it and the next | 143 (59.3%) | 53-65% |
 
 Paired, every difference is significant (p from 5e-8 to 0.019): a 25 Hz command stream loses
-much of the expert's step-by-step correction. The datasets are therefore also exported at 50
+much of the expert's step-by-step correction. Not with our controller only: NVIDIA's recorded
+commands, on 241 of its matched set's episodes, succeed on 233 (96.7%) at 50 Hz and 173 (71.8%)
+at 25 Hz held (66 against 6 episodes, p = 7e-14). The datasets are therefore also exported at 50
 frames per second, NVIDIA's own G1 data rate. The 50 Hz result agrees with the replay check's 162
 of 241 (67%), so the loop itself adds no loss. Files: [eval/](eval/).
 
