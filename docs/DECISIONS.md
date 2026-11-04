@@ -52,6 +52,9 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 | [D-042](#d-042-the-replay-check-tests-each-episodes-first-second-and-the-training-sets-seeds-2026-11-04) | The replay check tests each episode's first second, and the training set's seeds | 2026-11-04 |
 | [D-043](#d-043-how-the-head-camera-video-is-rendered-and-randomized-2026-11-04) | How the head-camera video is rendered and randomized (lens amended by D-044) | 2026-11-04 |
 | [D-044](#d-044-the-head-cameras-lens-is-87-degrees-wide-2026-11-04) | The head camera's lens is 87 degrees wide | 2026-11-04 |
+| [D-045](#d-045-the-datasets-export-format-gr00t-flavoured-lerobot-v21-and-lerobot-v30-2026-11-04) | The dataset's export format: GR00T-flavoured LeRobot v2.1, and LeRobot v3.0 | 2026-11-04 |
+| [D-046](#d-046-nvidias-controller-as-the-tasks-low-level-2026-11-04) | NVIDIA's controller as the task's low level | 2026-11-04 |
+| [D-047](#d-047-training-set-v2-and-a-validation-set-2026-11-04) | Training set v2 and a validation set | 2026-11-04 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -1090,6 +1093,93 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 - **Cost:** objects look smaller than with the default lens. The colour image is wider than
   the real D435's colour camera (69 degrees); that would matter on the real robot, which this
   project doesn't claim. The first render, at 60.4 degrees, is superseded.
+
+## D-045: The dataset's export format: GR00T-flavoured LeRobot v2.1, and LeRobot v3.0 (2026-11-04)
+
+- **What:** [scripts/export_dataset.py](../scripts/export_dataset.py)
+  ([src/pi_wbc/stage3/export.py](../src/pi_wbc/stage3/export.py)) writes each dataset in the
+  layout GR00T N1.6 reads (LeRobot v2.1 plus `meta/modality.json`), with the names of GR00T
+  N1.6's own `unitree_g1` data config:
+  - one row per video frame, 25 per second: frame k shows the state control step 2k's command
+    was applied to (D-043);
+  - `observation.state`: the 43 joint positions (legs, waist, left arm, left hand, right arm,
+    right hand), in the same order as NVIDIA's G1 datasets;
+  - `action`, 35 values: left and right arm and hand joint targets (28), waist yaw, roll and
+    pitch goals, pelvis height goal, and `navigate_command` (forward and sideways speed, turn
+    rate): the expert's commands at that control step, which the VLA will send;
+  - the instruction as `task_index` and `annotation.human.task_description`;
+  - GR00T's own `gr00t/data/stats.py` (branch `n1d6`, commit 9b37aa1) adds `stats.json` and the
+    relative arm statistics of its G1 config.
+
+  LeRobot's own converter (`convert_dataset_v21_to_v30`, LeRobot 0.6.1) makes the LeRobot v3.0
+  copy, run offline on a hard-linked copy, with LeRobot's quantile statistics added for π0.5
+  ([scripts/check_lerobot_dataset.py](../scripts/check_lerobot_dataset.py): LeRobot's own
+  functions on the same rows and sampled frames as its script, each episode decoded in one
+  pass; identical to its script's numbers on the episodes compared, which its random-access
+  decoding needs about 6 s each for).
+- **Checks:** GR00T's `LeRobotEpisodeLoader` with its `unitree_g1` config loads all 1,000
+  training episodes ([scripts/check_groot_dataset.py](../scripts/check_groot_dataset.py)):
+  every state and action group has its size and equals the table, the instruction is the
+  episode's, the decoded frames equal ffmpeg's (difference 0.00) and change between frames,
+  and its training-sample builder returns 30-step action chunks. LeRobot's `LeRobotDataset`
+  loads the v3.0 copy: on 12 episodes the rows equal the v2.1 tables, π0.5's 50-step chunks
+  follow the rows and are marked as padding past the end, and the images equal the source
+  frames.
+- **Why:** GR00T reads LeRobot v2 with `modality.json`; its G1 names let stage 4 fine-tune
+  under either its `UNITREE_G1` head (pretrained on NVIDIA's G1 data, same joint order) or
+  `NEW_EMBODIMENT`. LeRobot's current format is v3.0, and its `pi05` policy normalizes state
+  and action by quantiles.
+- **Cost:** 25 frames per second where NVIDIA's G1 data has 50, so stage 4's action horizon is
+  chosen for 25. The commands at odd control steps are not in the data; the VLA's command is
+  held for two control steps. LeRobot's `pi05` pads state and action to 32 values, and ours are
+  43 and 35; stage 4 must cut them for π0.5. The working hand's 7 targets are exactly open +
+  s x (closed - open), s from 0 to 1 (largest error 6e-8 rad over all 1,088 recordings), and
+  the idle hand holds its default pose, so 14 arm + 2 hand + 3 waist + 1 height + 3 velocity =
+  23 command values lose nothing if the idle hand is held at its default; the state without
+  the legs has 31 values.
+
+## D-046: NVIDIA's controller as the task's low level (2026-11-04)
+
+- **What:** `--low-level nvidia` (scripts/expert_rollout.py, scripts/replay_check.py;
+  [src/pi_wbc/stage3/nvidia_wbc.py](../src/pi_wbc/stage3/nvidia_wbc.py)) runs NVIDIA's released
+  Balance and Walk policies (D-004) under the same commands as ours (design sections 6-7). Its
+  observation is built as in the Newton test from the task's commands: velocity as given;
+  height = our pelvis-height command minus 0.04 m (the two controllers' nominal heights, 0.78
+  and 0.74 m: the command's height is taken relative to each controller's nominal); torso
+  roll, pitch and yaw = our waist roll, pitch and yaw goals. Arms and hands are set by the task,
+  as for ours. Its leg and waist targets are converted into our action term's units, and
+  [scripts/check_nvidia_targets.py](../scripts/check_nvidia_targets.py) checks that the task
+  applies exactly them (largest difference 0.0 rad over 2 s of standing, walking and leaning).
+- **Result:** the expert through NVIDIA's controller on training layouts 1000-1383, the ones
+  ours ran on for D-041: 367 of 384 (95.6%, 95% interval 93.0-97.2%) against 361 (94.0%,
+  91.2-96.0%). On the same layouts 352 succeed with both, 15 only with NVIDIA's, 9 only with
+  ours, 8 with neither (exact paired test p = 0.31): no difference shown. NVIDIA's episodes are
+  slower (median 37.7 s against 31.4 s); its failures are other objects pushed while the hand
+  comes down (8) or reaches over the bin (4), where ours pushes them mostly in the retract (10).
+  NVIDIA's own results file: logs/expert/nvidia/train-1000-1383.json.
+- **Why:** the stage 5 grid needs NVIDIA's controller under the same command interface, and
+  the matched demonstration set (design section 6) needs the expert to run through it.
+- **Cost:** the height offset and the waist-as-torso mapping are this project's adapter
+  choices, not NVIDIA's; its released checkpoints have no training code here to check them
+  against.
+
+## D-047: Training set v2 and a validation set (2026-11-04)
+
+- **What:** the expert recorded training seeds 11,088-12,239 (1,076 of 1,152 succeed, 93.4%,
+  95% interval 91.8-94.7%) and validation seeds 40,000-40,255, unused training-range seeds
+  kept apart (241 of 256, 94.1%). By D-042's rule
+  ([scripts/build_dataset_manifest.py](../scripts/build_dataset_manifest.py), which rebuilds
+  v1's manifest exactly): **training set v2** = the first 2,000 qualifying episodes from seed
+  10,000 (seeds 10,000-12,155; it contains v1; 6 successes dropped by the replay check; 1,484
+  right-hand and 516 left-hand), and **validation set v1** = all 241 qualifying episodes.
+  Manifests: results/stage3/dataset/train-v2-manifest.json, val-v1-manifest.json.
+- **Why:** stage 4 can then measure what the second 1,000 episodes add, and track a validation
+  loss on layouts it never trains on; test layouts stay for closed-loop success only.
+- **Cost:** about 1.5 GPU-hours of recording and replay. The new runs' result files say commit
+  eae88f1, but provenance stamps the commit when a file is saved: the runs started at 5d1eecd,
+  and the commits between them added only export code they never import (the package's source
+  hash is the same, e354b5f5d565). Two replay files say "dirty" for the same reason: two
+  scripts they don't use were uncommitted.
 
 ## Open items
 
