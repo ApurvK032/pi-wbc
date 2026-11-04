@@ -125,3 +125,17 @@ def test_a_real_recording() -> None:
     col = m["right_arm"]["start"] + E.ACTION_GROUPS["right_arm"].index("right_elbow_joint")
     assert np.allclose(action[:, col], ep["cmd_arm_hand"][::2, right_elbow])
     assert np.allclose(action[:, m["base_height_command"]["start"]], ep["cmd_body"][::2, 0])
+
+
+def test_fifty_frames_per_second() -> None:
+    """D-048: one row per control step, timestamps 0.02 s apart."""
+    pytest.importorskip("pyarrow")
+    assert E.frames_of(7, frame_step=1).tolist() == list(range(7))
+    ep, meta = _episode(steps=5)
+    state, action = E.episode_arrays(ep, meta, frame_step=1)
+    assert np.array_equal(state, ep["joint_pos"]) and len(action) == 5
+    assert np.allclose(action[3, 32:], ep["cmd_velocity"][3])
+    rows = E.episode_table(state, action, 0, 0, 0, fps=50).to_pylist()
+    assert [r["timestamp"] for r in rows] == pytest.approx([0.0, 0.02, 0.04, 0.06, 0.08])
+    assert E.features(640, 480, fps=50)[E.VIDEO_KEY]["info"]["video.fps"] == 50
+    assert E.FPS * E.FRAME_STEP == E.CONTROL_HZ == 50

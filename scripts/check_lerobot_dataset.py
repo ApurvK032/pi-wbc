@@ -28,7 +28,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-FPS = 25
 CHUNK = 50  # π0.5's action horizon in LeRobot
 REPO_ID = "local/pi_wbc"
 _worker_dataset = None
@@ -136,13 +135,14 @@ def main() -> None:
             write_stats(aggregate_stats(episode_stats), ds.meta.root)
             print("[lerobot] quantile statistics written", flush=True)
 
+    fps = json.loads((args.dataset / "meta/info.json").read_text())["fps"]
     ds = LeRobotDataset(REPO_ID, root=args.dataset,
-                        delta_timestamps={"action": [k / FPS for k in range(CHUNK)]})  # fmt: skip
+                        delta_timestamps={"action": [k / fps for k in range(CHUNK)]})  # fmt: skip
     ref_info = json.loads((args.reference / "meta/info.json").read_text())
     ref_eps = [json.loads(line) for line in (args.reference / "meta/episodes.jsonl").open()]
     assert ds.meta.total_episodes == len(ref_eps), ds.meta.total_episodes
     assert ds.meta.total_frames == sum(e["length"] for e in ref_eps), ds.meta.total_frames
-    assert ds.meta.fps == FPS
+    assert ds.meta.fps == ref_info["fps"] == fps
     stats = ds.meta.stats
     for key in ("action", "observation.state"):
         assert all(q in stats[key] for q in ("q01", "q99")), (key, sorted(stats[key]))

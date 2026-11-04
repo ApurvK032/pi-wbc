@@ -26,6 +26,13 @@ parser.add_argument(
 parser.add_argument("--limit", type=int, default=None, help="render only the first N episodes")
 parser.add_argument("--num-envs", type=int, default=32)
 parser.add_argument("--render-seed", type=int, default=0, help="selects another set of looks")
+parser.add_argument(
+    "--fps",
+    type=int,
+    choices=[25, 50],
+    default=25,
+    help="25 (D-043) or 50 (D-048) frames per second",
+)
 parser.add_argument("--crf", type=int, default=20, help="libx264 quality (lower is better)")
 parser.add_argument("--gop", type=int, default=25, help="frames between key frames")
 parser.add_argument("--no-shadows", action="store_true")
@@ -56,8 +63,8 @@ from pi_wbc.stage3 import layout as L  # noqa: E402
 from pi_wbc.tasks.g1_pick_place import BIN_PARTS  # noqa: E402
 
 TASK = "PiWbc-G1-PickPlace"
-FRAME_STEP = 2  # control steps per frame: 50 Hz control, 25 frames per second
-FPS = 25
+FPS = args.fps
+FRAME_STEP = 50 // FPS  # control steps per frame (50 Hz control)
 
 
 def tt(x):

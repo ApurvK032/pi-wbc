@@ -6,9 +6,10 @@ Layout (GR00T's `getting_started/data_preparation.md`, N1.6 branch; LeRobot v2.1
     data/chunk-000/episode_000000.parquet ...
     videos/chunk-000/observation.images.ego_view/episode_000000.mp4 ...
 
-One row per video frame: frame k shows the state that control step 2k's command was applied to
-(25 frames per second from 50 Hz control, D-043), and the row holds that step's joint positions
-(`observation.state`) and commands (`action`). The names follow GR00T N1.6's `unitree_g1` data
+One row per video frame: frame k shows the state that control step k x frame_step's command was
+applied to (25 frames per second from 50 Hz control, frame_step 2, D-043; or 50 per second,
+frame_step 1, D-048), and the row holds that step's joint positions (`observation.state`) and
+commands (`action`). The names follow GR00T N1.6's `unitree_g1` data
 config, and the state's 43 joints are in the same order as NVIDIA's G1 datasets:
 
 - state: left_leg, right_leg, waist, left_arm, left_hand, right_arm, right_hand (joint positions);
@@ -24,8 +25,9 @@ from pathlib import Path
 
 import numpy as np
 
-FPS = 25
-FRAME_STEP = 2  # control steps per frame
+CONTROL_HZ = 50
+FPS = 25  # the default rate (D-043); 50 is the other (D-048)
+FRAME_STEP = CONTROL_HZ // FPS  # control steps per frame
 CHUNK = 1000  # episodes per chunk folder
 VIDEO_KEY = "observation.images.ego_view"
 TASK_COLUMN = "annotation.human.task_description"
@@ -89,7 +91,7 @@ def modality() -> dict:
     }
 
 
-def features(width: int, height: int) -> dict:
+def features(width: int, height: int, fps: int = FPS) -> dict:
     """LeRobot v2.1 info.json features: every parquet column, plus the video."""
 
     def scalar(dtype):
@@ -106,7 +108,7 @@ def features(width: int, height: int) -> dict:
                 "video.codec": "h264",
                 "video.pix_fmt": "yuv420p",
                 "video.is_depth_map": False,
-                "video.fps": FPS,
+                "video.fps": fps,
                 "video.channels": 3,
                 "has_audio": False,
             },
@@ -128,12 +130,14 @@ def features(width: int, height: int) -> dict:
     }
 
 
-def frames_of(steps: int) -> np.ndarray:
+def frames_of(steps: int, frame_step: int = FRAME_STEP) -> np.ndarray:
     """Control steps shown by the frames of an episode with `steps` control steps."""
-    return np.arange(0, steps, FRAME_STEP)
+    return np.arange(0, steps, frame_step)
 
 
-def episode_arrays(ep: dict, meta: dict) -> tuple[np.ndarray, np.ndarray]:
+def episode_arrays(
+    ep: dict, meta: dict, frame_step: int = FRAME_STEP
+) -> tuple[np.ndarray, np.ndarray]:
     """(state, action) per frame of one recorded episode, float32, in the export's layout."""
     joints = list(meta["joint_names"])
     if joints != STATE_NAMES:
@@ -141,7 +145,7 @@ def episode_arrays(ep: dict, meta: dict) -> tuple[np.ndarray, np.ndarray]:
     arm_hand = list(meta["arm_hand_names"])
     pick = [arm_hand.index(n) for g in ("left_arm", "right_arm", "left_hand", "right_hand")
             for n in ACTION_GROUPS[g]]  # fmt: skip
-    k = frames_of(len(ep["phase"]))
+    k = frames_of(len(ep["phase"]), frame_step)
     body = ep["cmd_body"][k]  # pelvis height, waist yaw, roll, pitch
     action = np.concatenate(
         [ep["cmd_arm_hand"][k][:, pick], body[:, 1:4], body[:, :1], ep["cmd_velocity"][k]], axis=1
@@ -149,7 +153,7 @@ def episode_arrays(ep: dict, meta: dict) -> tuple[np.ndarray, np.ndarray]:
     return ep["joint_pos"][k].astype(np.float32), action.astype(np.float32)
 
 
-def episode_table(state, action, episode_index: int, first_index: int, task: int):
+def episode_table(state, action, episode_index: int, first_index: int, task: int, fps: int = FPS):
     """One episode's parquet table."""
     import pyarrow as pa
 
@@ -159,7 +163,7 @@ def episode_table(state, action, episode_index: int, first_index: int, task: int
     return pa.table({
         "observation.state": pa.array(list(state), type=pa.list_(pa.float32())),
         "action": pa.array(list(action), type=pa.list_(pa.float32())),
-        "timestamp": pa.array((t / FPS).astype(np.float32)),
+        "timestamp": pa.array((t / fps).astype(np.float32)),
         "frame_index": pa.array(t.astype(np.int64)),
         "episode_index": pa.array(np.full(n, episode_index, dtype=np.int64)),
         "index": pa.array((first_index + t).astype(np.int64)),
