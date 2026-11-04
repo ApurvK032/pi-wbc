@@ -20,16 +20,16 @@ under a vision-language-action model.</b></p>
 <p align="center">
   <img src="results/stage1/long_s2_turn_0.8.gif" alt="Turning in place at 0.8 rad/s" width="270">
   <img src="results/stage1/long_s2_kicks_walk_1.0.gif" alt="Kicked at 2 m/s while walking at 1 m/s" width="270">
-  <img src="results/stage1/long_s2_arms_walk.gif" alt="Walking while the arms move through their full range" width="270">
+  <img src="results/stage1/long_s2_arms_walk.gif" alt="Walking while the arms move through their trained range" width="270">
 </p>
 <p align="center"><em>The stage 1 controller, trained in Isaac Lab and run unchanged in plain MuJoCo on
 MuJoCo Menagerie's G1 model, which it never trained on: walking while turning, turning in place,
-kicked at 2 m/s while walking at 1 m/s, and walking while the arms sweep their full range.
-Training seed 2, recording seed 0, the first take.</em></p>
+kicked at 2 m/s while walking at 1 m/s, and walking while the arms sweep their trained range.
+Training seed 2, recording seed 0, the first take, on the fixed bench (D-040).</em></p>
 
-| **0** | **3** | **2.5 m/s** | **3.2 h** |
+| **1** | **3** | **2.5 m/s** | **3.2 h** |
 |:---:|:---:|:---:|:---:|
-| falls in 66,000 MuJoCo test episodes without kicks, with low friction, 1 kg in each hand, extra delay and sensor noise included | simulators the same policy runs in without retraining: Isaac Lab (Newton), Isaac Sim (PhysX) and MuJoCo | the largest kick survived at least 95% of the time on every training seed (98-99% of kicks) | of training per seed on one L40S GPU, 4096 robots in parallel |
+| fall in 66,000 MuJoCo test episodes without kicks, with low friction, 1 kg in each hand, extra delay and sensor noise included | simulators the same policy runs in without retraining: Isaac Lab (Newton), Isaac Sim (PhysX) and MuJoCo | the largest kick survived at least 95% of the time on every training seed (98.6%-99.4% of kicks) | of training for one seed on one L40S GPU, 4096 robots in parallel (seed 3: teacher 2.5 h, student 0.7 h) |
 
 > **Status: stage 1 of 5, the whole-body controller, is done.** A student policy that sees only
 > what a real G1 measures walks, turns, crouches, leans and keeps its balance while its arms
@@ -44,27 +44,34 @@ Training seed 2, recording seed 0, the first take.</em></p>
 
 ## Highlights
 
-- **Whole-body control from proprioception alone.** The deployed student sees what a real G1
+- **Whole-body control from proprioception alone.** The exported student sees what a real G1
   measures: the IMU and the joint encoders over the last 0.5 s, with sensor noise, and no base
-  velocity. It follows walking, turning, pelvis-height and torso commands while its arms and
-  hands move through their full range, with up to 1 kg in each hand.
+  velocity. It follows walking, turning, pelvis-height and torso commands while its arms move
+  through their trained range (beside and in front of the body) and its hands through their
+  full range, with up to 1 kg in each hand.
 - **Runs unchanged in two other simulators.** Trained on Isaac Lab's Newton physics, it is
   exported to ONNX and run as-is in plain MuJoCo, on MuJoCo Menagerie's independently built G1
-  model as well as its training model, and in Isaac Sim's PhysX engine. Without kicks it fell in
-  none of them (0 of 66,000 MuJoCo test episodes); walking errors agree to within 0.03 m/s.
+  model as well as its training model, and in Isaac Sim's PhysX engine. Without kicks it fell
+  once in 66,000 MuJoCo test episodes and never in Isaac Lab or PhysX; walking errors agree to
+  within 0.03 m/s.
 - **Robustness that is measured, not assumed.** Six domain-randomization groups and a curriculum.
   An ablation switches each one off in turn, on three training seeds, and measures what it buys:
-  without kicks in training, 92% of episodes with 1 m/s kicks end in a fall; without any
+  without kicks in training, 95% of episodes with 1 m/s kicks end in a fall; without any
   randomization, sensor noise alone floors the robot in 31% of episodes.
 - **Evaluated like a study, not a demo.** Three training seeds per configuration, development
-  seeds for every choice and frozen test seeds for final numbers only, 95% Wilson intervals,
-  and every result file stamped with its commit, package versions and GPU. 29 decisions are
-  logged with what each one cost.
-- **Debugged in the open.** Four problems were found and fixed on the way (slow walking, falls
-  at full arm ranges, too short a history, lost turning), each traced to its cause with an
-  experiment; one fix that did not work is kept as a negative result.
+  seeds for choices and frozen test seeds reported in full for every candidate recipe (one
+  problem first seen there led to D-024), 95% Wilson intervals, and result files stamped with
+  their commit, code hash, package versions and GPU. 40 decisions are logged with what each one
+  cost.
+- **Debugged in the open.** Four problems were found and fixed on the way (slow walking, falls at
+  full arm ranges, too short a history, lost turning), each traced to its cause with an
+  experiment; one fix that did not work is kept as a negative result. An audit of the MuJoCo test
+  bench then found eight faults, among them the feet of one robot model standing on the wrong
+  friction and IMU readings one 2.5 ms physics step old; every published bench number was rerun
+  after the fixes (D-039, D-040), and turning in place, which one seed had met, now misses on all
+  three.
 - **Built for a cluster.** The same commit trains on a workstation (RTX 4070) and on a Slurm
-  cluster (L40S) through an Apptainer container, with resumable jobs.
+  cluster (L40S) through an Apptainer container, with jobs that restart from checkpoints.
 
 ## The project
 
@@ -107,14 +114,17 @@ flowchart LR
 1. **Commands a VLA can send.** Base velocity (forward -0.5 to 1.0 m/s, sideways ±0.5 m/s, yaw
    rate ±1.0 rad/s), pelvis height 0.50-0.78 m and torso roll, pitch and yaw, as in NVIDIA's
    Decoupled WBC. The policy drives the 12 leg and 3 waist joints at 50 Hz; the arms and hands
-   follow their own joint targets, and the legs learn to keep balance whatever the arms do.
+   follow their own joint targets, and the legs learn to keep balance whatever the arms do
+   within their trained range.
 2. **A human-like gait.** A gait clock and Unitree's G1 rewards turn the first policy's fast
    shuffle into a walk of about 2.5 steps per second. Each reward term's weight, source and
    reason are in the [design](docs/STAGE1_DESIGN.md#5-gait-how-the-robot-is-told-to-walk-like-a-person).
-3. **A curriculum.** Command ranges, arm motion and kick size grow as the robot copes; the
-   teacher then trains 7000 more iterations at the full ranges (D-028).
-4. **Domain randomization in six groups:** friction, link masses and centre of mass, motor gains,
-   action delay, sensor noise, and kicks. Each can be switched off on its own for the ablation.
+3. **A curriculum.** Pelvis-height and torso ranges, arm motion and kick size grow as the robot
+   copes (the velocity ranges are full from the start); the teacher then trains 7000 more
+   iterations at the full ranges (D-028).
+4. **Domain randomization in six groups:** friction, link masses and centre of mass, PD gains and
+   joint armature, action delay, sensor noise, and kicks. Each can be switched off on its own for
+   the ablation.
 5. **Teacher and student.** The teacher learns with PPO from privileged state that a real robot
    cannot measure. The student, which sees only proprioception, is distilled from it
    DAgger-style: it acts, and the teacher labels what it should have done.
@@ -141,18 +151,19 @@ The design's finish line, on the frozen MuJoCo test seeds (1000-1199, 4400 episo
 | Measure | Target | Seed 1 | Seed 2 | Seed 3 | Met |
 |---|---|---|---|---|---|
 | Falls, all commands | upper 95% bound below 5% | 0/4400 | 0/4400 | 0/4400 | yes: 0 of 13,200 (0.00%-0.03%) |
-| Speed error, walking 1 m/s | at most 0.15 m/s | 0.12 / 0.11 | 0.10 / 0.09 | 0.05 / 0.04 | yes |
-| Speed error, walking 0.5 m/s | at most 0.15 m/s | 0.05 / 0.04 | 0.05 / 0.04 | 0.04 / 0.04 | yes |
-| Speed error, sideways 0.3 m/s | at most 0.15 m/s | 0.07 / 0.08 | 0.08 / 0.10 | 0.05 / 0.07 | yes |
-| Turn-rate error, 0.8 rad/s in place | at most 0.2 rad/s | 0.19 / 0.19 | 0.25 / 0.24 | 0.22 / 0.22 | seed 1 (D-029) |
-| Step rate at 1 m/s | 1.5-3 steps/s | 2.4 / 2.4 | 2.5 / 2.5 | 2.4 / 2.4 | yes |
-| Step length at 1 m/s | at least 30 cm | 37 / 38 cm | 37 / 38 cm | 40 / 41 cm | yes |
-| Foot lift at 1 m/s | at least 5 cm | 7.1 / 7.3 cm | 7.3 / 7.5 cm | 6.8 / 6.9 cm | yes |
-| Slip at the sole, 1 m/s | at most 0.1 m/s | 0.04 / 0.02 | 0.05 / 0.01 | 0.05 / 0.02 | yes |
-| Arm joint error, arms moving while walking | report | 0.039 / 0.033 rad | 0.039 / 0.033 rad | 0.038 / 0.033 rad | - |
+| Speed error, walking 1 m/s | at most 0.15 m/s | 0.10 / 0.10 | 0.09 / 0.09 | 0.05 / 0.04 | yes |
+| Speed error, walking 0.5 m/s | at most 0.15 m/s | 0.05 / 0.04 | 0.05 / 0.04 | 0.03 / 0.04 | yes |
+| Speed error, sideways 0.3 m/s | at most 0.15 m/s | 0.08 / 0.08 | 0.09 / 0.10 | 0.07 / 0.07 | yes |
+| Turn-rate error, 0.8 rad/s in place | at most 0.2 rad/s | 0.21 / 0.19 | 0.29 / 0.26 | 0.24 / 0.22 | no (D-029, D-040) |
+| Step rate at 1 m/s | 1.5-3 steps/s | 2.4 / 2.4 | 2.5 / 2.5 | 2.4 / 2.5 | yes |
+| Step length at 1 m/s | at least 30 cm | 38 / 38 cm | 37 / 37 cm | 40 / 40 cm | yes |
+| Foot lift at 1 m/s (the ankle's rise) | at least 5 cm | 7.1 / 7.1 cm | 7.3 / 7.5 cm | 6.8 / 6.8 cm | yes |
+| Slip at the sole, 1 m/s | at most 0.1 m/s | 0.03 / 0.01 | 0.07 / 0.02 | 0.03 / 0.01 | yes |
+| Arm joint error, arms moving while walking | report | 0.039 / 0.033 rad | 0.039 / 0.033 rad | 0.039 / 0.033 rad | - |
 
-Every target is met on every seed except turning in place, which seed 1 meets and seeds 2 and
-3 miss by 0.02-0.05 rad/s; it is accepted as a known limit (D-029).
+Every target is met on every seed except turning in place, which every seed misses by
+0.01-0.09 rad/s (seed 1 meets it on Newton's model only); it is accepted as a known limit
+(D-029). Seed 1 met it on both models before the bench fixes of D-040.
 
 ### Robustness
 
@@ -168,13 +179,13 @@ condition) with 95% Wilson intervals, against the two earlier recipes:
 
 | Condition | Warm-up students (D-021) | B2 students (D-022) | Stage 1 controller (D-028) |
 |---|---|---|---|
-| nominal | 1 / 5 / 0 (0.02%-0.10%) | 39 / 6 / 1 (0.26%-0.46%) | **0 / 0 / 0 (0.00%-0.03%)** |
-| floor friction 0.4 | 1 / 21 / 5 (0.14%-0.30%) | 28 / 2 / 2 (0.17%-0.34%) | **0 / 0 / 0 (0.00%-0.03%)** |
-| 1 kg in each hand | 4 / 16 / 3 (0.12%-0.26%) | 58 / 14 / 16 (0.54%-0.82%) | **0 / 0 / 0 (0.00%-0.03%)** |
-| 20 ms extra delay | 0 / 2 / 0 (0.00%-0.06%) | 19 / 3 / 0 (0.11%-0.25%) | **0 / 0 / 0 (0.00%-0.03%)** |
-| sensor noise | 1 / 6 / 0 (0.03%-0.11%) | 9 / 0 / 2 (0.05%-0.15%) | **0 / 0 / 0 (0.00%-0.03%)** |
-| 1 m/s kicks every 4 s | 84 / 106 / 66 (1.72%-2.19%) | 50 / 59 / 33 (0.91%-1.27%) | **3 / 7 / 1 (0.05%-0.15%)** |
-| 2 m/s kicks every 4 s | 254 / 298 / 241 (5.61%-6.43%) | 227 / 259 / 168 (4.60%-5.34%) | **27 / 30 / 17 (0.45%-0.70%)** |
+| nominal | 0 / 10 / 2 (0.05%-0.16%) | 49 / 4 / 1 (0.31%-0.53%) | **0 / 0 / 0 (0.00%-0.03%)** |
+| floor friction 0.4 | 2 / 15 / 5 (0.11%-0.25%) | 30 / 3 / 0 (0.18%-0.35%) | **0 / 0 / 0 (0.00%-0.03%)** |
+| 1 kg in each hand | 4 / 11 / 5 (0.10%-0.23%) | 55 / 16 / 8 (0.48%-0.75%) | **0 / 0 / 0 (0.00%-0.03%)** |
+| 20 ms extra delay | 0 / 9 / 1 (0.04%-0.14%) | 22 / 3 / 2 (0.14%-0.30%) | **0 / 0 / 0 (0.00%-0.03%)** |
+| sensor noise | 0 / 4 / 2 (0.02%-0.10%) | 9 / 1 / 0 (0.04%-0.14%) | **1 / 0 / 0 (0.00%-0.04%)** |
+| 1 m/s kicks every 4 s | 90 / 146 / 85 (2.18%-2.71%) | 71 / 96 / 77 (1.63%-2.09%) | **8 / 10 / 3 (0.10%-0.24%)** |
+| 2 m/s kicks every 4 s | 254 / 317 / 235 (5.71%-6.53%) | 248 / 331 / 159 (5.21%-6.00%) | **14 / 14 / 10 (0.21%-0.39%)** |
 
 <p align="center">
 <picture>
@@ -183,10 +194,12 @@ condition) with 95% Wilson intervals, against the two earlier recipes:
 </picture>
 </p>
 
-The largest kick survived at least 95% of the time is 2.5 m/s on every seed (98-99% of kicks
-survived at 2.5 m/s, 85-94% at 3 m/s); the B2 students' was 2.0 m/s (92-95% at 2.5). One
-weakness: walking at 0.5 m/s on Menagerie's model, seed 1 trips over gentle 0.5 m/s kicks in 30
-of 200 episodes, though never over 1 m/s kicks there; the cause was not investigated.
+The largest kick survived at least 95% of the time is 2.5 m/s on every seed (98.6%-99.4% of
+kicks survived at 2.5 m/s, 87%-95% at 3 m/s); the B2 students' was 2.0 m/s (91%-94% at 2.5).
+Episodes with kicks run 23 s, so the last kick, at 19 s, is watched for 4 s like the others.
+One weakness: walking at 0.5 m/s on Menagerie's model, seed 1 trips over gentle 0.5 m/s kicks
+in 10 of 200 episodes, though never over 1 m/s kicks there (30 of 200 before the bench fixes;
+the cause of the rest is not known).
 
 ### One policy, three simulators
 
@@ -204,13 +217,14 @@ models (Menagerie's G1 and the training model).
 |---|---|---|
 | nominal robot | 0 / 0 / 0 | 0 / 0 / 0 |
 | 1 m/s kicks | 0 / 0 / 0 (0.0%-0.2%) | 2 / 0 / 3 (0.1%-0.7%) |
-| 2 m/s kicks | 1 / 1 / 2 (0.1%-0.6%) | 25 / 38 / 22 (4.2%-6.3%) |
+| 2 m/s kicks | 1 / 1 / 5 (0.2%-0.9%) | 27 / 39 / 22 (4.3%-6.5%) |
 
 Newton's solver is MuJoCo-Warp, so MuJoCo is the nearer transfer (its harder part is the
 independently built Menagerie model); PhysX, with its own contact model and solver, is the
-harder one. Walking transfers to PhysX with no loss. Hard kicks transfer less well: 5% of
-episodes with 2 m/s kicks end in a fall on PhysX against 0.2% on Newton, though that is a third
-of the previous students' rate on PhysX (15%).
+harder one. Walking transfers to PhysX with little loss (speed errors within 0.03 m/s of
+Newton's). Hard kicks transfer less well: 5% of episodes with 2 m/s kicks end in a fall on
+PhysX against 0.4% on Newton, though that is a third of the previous students' rate on PhysX
+(16%). Kick episodes run 23 s on every engine.
 
 ### What each part of training buys
 
@@ -224,17 +238,18 @@ of the previous students' rate on PhysX (15%).
 Each row is the step 4 recipe (before the fixes below) trained without one part, three seeds
 each. Seen on every seed:
 
-- **Kicks in training are what keep it up when kicked:** without them 92% of episodes with
-  1 m/s kicks end in a fall, against 1.9%.
+- **Kicks in training are what keep it up when kicked:** without them 95% of episodes with
+  1 m/s kicks end in a fall, against 2.4%.
 - **Randomization costs precision.** Without any, sensor noise floors the robot in 31% of
-  episodes, but it walks more precisely (speed error at 1 m/s 0.10-0.13 m/s against 0.17-0.23).
-- **Without friction randomization, falls to kicks triple.** Without the curriculum, or without
-  the teacher (PPO alone), the turning error about doubles.
+  episodes, but it walks more precisely (speed error at 1 m/s 0.10-0.14 m/s against 0.16-0.22).
+- **Without friction randomization, falls to kicks rise 2.6-2.9 times** (pooled). Without the
+  curriculum, or without the teacher (PPO alone), the turning error about doubles.
 - **Two surprises.** The student trained without a teacher fell least of all to 1 m/s kicks
-  (9 / 8 / 6 falls against 84 / 106 / 66 for the full recipe), and the one trained without sensor
-  noise fell less to kicks of both sizes (1 m/s: 37 / 32 / 27; 2 m/s: 201 / 198 / 83 against
-  254 / 298 / 241) while still rarely falling to noise. So here the teacher bought precise command following, not
-  robustness, and noise randomization cost some push recovery. Neither cause was tested.
+  (3 / 4 / 8 falls against 90 / 146 / 85 for the full recipe), though not to 2 m/s kicks (164 /
+  214 / 493 against 254 / 317 / 235: fewer on two seeds, twice as many on the third). The one
+  trained without sensor noise fell less to kicks of both sizes (1 m/s: 31 / 53 / 29; 2 m/s:
+  84 / 258 / 116) and more to sensor noise, though still rarely (48 against 6 of 13,200). So
+  noise randomization seems to cost some push recovery; neither cause was tested.
 
 ## What went wrong on the way, and the fixes
 
@@ -249,10 +264,10 @@ Each fix is a decision in [docs/DECISIONS.md](docs/DECISIONS.md), with what it c
 
 | Problem | Cause found | Fix | Result |
 |---|---|---|---|
-| Students walked at 86% of the commanded speed | the speed reward still paid 92% at 0.14 m/s off | a second, narrower speed reward (D-022) | speed error at 1 m/s 0.21 → 0.10 m/s |
-| Falls with the arms moving over their full range | the curriculum stopped at 70-80% of the ranges | train the teachers on to the full ranges (D-024) | teachers fell in 3 of 9900 test episodes |
-| Students of those teachers walked slower | 0.12 s of history was too short | 0.5 s of history (D-026) | falls 53 → 6 (nominal) and 285 → 84 (randomized) of 9900 |
-| Turning in place dropped to 0.31-0.47 rad/s for 0.8 | the teachers were undertrained at the full ranges (figure above) | train them 7 times longer there (D-028) | 0.57-0.70 rad/s, and no falls in 66,000 test episodes without kicks |
+| Students walked at 86% of the commanded speed | the speed reward still paid 92% at 0.14 m/s off | a second, narrower speed reward (D-022) | speed error at 1 m/s 0.19 → 0.10 m/s (test seeds, mean of three) |
+| Falls with the arms moving over their full trained range | the curriculum stopped at 70-80% of the ranges | train the teachers on to the full ranges (D-024) | teachers fell in 3 of 9900 Isaac Lab episodes |
+| Students of those teachers walked slower | 0.12 s of history was too short | 0.5 s of history (D-026) | seed 1 walks at 1.00 m/s asked 1.0, against 0.71 (Isaac Lab; one seed compared) |
+| Turning in place dropped to 0.31-0.47 rad/s for 0.8 | the teachers were undertrained at the full ranges (figure above) | train them 7 times longer there (D-028) | 0.57-0.70 rad/s in Isaac Lab (0.56-0.72 in MuJoCo), and 1 fall in 66,000 MuJoCo test episodes without kicks |
 | Tried and dropped: a narrow turning reward | it helped one seed and hurt two | stays off (D-027) | a negative result, kept |
 
 <p align="center">
@@ -278,7 +293,7 @@ uv run pytest
 |---|---|---|
 | Teacher (3000 iterations) and a first student, one seed | `OVERRIDES="env.rewards.track_lin_vel_xy_fine.weight=0.5" scripts/teacher_student_local.sh 3000 1000 results/mine b2 1` | about 1.5 h on an RTX 4070 |
 | That teacher 7000 more iterations at the full ranges, then the final student | `CONTINUE_FROM="logs/rsl_rl/pi_wbc_g1_teacher/pc-b2-teacher-s{seed}-3000it/model_2999.pt" OVERRIDES="env.rewards.track_lin_vel_xy_fine.weight=0.5 env.observations.policy.history_length=25" scripts/teacher_student_local.sh 7000 3000 results/mine final 1` | about 4 h on an RTX 4070 (estimated) |
-| The same on a Slurm cluster | `msi/jobs/teacher_student.sbatch` ([docs/MSI.md](docs/MSI.md)) | 3.2 h per seed on an L40S |
+| The same on a Slurm cluster | `msi/jobs/teacher_student.sbatch` ([docs/MSI.md](docs/MSI.md)) | 3.2 h for seed 3 on an L40S |
 | Frozen MuJoCo test seeds | `scripts/test_seeds.sh final-s1 logs/rsl_rl/pi_wbc_g1_student/pc-final-student-ramp-s1-3000it/exported results/mine` | about 1.5 h on 7 CPU threads |
 | Isaac Sim PhysX check | `scripts/isaacsim_env.sh`, then `pi-wbc-isaac-eval ... physics=isaacsim_physx` | about 10 min per seed |
 | Tables and figures | `uv run python scripts/figures.py` | seconds |
@@ -302,12 +317,13 @@ uv run pytest
 
 - **Simulation only.** Transfer is sim-to-sim (Newton to PhysX and MuJoCo); nothing has run on a
   real G1.
-- **Flat ground only.** No stairs, slopes or rough terrain; Isaac Lab's Newton backend supports
-  flat-terrain locomotion in this release.
-- **Turning in place falls short.** Asked for 0.8 rad/s, the students turn at 0.57-0.73 rad/s;
-  two seeds of three miss the design's 0.2 rad/s turn-error target (D-029).
+- **Flat ground only.** No stairs, slopes or rough terrain: the stage 3 task is on a flat
+  floor, and Newton's rough-terrain support is newer (D-015).
+- **Turning in place falls short.** Asked for 0.8 rad/s, the students turn at 0.56-0.72 rad/s
+  in MuJoCo (0.57-0.70 in Isaac Lab); every seed misses the design's 0.2 rad/s turn-error
+  target, by 0.01-0.09 rad/s (D-029, D-040).
 - **Hard kicks depend on the engine.** At 2 m/s, 5% of episodes on PhysX end in a fall against
-  0.2% on Newton: the controller's push recovery is partly tuned to its training physics.
+  0.4% on Newton: the controller's push recovery is partly tuned to its training physics.
 - **The arms are position-controlled.** They follow joint targets; there is no wrist-pose or
   force control yet, and in training the hands only move to random poses.
 - **Three seeds per configuration.** Enough to trust differences seen on every seed, which is
@@ -320,7 +336,7 @@ uv run pytest
 | 0 | Setup: Isaac Lab training, MuJoCo sim-to-sim bench, cluster jobs ([results](results/stage0/README.md)) | done |
 | 1 | Whole-body controller: PPO, rewards, curriculum, domain randomization, teacher-student ([results](results/stage1/README.md)) | done |
 | 2 | Human motion imitation from retargeted motion capture | planned |
-| 3 | Pick-and-place task, scripted expert, rendered demonstrations | planned |
+| 3 | Pick-and-place task, scripted expert, rendered demonstrations | in progress |
 | 4 | VLA fine-tuning (GR00T N1.6, π0.5) and closed-loop evaluation | planned |
 | 5 | Failure attribution study and controller swap against NVIDIA's controller | planned |
 
