@@ -2,8 +2,10 @@
 
 A state machine per environment over the simulator's true state. Every control step it writes
 the high level's commands (`pi_wbc.tasks.g1_pick_place.HighLevel`): base velocity while walking,
-the body pose (a torso lean to reach the table), and the right arm and hand joint targets. The
-left arm and hand stay at the default pose.
+the body pose (a torso lean to reach the table), and one arm's and hand's joint targets: the right,
+or the left for an object next to the right-hand bin (the right hand, coming in from the object's
+right, would meet that bin's wall); everything about the grasp is then mirrored. The other arm
+and hand stay at the default pose.
 
 Phases: walk to the object's stance, settle, raise the hand in front of the chest while leaning,
 reach above the object, lower beside it, close, lift; straighten, walk to the bin's stance,
@@ -39,6 +41,11 @@ RIGHT_HAND = [
 ]  # fmt: skip
 HAND_OPEN = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.72, 0.0])  # fingers straight, thumb back
 HAND_CLOSED = np.array([1.2, 1.2, 1.2, 1.2, 0.0, -1.0, -0.9])
+SIDES = ("right", "left")
+HAND_JOINTS = {side: [j.replace("right_", f"{side}_", 1) for j in RIGHT_HAND] for side in SIDES}
+# the left arm and hand mirror the right across the robot's sagittal plane: their palm frames
+# match, the object sits at -y in the left palm, and every finger joint's sign flips
+MIRROR = {"right": 1.0, "left": -1.0}
 
 # Leaning moves the pelvis (the controller steps back a little), so the robot walks to its
 # stance upright, leans, and then steps onto the stance again with the lean held ("align").
@@ -49,13 +56,19 @@ PHASES = (
 )  # fmt: skip
 P = {name: i for i, name in enumerate(PHASES)}
 # "no_plan" is the expert's own failure (its stance left the target out of reach)
-LABELS = ("success", "fell", "knocked", "missed_grasp", "dropped", "wrong_bin", "timed_out",
-          "no_plan")  # fmt: skip
+# "knocked_other": an object other than the target was pushed (a demonstration must not do that)
+LABELS = ("success", "fell", "knocked", "knocked_other", "missed_grasp", "dropped", "wrong_bin",
+          "timed_out", "no_plan")  # fmt: skip
 
 
 @dataclass(frozen=True)
 class ExpertParams:
-    stance_rel: tuple[float, float] = (0.40, -0.18)  # object in the robot's heading frame
+    stance_rel: tuple[float, float] = (0.40, -0.18)  # object in the robot's heading frame (right
+    # hand; mirrored for the left)
+    hand_room: float | None = 0.12  # free space the right hand needs beside the target, on its
+    # side, to the nearest other object's edge or bin wall (m). The left hand when there is
+    # less and the left side has more; None: always the right. With under 10 cm the right hand
+    # succeeded 50-64% (hand hits the bin wall or the neighbour), with more 95-99%
     lean: float = 0.28  # waist pitch while reaching (rad; trained up to 0.45)
     # pelvis height at the table, from leaning to the lift (m; None: the nominal 0.78). Reaching
     # down beside the object tips the pelvis back up to 0.17 rad (the controller balancing the
@@ -87,6 +100,11 @@ class ExpertParams:
     retract_rise_s: float = 0.8
     retract_back: float = 0.15  # then moves this far back toward the body (heading frame), so
     retract_back_s: float = 0.8  # lowering the arm doesn't sweep through the bin (was 0)
+    retract_clear_x: float | None = -0.15  # pull the raised hand back toward this x (table
+    # frame: in front of the table's edge), as far as the arm reaches, before lowering it; None:
+    # back by retract_back only. Lowering from over the table swept through other objects (23
+    # of 128 training episodes with the old retract, 3 with this)
+    other_knock_dist: float | None = 0.02  # another object moved this far: knocked_other
     walk_timeout_s: float = 30.0
     episode_timeout_s: float = 60.0
     body_smooth: float = 1.0  # per step (1: the IK follows the measured body; 0.1, a ~0.2 s
@@ -134,6 +152,25 @@ def _rz(yaw: float) -> np.ndarray:
     return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
 
 
+def _side_room(lay: L.Layout) -> dict[str, float]:
+    """Free space beside the target object on its right (-y) and left (+y) side: from its centre
+    to the nearest other object's edge or bin wall (the bins' inner walls face the table at
+    y = +-(BIN_Y - BIN_SIZE[1] / 2)). All objects stand within a hand's length in x."""
+    _, ty, _ = lay.object_pos(lay.target_object)
+    wall = L.BIN_Y - L.BIN_SIZE[1] / 2
+    room = {"right": ty + wall, "left": wall - ty}
+    for name in lay.objects:
+        if name == lay.target_object:
+            continue
+        _, oy, _ = lay.object_pos(name)
+        r = L.OBJECTS[name]["radius"]
+        if oy < ty:
+            room["right"] = min(room["right"], ty - oy - r)
+        else:
+            room["left"] = min(room["left"], oy - r - ty)
+    return room
+
+
 class Expert:
     def __init__(self, env, high_level, export_dir: str | Path, params: ExpertParams | None = None):
         self.base = env.unwrapped
@@ -144,24 +181,33 @@ class Expert:
         self.dt = base.step_dt
         self.robot = base.scene["robot"]
         export_dir = Path(export_dir)
-        self.iks = [
-            ArmIK(
-                export_dir / "newton_model.xml",
-                export_dir / "policy_io.json",
-                "right",
-                w_rot=self.p.ik_w_rot,
-            )
-            for _ in range(self.n)
-        ]
+        self.ik_pool = {
+            side: [
+                ArmIK(
+                    export_dir / "newton_model.xml",
+                    export_dir / "policy_io.json",
+                    side,
+                    w_rot=self.p.ik_w_rot,
+                )
+                for _ in range(self.n)
+            ]
+            for side in SIDES
+        }
+        self.side = ["right"] * self.n  # the hand each environment uses (chosen at reset)
+        self.iks = list(self.ik_pool["right"])  # each environment's IK, for its hand
         names = list(self.robot.joint_names)
         self.joint_names = names
-        self.arm_ids = [names.index(j) for j in RIGHT_ARM]
-        self.hand_slots = high_level.index(RIGHT_HAND)
-        self.arm_slots = high_level.index(RIGHT_ARM)
-        self.palm = self.robot.find_bodies("right_hand_palm_link")[0][0]
+        self.arm_ids_of = {s: [names.index(j) for j in arm_joint_names(s)] for s in SIDES}
+        self.hand_slots_of = {s: high_level.index(HAND_JOINTS[s]) for s in SIDES}
+        self.arm_slots_of = {s: high_level.index(arm_joint_names(s)) for s in SIDES}
+        self.palm_of = {s: self.robot.find_bodies(f"{s}_hand_palm_link")[0][0] for s in SIDES}
+        self.palm_idx = torch.full((self.n,), self.palm_of["right"], device=self.dev)
         self.objects = [base.scene[f"obj_{name}"] for name in L.OBJECT_NAMES]
-        self.q_hang = np.array([float(high_level.upper.default[high_level.index([j])[0]])
-                                for j in RIGHT_ARM])  # fmt: skip
+        default = high_level.upper.default
+        self.q_hang_of = {
+            s: np.array([float(default[high_level.index([j])[0]]) for j in arm_joint_names(s)])
+            for s in SIDES
+        }
         self.nominal_height = float(high_level.body.nominal[0])
         self.left_pitch_slot = high_level.index(["left_shoulder_pitch_joint"])[0]
         self.left_pitch_default = float(high_level.upper.default[self.left_pitch_slot])
@@ -171,12 +217,15 @@ class Expert:
         self.age = np.zeros(n, dtype=int)  # steps in the episode
         self.label = [None] * n
         self.failed_in: list[str | None] = [None] * n  # the phase a failure happened in
-        self.q_ik = [self.q_hang.copy() for _ in range(n)]
+        self.q_ik = [self.q_hang_of["right"].copy() for _ in range(n)]
         self.q_corr = torch.zeros(n, 7, device=self.dev)
         self.hand = np.tile(HAND_OPEN, (n, 1))
         self.plan: list[dict] = [{} for _ in range(n)]
         self.goal = torch.zeros(n, 3, device=self.dev)
         self.obj_start = torch.zeros(n, 3, device=self.dev)
+        n_obj = len(L.OBJECT_NAMES)
+        self.others = torch.zeros(n, n_obj, dtype=torch.bool, device=self.dev)
+        self.others_start = torch.zeros(n, n_obj, 3, device=self.dev)
         self.obj_in_palm = [np.zeros(3) for _ in range(n)]
         self.target_k = np.zeros(n, dtype=int)
         self.tries = np.zeros(n, dtype=int)
@@ -211,34 +260,72 @@ class Expert:
         return self._env_pos(pos[rows, torch.as_tensor(self.target_k, device=self.dev)])
 
     def _palm_pose(self):
-        return (self._env_pos(self.robot.data.body_link_pos_w.torch[:, self.palm]),
-                self.robot.data.body_link_quat_w.torch[:, self.palm])  # fmt: skip
+        rows = torch.arange(self.n, device=self.dev)
+        return (self._env_pos(self.robot.data.body_link_pos_w.torch[rows, self.palm_idx]),
+                self.robot.data.body_link_quat_w.torch[rows, self.palm_idx])  # fmt: skip
+
+    # -- the hand an environment uses, and the grasp mirrored for it -------------------------------
+    def _m(self, i: int) -> float:
+        return MIRROR[self.side[i]]
+
+    def _arm_ids(self, i: int) -> list[int]:
+        return self.arm_ids_of[self.side[i]]
+
+    def _q_hang(self, i: int) -> np.ndarray:
+        return self.q_hang_of[self.side[i]]
+
+    def _grasp_in_palm(self, i: int) -> np.ndarray:
+        x, y, z = self.p.grasp_in_palm
+        return np.array([x, self._m(i) * y, z])
+
+    def _stance_rel(self, i: int) -> tuple[float, float]:
+        x, y = self.p.stance_rel
+        return (x, self._m(i) * y)
+
+    def _hand_open(self, i: int) -> np.ndarray:
+        return self._m(i) * HAND_OPEN
+
+    def _hand_closed(self, i: int) -> np.ndarray:
+        return self._m(i) * HAND_CLOSED
 
     def reset(self, env_ids) -> None:
         # tensors replaced during an inference-mode rollout can't be changed in place outside it
-        for name in ("q_corr", "goal", "obj_start", "body_pos", "body_quat", "body_q"):
+        for name in ("q_corr", "goal", "obj_start", "others", "others_start", "body_pos",
+                     "body_quat", "body_q"):  # fmt: skip
             setattr(self, name, getattr(self, name).clone())
         layouts = self.base.pick_place_layouts
         for i in env_ids:
             lay = layouts[i]
+            room = _side_room(lay)
+            left = self.p.hand_room is not None and (
+                room["right"] < self.p.hand_room and room["left"] > room["right"]
+            )
+            self.side[i] = "left" if left else "right"
+            self.iks[i] = self.ik_pool[self.side[i]][i]
+            self.palm_idx[i] = self.palm_of[self.side[i]]
             self.phase[i] = P["walk_obj"]
             self.t[i] = self.age[i] = 0
             self.label[i] = None
             self.failed_in[i] = None
-            self.q_ik[i] = self.q_hang.copy()
-            self.hand[i] = HAND_OPEN
+            self.q_ik[i] = self._q_hang(i).copy()
+            self.hand[i] = self._hand_open(i)
             self.plan[i] = {}
             self.tries[i] = 0
             self.paused[i] = 0
             self.left_back[i] = 0.0
-            self.notes[i] = {}
+            room_cm = {k: round(v * 100, 1) for k, v in room.items()}
+            self.notes[i] = {"hand": self.side[i], "room_cm": room_cm}
             self.trace[i].clear()
             self.target_k[i] = L.OBJECT_NAMES.index(lay.target_object)
             obj = torch.tensor(lay.object_pos(lay.target_object)[:2], device=self.dev)[None]
-            self.goal[i] = nav.stance_for(obj, self.p.stance_rel, torch.zeros(1, device=self.dev))[
-                0
-            ]
+            zero = torch.zeros(1, device=self.dev)
+            self.goal[i] = nav.stance_for(obj, self._stance_rel(i), zero)[0]
             self.obj_start[i] = torch.tensor(lay.object_pos(lay.target_object), device=self.dev)
+            for k, name in enumerate(L.OBJECT_NAMES):  # the other objects on the table
+                on_table = name in lay.objects and name != lay.target_object
+                self.others[i, k] = on_table
+                if on_table:
+                    self.others_start[i, k] = torch.tensor(lay.object_pos(name), device=self.dev)
         self.q_corr[env_ids] = 0.0
         self._snap_body(env_ids)
         self.hl.reset(env_ids)
@@ -273,8 +360,8 @@ class Expert:
         rot = _rz(yaw)  # handshake: palm frame = the robot's heading frame
         obj = self._target_obj_pos()[i].cpu().numpy()
         center = np.array([obj[0], obj[1], L.TABLE_TOP + p.grasp_height])
-        grasp = center - rot @ np.array(p.grasp_in_palm)
-        out = grasp - p.slide_in * rot[:, 1]  # 2.5 cm further from the object, then slide in
+        grasp = center - rot @ self._grasp_in_palm(i)
+        out = grasp - self._m(i) * p.slide_in * rot[:, 1]  # further from the object, then slide in
         up = np.array([0.0, 0.0, 1.0])
         pre = out + p.pre_up * up
         pelvis_pos = self._env_pos(self.robot.data.root_pos_w.torch)[i].cpu().numpy()
@@ -284,12 +371,12 @@ class Expert:
         start = pre.copy()  # in front of the chest, on the grasp's line, at the descent's height
         start[:2] = pelvis + rot[:2, :2] @ np.array([p.raise_x, grasp_rel[1]])
         self._ik_state(i)  # the IK's model at the measured body against the measured palm
-        q_now = self.robot.data.joint_pos.torch[i, self.arm_ids].cpu().numpy()
+        q_now = self.robot.data.joint_pos.torch[i, self._arm_ids(i)].cpu().numpy()
         model_palm, _ = ik.palm_pose(q_now)
         miss = self._palm_pose()[0][i].cpu().numpy() - model_palm
         self.notes[i]["palm_model_err_cm"] = np.round(miss * 100, 1).tolist()
         self._ik_state(i, waist_pitch=p.lean)
-        g = ik.solve(grasp, rot, self.q_hang, iters=400)
+        g = ik.solve(grasp, rot, self._q_hang(i), iters=400)
         if g.pos_err > 0.01 or g.rot_err > 0.05:
             return False
         q = g.q
@@ -301,7 +388,7 @@ class Expert:
                 q = ik.solve(a + s * (b - a), rot, q, iters=100).q
             q_plan[name] = q.copy()
         q_plan["lift"] = ik.solve(grasp + np.array([0.0, 0.0, p.lift_up]), rot, g.q, iters=200).q
-        q_now = self.robot.data.joint_pos.torch[i, self.arm_ids].cpu().numpy()
+        q_now = self.robot.data.joint_pos.torch[i, self._arm_ids(i)].cpu().numpy()
         self.plan[i] = {"rot": rot, "grasp": grasp, "out": out, "pre": pre, "start": start,
                         "q_start": q, "q_plan": q_plan,
                         "q_from": q_now}  # fmt: skip
@@ -318,18 +405,19 @@ class Expert:
         # (the object's place relative to the robot at its stance), so a stance a few cm off
         # still reaches
         pelvis = self._env_pos(self.robot.data.root_pos_w.torch)[i, :2].cpu().numpy()
-        ideal = pelvis + rot[:2, :2] @ np.array(p.stance_rel)
+        ideal = pelvis + rot[:2, :2] @ np.array(self._stance_rel(i))
         r = L.OBJECTS[lay.target_object]["radius"]
         half = np.array([L.BIN_SIZE[0] / 2 - L.BIN_WALL[0] - r - 0.015,
                          L.BIN_SIZE[1] / 2 - L.BIN_WALL[0] - r - 0.015])  # fmt: skip
-        bx, by = np.array([bx, by]) + np.clip(ideal - np.array([bx, by]), -half, half)
+        b0 = np.array([bx, by])
+        bx, by = b0 + np.clip(ideal - b0, -half, half)
         obj_target = np.array(
             [bx, by, L.TABLE_TOP + 0.01 + L.BIN_WALL[1] + p.release_above + h / 2]
         )
         palm_target = obj_target - rot @ self.obj_in_palm[i]
         palm_now = self._palm_pose()[0][i].cpu().numpy()
         self._ik_state(i, waist_pitch=p.lean)
-        seeds = [self.q_ik[i], self.plan[i].get("q_hold", self.q_ik[i]), self.q_hang]
+        seeds = [self.q_ik[i], self.plan[i].get("q_hold", self.q_ik[i]), self._q_hang(i)]
         r = min((ik.solve(palm_target, rot, q0, iters=300) for q0 in seeds),
                 key=lambda res: res.pos_err + 0.1 * res.rot_err)  # fmt: skip
         self.notes[i]["release_ik_error_cm"] = round(r.pos_err * 100, 1)
@@ -337,17 +425,23 @@ class Expert:
         self.notes[i]["pelvis_at_release_plan"] = np.round(pelvis, 3).tolist()
         if r.pos_err > 0.02:
             return False
-        q_from = self.robot.data.joint_pos.torch[i, self.arm_ids].cpu().numpy()
+        q_from = self.robot.data.joint_pos.torch[i, self._arm_ids(i)].cpu().numpy()
         self.plan[i].update(
             {"rot": rot, "from": palm_now, "to": palm_target, "q_rel": r.q, "q_from": q_from}
         )
         return True
 
     def _ik_follow(
-        self, i: int, target: np.ndarray, rot: np.ndarray, q_rest: np.ndarray | None = None
+        self,
+        i: int,
+        target: np.ndarray,
+        rot: np.ndarray,
+        q_rest: np.ndarray | None = None,
+        best_effort: bool = False,
     ) -> np.ndarray:
         """One step of the arm along its path; a solution that misses the target by more than
-        3 cm is not taken (the arm keeps its last angles instead of running to its limits)."""
+        3 cm is not taken (the arm keeps its last angles instead of running to its limits),
+        unless `best_effort` (the arm goes as far toward the target as it reaches)."""
         self._ik_state(i)
         r = self.iks[i].solve(target, rot, self.q_ik[i], iters=40, q_rest=q_rest)
         self.ik_err[i] = r.pos_err
@@ -357,9 +451,10 @@ class Expert:
             ph = PHASES[self.phase[i]]
             for j in np.where((r.q - ik.lower < 0.02) | (ik.upper - r.q < 0.02))[0]:
                 side = "low" if r.q[j] - ik.lower[j] < 0.02 else "high"
-                key = f"{ph}:{RIGHT_ARM[j][6:-6]}:{side}"
+                joint = arm_joint_names(self.side[i])[j].split("_", 1)[1][:-6]
+                key = f"{ph}:{joint}:{side}"
                 stuck[key] = stuck.get(key, 0) + 1
-        if r.pos_err < 0.03:
+        if r.pos_err < 0.03 or best_effort:
             self.q_ik[i] = r.q
         else:
             self.notes[i]["ik_misses"] = self.notes[i].get("ik_misses", 0) + 1
@@ -392,6 +487,10 @@ class Expert:
         palm_pos, palm_quat = self._palm_pose()
         obj_palm = (obj - palm_pos).norm(dim=-1).cpu().numpy()
         moved = (obj - self.obj_start).norm(dim=-1).cpu().numpy()
+        every = torch.stack([o.data.root_pos_w.torch for o in self.objects], dim=1)
+        every = every - self.base.scene.env_origins[:, None]
+        shift = (every - self.others_start)[..., :2].norm(dim=-1) * self.others
+        other_moved = shift.max(dim=-1).values.cpu().numpy()
         cmd_obj, arr_obj = nav.command(pose, self.goal, p.nav)
         cmd_bin, arr_bin = nav.command(pose, self.goal, p.nav_bin)
         at_bin = torch.as_tensor(self.phase >= P["walk_bin"], device=self.dev)
@@ -416,6 +515,9 @@ class Expert:
                 continue
             if self.phase[i] < P["close"] and moved[i] > p.knock_dist:
                 self._fail(i, "knocked")
+                continue
+            if p.other_knock_dist is not None and other_moved[i] > p.other_knock_dist:
+                self._fail(i, "knocked_other")
                 continue
             if P["lift"] < self.phase[i] < P["release"] and obj_palm[i] > 0.12:
                 self._fail(i, "dropped")
@@ -489,7 +591,7 @@ class Expert:
                 arm = self._ik_follow(i, target, pl["rot"], q_rest)
                 targets[i] = (target, pl["rot"])
                 if ph == "lift":
-                    self.hand[i] = HAND_CLOSED
+                    self.hand[i] = self._hand_closed(i)
                 if k * dt >= dur:
                     if ph == "lift":
                         lifted = float(obj[i, 2] - self.obj_start[i, 2])
@@ -520,11 +622,11 @@ class Expert:
                 if ph == "fine_grasp" and p.grab_tol > 0:
                     rel = pl["rot"].T @ (obj[i] - palm_pos[i]).cpu().numpy()
                     lay = self.base.pick_place_layouts[i]
-                    want = np.array(p.grasp_in_palm)
+                    want = self._grasp_in_palm(i)
                     want[2] += L.OBJECTS[lay.target_object]["height"] / 2 - p.grasp_height
                     off = rel - want
                     in_hand = (abs(off[0]) < p.grab_tol and abs(off[2]) < p.grab_tol
-                               and off[1] < p.grab_tol / 2)  # fmt: skip
+                               and self._m(i) * off[1] < p.grab_tol / 2)  # fmt: skip
                 if err < tol or in_hand or k * dt >= p.fine_max_s:
                     if ph == "fine_grasp":  # where the object sits in the hand as it closes
                         rel = pl["rot"].T @ (obj[i] - palm_pos[i]).cpu().numpy()
@@ -533,8 +635,8 @@ class Expert:
                         note["obj_in_palm_at_close_cm"] = np.round(rel * 100, 1).tolist()
                         note["palm_error_at_close_cm"] = np.round(e3 * 100, 1).tolist()
                         note["fine_grasp_s"] = round(k * dt, 2)
-                        cmd = hl.arm_hand[i, self.arm_slots].cpu().numpy()
-                        got = self.robot.data.joint_pos.torch[i, self.arm_ids].cpu().numpy()
+                        cmd = hl.arm_hand[i, self.arm_slots_of[self.side[i]]].cpu().numpy()
+                        got = self.robot.data.joint_pos.torch[i, self._arm_ids(i)].cpu().numpy()
                         note["arm_target_minus_angle_rad"] = np.round(cmd - got, 3).tolist()
                     self._go(
                         i, {"fine_pre": "lower", "fine_out": "slide", "fine_grasp": "close"}[ph]
@@ -544,7 +646,8 @@ class Expert:
                 arm = self._ik_follow(i, pl["grasp"], pl["rot"], pl["q_plan"]["grasp"])
                 targets[i] = (pl["grasp"], pl["rot"])
                 s = min(1.0, k * dt / p.close_s)  # fingers and thumb together
-                self.hand[i] = HAND_OPEN + s * (HAND_CLOSED - HAND_OPEN)
+                opened, closed = self._hand_open(i), self._hand_closed(i)
+                self.hand[i] = opened + s * (closed - opened)
                 if k * dt >= p.close_s:
                     self._go(i, "lift")
             elif ph == "straighten":
@@ -555,7 +658,7 @@ class Expert:
                     lay = self.base.pick_place_layouts[i]
                     bxy = torch.tensor(lay.bin_xy(lay.target_bin), device=self.dev)[None]
                     zero = torch.zeros(1, device=self.dev)
-                    self.goal[i] = nav.stance_for(bxy, p.stance_rel, zero)[0]
+                    self.goal[i] = nav.stance_for(bxy, self._stance_rel(i), zero)[0]
                     self._go(i, "walk_bin")
             elif ph == "reach_bin":  # in joint space, to the release plan's own solution
                 pl = self.plan[i]
@@ -568,11 +671,12 @@ class Expert:
             elif ph == "release":
                 pl = self.plan[i]
                 away = _smooth(k * dt / 0.5 - 1.0) * p.release_away  # after the hand is open
-                target = pl["to"] - away * pl["rot"][:, 1]
+                target = pl["to"] - self._m(i) * away * pl["rot"][:, 1]
                 arm = self._ik_follow(i, target, pl["rot"], pl["q_rel"])
                 pl["release_end"] = target
                 s = min(1.0, k * dt / 0.5)
-                self.hand[i] = HAND_CLOSED + s * (HAND_OPEN - HAND_CLOSED)
+                opened, closed = self._hand_open(i), self._hand_closed(i)
+                self.hand[i] = closed + s * (opened - closed)
                 if k * dt >= p.release_s:
                     self._judge_place(i, obj[i].cpu().numpy())
                     self._go(i, "retract")
@@ -588,13 +692,17 @@ class Expert:
                     else:
                         # (not `back`: that name holds every robot's tilt for this step)
                         drawn = up - p.retract_back * pl["rot"][:, 0]
+                        if p.retract_clear_x is not None:  # in front of the table's edge
+                            drawn = up.copy()
+                            drawn[0] = min(up[0] - p.retract_back, p.retract_clear_x)
                         target = up + _smooth((t_ - t1) / p.retract_back_s) * (drawn - up)
-                    arm = self._ik_follow(i, target, pl["rot"], pl["q_rel"])
+                    best = p.retract_clear_x is not None and t_ >= t1
+                    arm = self._ik_follow(i, target, pl["rot"], pl["q_rel"], best_effort=best)
                     targets[i] = (target, pl["rot"])
                     pl["q_from"] = self.q_ik[i].copy()
                 else:
                     s = _smooth((t_ - t2) / p.retract_s)
-                    arm = pl["q_from"] + s * (self.q_hang - pl["q_from"])
+                    arm = pl["q_from"] + s * (self._q_hang(i) - pl["q_from"])
                     hl.body_goal[i, 3] = 0.0
                     if t_ >= t2 + p.retract_s:
                         self._final_judge(i, obj[i].cpu().numpy())
@@ -603,7 +711,7 @@ class Expert:
                 arm = self.plan[i]["q_hold"]  # the carry pose, joint angles held
             if arm is not None:
                 arm_cmd[i] = arm
-            hl.arm_hand[i, self.hand_slots] = torch.tensor(
+            hl.arm_hand[i, self.hand_slots_of[self.side[i]]] = torch.tensor(
                 self.hand[i], device=self.dev, dtype=torch.float32
             )
 
@@ -618,7 +726,7 @@ class Expert:
             for i in range(self.n):
                 ph = self.phase[i]
                 lean = P["lean_obj"] <= ph <= P["lift"] or P["lean_bin"] <= ph <= P["release"]
-                want = p.counter_arm if lean else 0.0
+                want = p.counter_arm if lean and self.side[i] == "right" else 0.0
                 rate = p.counter_rate * dt
                 self.left_back[i] += min(max(want - self.left_back[i], -rate), rate)
                 hl.arm_hand[i, self.left_pitch_slot] = min(
@@ -639,7 +747,7 @@ class Expert:
             # the held object sags only about 2 cm
             self._ik_state(i)
             ff = self.iks[i].gravity_offset(arm)
-            hl.arm_hand[i, self.arm_slots] = (
+            hl.arm_hand[i, self.arm_slots_of[self.side[i]]] = (
                 torch.tensor(arm + ff, device=self.dev, dtype=torch.float32) + self.q_corr[i]
             )
 
@@ -681,7 +789,7 @@ class Expert:
         pl = self.plan[i]
         o = obj.cpu().numpy()
         center = np.array([o[0], o[1], L.TABLE_TOP + self.p.grasp_height])
-        pl["grasp"] = center - pl["rot"] @ np.array(self.p.grasp_in_palm)
+        pl["grasp"] = center - pl["rot"] @ self._grasp_in_palm(i)
 
     def _start_hold(self, i: int, palm: torch.Tensor, pose: torch.Tensor) -> None:
         """Remember the palm's position in the robot's heading frame and its height."""
@@ -738,10 +846,14 @@ class Expert:
             self.label[i] = "wrong_bin" if inside(other) else "dropped"
 
     def _sag_correction(self, targets, palm_pos, palm_quat) -> None:
+        for side in SIDES:  # one batch per hand: its palm and its arm's joints
+            mine = {i: v for i, v in targets.items() if self.side[i] == side}
+            if mine:
+                self._sag_correction_side(side, mine, palm_pos, palm_quat)
+
+    def _sag_correction_side(self, side, targets, palm_pos, palm_quat) -> None:
         from isaaclab.utils.math import compute_pose_error, quat_from_matrix
 
-        if not targets:
-            return
         ids = torch.tensor(sorted(targets), device=self.dev)
         tgt = torch.tensor(
             np.stack([targets[int(i)][0] for i in ids]), device=self.dev, dtype=torch.float32
@@ -751,8 +863,8 @@ class Expert:
         )
         q_tgt = quat_from_matrix(rots)
         base = self.robot.num_base_dofs  # 6 for the floating base, 0 for a pinned (fixed) one
-        jac = self.robot.data.body_link_jacobian_w.torch[ids, self.palm][
-            :, :, [base + j for j in self.arm_ids]
+        jac = self.robot.data.body_link_jacobian_w.torch[ids, self.palm_of[side]][
+            :, :, [base + j for j in self.arm_ids_of[side]]
         ]
         ep, eo = compute_pose_error(
             palm_pos[ids], palm_quat[ids], tgt, q_tgt, rot_error_type="axis_angle"

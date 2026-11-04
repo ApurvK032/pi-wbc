@@ -19,6 +19,12 @@ parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
 parser.add_argument("--num-envs", type=int, default=8)
 parser.add_argument("--episodes", type=int, default=8)
 parser.add_argument("--first-seed", type=int, default=50_000, help="development layouts")
+parser.add_argument(
+    "--seed-list",
+    type=str,
+    default=None,
+    help="comma-separated layout seeds to run instead of consecutive ones (sets --episodes)",
+)
 parser.add_argument("--run", type=Path, default=Path(DEFAULT_RUN), help="controller run folder")
 parser.add_argument("--gif", type=Path, default=None)
 parser.add_argument("--gif-env", type=int, default=0, help="which robot of the first batch")
@@ -133,6 +139,9 @@ def main() -> None:
         TASK, "rsl_rl_cfg_entry_point", overrides=[*overrides, "physics=newton_mjwarp"]
     )
     agent_cfg = handle_deprecated_rsl_rl_cfg(agent_cfg, check_rsl_rl_version())
+    seed_list = [int(s) for s in args.seed_list.split(",")] if args.seed_list else None
+    if seed_list is not None:
+        args.episodes = len(seed_list)
     n = min(args.num_envs, args.episodes)
     env_cfg.scene.num_envs = n
     if args.gif is not None or args.fail_gifs is not None:
@@ -170,7 +179,11 @@ def main() -> None:
         sim_steps = 0
         while len(results) < args.episodes:
             m = min(n, args.episodes - len(results))
-            seeds = [seed + i for i in range(n)]
+            if seed_list is not None:  # the next n of the list (the last batch is padded)
+                done = len(results)
+                seeds = (seed_list[done : done + n] + seed_list[:n])[:n]
+            else:
+                seeds = [seed + i for i in range(n)]
             seed += n
             base.pick_place_layouts = [L.sample(s) for s in seeds]
             base.reset()
