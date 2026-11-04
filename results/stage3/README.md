@@ -394,7 +394,9 @@ layouts (seeds 10,000-11,087):
 
 Paired on the same layouts: 986 succeed with both, 63 only with NVIDIA's, 24 only with ours, 15
 with neither (p = 3.5e-5). Nearly all of the gap is other objects pushed while the arm withdraws
-from the bin with our controller under the robot; why is not traced yet (a stage 5 lead). Under
+from the bin with our controller under the robot; why is not traced yet (a stage 5 lead). Run
+again through ours, 8 such layouts gave 6 successes and 2 pushes in the retract, so these
+failures are mostly chance. Under
 NVIDIA's controller small differences between runs also grow far less: replaying its recorded
 commands reproduces 97% of successes, ours 70%. NVIDIA's training set v1 is the first 1,000
 qualifying episodes (seeds 10,000-11,036, 936 of them on the same layouts as ours):
