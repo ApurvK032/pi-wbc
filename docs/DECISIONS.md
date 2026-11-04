@@ -55,6 +55,7 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 | [D-045](#d-045-the-datasets-export-format-gr00t-flavoured-lerobot-v21-and-lerobot-v30-2026-11-04) | The dataset's export format: GR00T-flavoured LeRobot v2.1, and LeRobot v3.0 | 2026-11-04 |
 | [D-046](#d-046-nvidias-controller-as-the-tasks-low-level-2026-11-04) | NVIDIA's controller as the task's low level | 2026-11-04 |
 | [D-047](#d-047-training-set-v2-and-a-validation-set-2026-11-04) | Training set v2 and a validation set | 2026-11-04 |
+| [D-048](#d-048-50-frames-per-second-versions-of-the-datasets-2026-11-04) | 50 frames-per-second versions of the datasets | 2026-11-04 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -1180,6 +1181,32 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   and the commits between them added only export code they never import (the package's source
   hash is the same, e354b5f5d565). Two replay files say "dirty" for the same reason: two
   scripts they don't use were uncommitted.
+
+## D-048: 50 frames-per-second versions of the datasets (2026-11-04)
+
+- **What:** besides the 25 fps sets of D-043 and D-045, each dataset is also rendered and
+  exported at 50 frames per second: one row and one video frame per control step, with that
+  step's commands, as NVIDIA's own G1 datasets are. Stage 4 chooses between them.
+- **Why:** the expert's recorded commands, replayed open loop through the closed-loop evaluation
+  loop ([scripts/vla_eval.py](../scripts/vla_eval.py), the stage 1 controller, the 241
+  validation episodes, success held 1 s within 60 s):
+
+  | Commands sent | Success | 95% interval |
+  |---|---:|---|
+  | every control step's (50 Hz) | 171 of 241 (71.0%) | 65-76% |
+  | the 25 fps dataset's, each held for two control steps | 120 (49.8%) | 44-56% |
+  | the 25 fps dataset's, the second step taking the mean of it and the next | 143 (59.3%) | 53-65% |
+
+  Paired on the same episodes, 50 Hz beats 25 Hz held (70 against 19 episodes, p = 5e-8) and
+  averaged (51 against 23, p = 0.0015); averaging beats holding (56 against 33, p = 0.019).
+  The expert corrects small errors at every control step, and a 25 Hz command stream loses much
+  of that; a VLA re-plans every few frames, so its loss is smaller, but it has the same handicap.
+  At 50 fps GR00T's own `unitree_g1` config (30-step chunks, 0.6 s) fits as NVIDIA trained it.
+  The 50 Hz replay here (71%) agrees with the replay check's 162 of 241 (67%, D-042), so the loop
+  itself adds no loss.
+- **Cost:** twice the rendering (about 40 minutes per 1,000 episodes on the RTX 4070) and twice
+  the video storage (about 6 GB per 1,000 episodes); twice the policy calls in closed loop if a
+  50 fps model re-plans as often in frames.
 
 ## Open items
 
