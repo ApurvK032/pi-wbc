@@ -41,7 +41,12 @@ keeps the robot balanced. Stage 4 is done when:
   current angles, everything else absolute; a 30-step action chunk, which is 1.2 s at our 25
   frames per second against 0.6 s in NVIDIA's 50 fps data). Second run: `NEW_EMBODIMENT` with
   our own config and a 16-step chunk (0.64 s). Compared on the validation set's action error and
-  a short closed-loop pilot; the better one goes to the test layouts.
+  a short closed-loop pilot; the better one goes to the test layouts. The second run's config:
+  [configs/groot/pi_wbc_g1_h16.py](../configs/groot/pi_wbc_g1_h16.py). GR00T stores the
+  relative-arm statistics per chunk step (shape (30, 7) for `unitree_g1`) and keeps keys
+  already in `meta/relative_stats.json`, so each chunk length gets its own dataset copy (data
+  and videos hard-linked, `meta/` without that file); checked: (16, 7) statistics and 16-step
+  training chunks on such a copy.
 - **Settings.** GR00T's defaults: the projector, the action head and the language model's top
   4 layers train, vision and the rest of the language model stay frozen; learning rate 1e-4,
   colour jitter on. NVIDIA's G1 example uses 10,000 steps at batch 1,024 on 8 GPUs; one L40S
