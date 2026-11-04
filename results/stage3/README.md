@@ -296,14 +296,14 @@ arm to the release, 20 s, every third frame at 288 x 216.)
 |---|---|
 | Videos | 1,000, one per episode: H.264, 640 x 480, 25 frames per second |
 | Frames | 790,046 (599-1,003 per episode, median 788) |
-| Size | 3.0 GB (median 3 MB per episode) |
+| Size | 3.0 GiB (median 3 MB per episode) |
 | Time | 21 min on the RTX 4070, about 650 frames per second for 32 episodes at once |
 | Sun height | 30, 40, 50, 60, 70, 80 degrees: 163, 169, 170, 176, 171, 151 episodes |
 
 Every video's frame count was checked against its recording. Each episode's look, frame count
 and file hash: [render/train-v1-render.json.gz](render/train-v1-render.json.gz). Training set v2
-(2,000 episodes, 1,581,058 frames, 6.0 GB, 59 min with other jobs on the GPU) and the validation
-set (241 episodes, 191,375 frames, 0.7 GB) are rendered the same way. An episode rendered twice
+(2,000 episodes, 1,581,058 frames, 6.0 GiB, 59 min with other jobs on the GPU) and the validation
+set (241 episodes, 191,375 frames, 0.7 GiB) are rendered the same way. An episode rendered twice
 keeps its look but not its exact pixels: of the 1,000 v1 episodes rendered again inside v2, 16
 gave byte-identical videos and the rest differ by 0.02-0.84 grey levels on average, at edges
 (D-043, amended).
@@ -339,12 +339,22 @@ GR00T N1.6 reads (LeRobot v2.1 plus GR00T's `meta/modality.json`), with the name
 | `annotation.human.task_description` | the instruction (index into `meta/tasks.jsonl`) |
 
 LeRobot's own converter makes a LeRobot v3.0 copy, with the quantile statistics LeRobot's
-π0.5 normalizes by. Each copy is checked with its framework's own loader:
+π0.5 normalizes by. Each set is checked with GR00T's `LeRobotEpisodeLoader` and its `unitree_g1`
+config ([script](../../scripts/check_groot_dataset.py): every episode; group sizes, values,
+instruction, frames equal to ffmpeg's decode and not off by one, 30-step training chunks), with
+LeRobot's `LeRobotDataset` on the v3.0 copy ([script](../../scripts/check_lerobot_dataset.py): 12
+episodes; rows, 50-step chunks with end padding, images equal to the source frames), and from
+disk ([script](../../scripts/verify_files.py): every row recomputed from its recording, every
+video's hash):
 
-| Check | Training set v1 | Validation set v1 |
-|---|---|---|
-| GR00T's `LeRobotEpisodeLoader`, `unitree_g1` config ([script](../../scripts/check_groot_dataset.py)): sizes, values, instruction, frames equal to ffmpeg's, 30-step training chunks | 1,000 of 1,000 episodes | 241 of 241 |
-| LeRobot's `LeRobotDataset` on the v3.0 copy ([script](../../scripts/check_lerobot_dataset.py)): rows, 50-step chunks with end padding, images equal to the source frames | 12 of 12 | 12 of 12 |
+| Set | Frames per second | Episodes | Rows | GR00T's loader | LeRobot's loader | From disk |
+|---|---:|---:|---:|---|---|---|
+| Training v1 | 25 | 1,000 | 790,046 | 1,000 of 1,000 | 12 of 12 | all match |
+| Training v1 | 50 | 1,000 | 1,579,583 | being checked | being checked | all match |
+| Training v2 | 25 | 2,000 | 1,581,058 | 2,000 of 2,000 | being checked | all match |
+| Validation v1 | 25 | 241 | 191,375 | 241 of 241 | 12 of 12 | all match |
+| Validation v1 | 50 | 241 | 382,630 | 241 of 241 | 12 of 12 | all match |
+| NVIDIA's training v1 | 25 | 1,000 | 929,052 | 1,000 of 1,000 | 12 of 12 | all match |
 
 Before stage 4: LeRobot's π0.5 takes at most 32 state and 32 action values (ours: 43 and 35).
 The working hand's 7 targets are exactly open + s x (closed - open) in every recorded step, and
