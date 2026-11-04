@@ -1,0 +1,2926 @@
+{
+  "label": "full-range-long-s1",
+  "condition": "push_0.5",
+  "condition_settings": {
+    "floor_friction": 1.0,
+    "robot_friction": null,
+    "hand_payload_kg": 0.0,
+    "delay_steps": 0,
+    "noise": false,
+    "push_speed": 0.5,
+    "push_times": [
+      3.0,
+      7.0,
+      11.0,
+      15.0,
+      19.0
+    ],
+    "episode_s": 23.0
+  },
+  "policy": "logs/rsl_rl/pi_wbc_g1_student/slurm-5628865-full-range-long-r/exported/policy.onnx",
+  "policy_io": "logs/rsl_rl/pi_wbc_g1_student/slurm-5628865-full-range-long-r/exported/policy_io.json",
+  "seeds": 100,
+  "seed_start": 0,
+  "duration_s": 23.0,
+  "fall_height_m": 0.35,
+  "settle_s": 2.0,
+  "models": {
+    "menagerie": {
+      "path": "third_party/mujoco_menagerie/unitree_g1/scene_with_hands.xml",
+      "total_mass_kg": 34.394235200000004,
+      "timestep_s": 0.0025,
+      "contacts": {
+        "geoms": {
+          "floor": [
+            {
+              "condim": 3,
+              "friction": [
+                1.0,
+                0.005,
+                0.0001
+              ],
+              "gap": 0.0,
+              "margin": 0.0,
+              "priority": 0,
+              "solimp": [
+                0.9,
+                0.95,
+                0.001,
+                0.5,
+                2.0
+              ],
+              "solmix": 1.0,
+              "solref": [
+                0.02,
+                1.0
+              ],
+              "geoms": 1
+            }
+          ],
+          "feet": [
+            {
+              "condim": 3,
+              "friction": [
+                0.6,
+                0.005,
+                0.0001
+              ],
+              "gap": 0.0,
+              "margin": 0.0,
+              "priority": 0,
+              "solimp": [
+                0.9,
+                0.95,
+                0.001,
+                0.5,
+                2.0
+              ],
+              "solmix": 1.0,
+              "solref": [
+                0.02,
+                1.0
+              ],
+              "geoms": 8
+            }
+          ],
+          "other": [
+            {
+              "condim": 3,
+              "friction": [
+                1.0,
+                0.005,
+                0.0001
+              ],
+              "gap": 0.0,
+              "margin": 0.0,
+              "priority": 0,
+              "solimp": [
+                0.9,
+                0.95,
+                0.001,
+                0.5,
+                2.0
+              ],
+              "solmix": 1.0,
+              "solref": [
+                0.02,
+                1.0
+              ],
+              "geoms": 43
+            }
+          ]
+        },
+        "solver": {
+          "timestep": 0.0025,
+          "integrator": "mjINT_IMPLICITFAST",
+          "cone": "mjCONE_PYRAMIDAL",
+          "iterations": 100,
+          "ls_iterations": 50,
+          "impratio": 1.0,
+          "tolerance": 1e-06
+        }
+      },
+      "wall_s": 81.5
+    }
+  },
+  "summary": [
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "command": [
+        0.5,
+        0.0,
+        0.0
+      ],
+      "body": null,
+      "arm_motion": false,
+      "episodes": 100,
+      "falls": 5,
+      "fall_rate": 0.05,
+      "fall_rate_ci95": [
+        0.021543679017992173,
+        0.1117504698741045
+      ],
+      "lin_err_mean": 0.09644430296416485,
+      "ang_err_mean": 0.16092335549476505,
+      "yaw_drift_abs_mean": 0.019483929525782765,
+      "gait": {
+        "step_rate_hz": 2.5038810155741396,
+        "step_length_m": 0.20300127052820205,
+        "swing_s": 0.3305556060622595,
+        "foot_lift_m": 0.04531081798107655,
+        "stance_foot_speed_mps": 0.07086405850701813,
+        "sole_slip_mps": 0.03021977578242813,
+        "double_support": 0.16406429966447994,
+        "flight": 1.001552406229656e-05,
+        "knee_range_deg": 22.116181904125366,
+        "arm_swing_deg": 1.1147819281520182
+      },
+      "height_err_mean": 0.005636205033671358,
+      "waist_err_mean": 0.008428399784836706,
+      "arm_err_mean": 0.007216014743423537
+    }
+  ],
+  "episodes": [
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 0,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09846805084769575,
+      "ang_err": 0.16273706980435637,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.1911637535202335,
+        "swing_s": 0.3279245283018868,
+        "foot_lift_m": 0.04478279869583618,
+        "stance_foot_speed_mps": 0.06711279243084284,
+        "sole_slip_mps": 0.02769839703515738,
+        "double_support": 0.16555661274976213,
+        "flight": 0.0,
+        "knee_range_deg": 22.21588535861578,
+        "arm_swing_deg": 1.17297974787243
+      },
+      "yaw_drift": 0.020521404412364667,
+      "body_err": {
+        "height_m": 0.00554215737079809,
+        "waist_rad": 0.008478983238074063,
+        "arm_rad": 0.007408363743801359
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 1,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09308266704474545,
+      "ang_err": 0.1564591259406113,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.21191706471142532,
+        "swing_s": 0.33692307692307694,
+        "foot_lift_m": 0.046652325433817726,
+        "stance_foot_speed_mps": 0.07093001152028193,
+        "sole_slip_mps": 0.029315372877364916,
+        "double_support": 0.15889628924833493,
+        "flight": 0.0,
+        "knee_range_deg": 22.08303170779915,
+        "arm_swing_deg": 1.1643513533370977
+      },
+      "yaw_drift": 0.001634260495738343,
+      "body_err": {
+        "height_m": 0.005448705167412426,
+        "waist_rad": 0.008357807760140022,
+        "arm_rad": 0.0070998094327784245
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 2,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10432072990739924,
+      "ang_err": 0.1744869488222934,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.20582935723726437,
+        "swing_s": 0.3211320754716981,
+        "foot_lift_m": 0.04578281177338429,
+        "stance_foot_speed_mps": 0.07978679093818945,
+        "sole_slip_mps": 0.036120725118013036,
+        "double_support": 0.1807802093244529,
+        "flight": 0.0,
+        "knee_range_deg": 21.874747790768428,
+        "arm_swing_deg": 1.2392175969522217
+      },
+      "yaw_drift": 0.023618523922834304,
+      "body_err": {
+        "height_m": 0.005914460675880338,
+        "waist_rad": 0.008688244791581543,
+        "arm_rad": 0.007245355687241655
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 3,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.08762772336801675,
+      "ang_err": 0.15405573416414192,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.1972137305005238,
+        "swing_s": 0.3346153846153846,
+        "foot_lift_m": 0.04467013649196055,
+        "stance_foot_speed_mps": 0.06752480923688742,
+        "sole_slip_mps": 0.029202265516300986,
+        "double_support": 0.16460513796384396,
+        "flight": 0.0,
+        "knee_range_deg": 22.23023349924653,
+        "arm_swing_deg": 1.0862223853923842
+      },
+      "yaw_drift": -0.03076495224630637,
+      "body_err": {
+        "height_m": 0.005423884923318644,
+        "waist_rad": 0.008302480259605383,
+        "arm_rad": 0.007316575880257256
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 4,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09514556066018652,
+      "ang_err": 0.16431457113167836,
+      "gait": {
+        "step_rate_hz": 2.5689819219790677,
+        "step_length_m": 0.18884900732601398,
+        "swing_s": 0.32074074074074077,
+        "foot_lift_m": 0.043913426781076306,
+        "stance_foot_speed_mps": 0.06933670737980593,
+        "sole_slip_mps": 0.03020566316442471,
+        "double_support": 0.1665080875356803,
+        "flight": 0.0,
+        "knee_range_deg": 22.169487692276803,
+        "arm_swing_deg": 1.1141165689705075
+      },
+      "yaw_drift": 0.005037714098854472,
+      "body_err": {
+        "height_m": 0.005891357730183084,
+        "waist_rad": 0.008656972029183491,
+        "arm_rad": 0.007375594229557756
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 5,
+      "fell": true,
+      "fall_time_s": 12.8,
+      "duration_s": 23.0,
+      "lin_err": 0.2291020890106928,
+      "ang_err": 0.32295047852177716,
+      "gait": null,
+      "yaw_drift": null,
+      "body_err": null
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 6,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.08901337410298171,
+      "ang_err": 0.16620629314072943,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.20807086428406643,
+        "swing_s": 0.3298113207547169,
+        "foot_lift_m": 0.045671694788043185,
+        "stance_foot_speed_mps": 0.07398585683204886,
+        "sole_slip_mps": 0.03189290725228656,
+        "double_support": 0.15889628924833493,
+        "flight": 0.0,
+        "knee_range_deg": 22.215028515564644,
+        "arm_swing_deg": 1.1395987265542427
+      },
+      "yaw_drift": -0.02636290543899198,
+      "body_err": {
+        "height_m": 0.005563538892336016,
+        "waist_rad": 0.008513530406342229,
+        "arm_rad": 0.007125334961145682
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 7,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09602175758883569,
+      "ang_err": 0.1639473796532518,
+      "gait": {
+        "step_rate_hz": 2.5689819219790677,
+        "step_length_m": 0.20041285258618977,
+        "swing_s": 0.32185185185185183,
+        "foot_lift_m": 0.044671855992939546,
+        "stance_foot_speed_mps": 0.07307872450684737,
+        "sole_slip_mps": 0.032297788984666745,
+        "double_support": 0.16460513796384396,
+        "flight": 0.0,
+        "knee_range_deg": 22.079596625536844,
+        "arm_swing_deg": 1.0999361954849294
+      },
+      "yaw_drift": 0.002726025720594507,
+      "body_err": {
+        "height_m": 0.005767133401676215,
+        "waist_rad": 0.008484595717953944,
+        "arm_rad": 0.007230938099958165
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 8,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09621781307668324,
+      "ang_err": 0.14768138850823775,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.19343678671851097,
+        "swing_s": 0.3373076923076923,
+        "foot_lift_m": 0.0448213690682043,
+        "stance_foot_speed_mps": 0.0642278055931459,
+        "sole_slip_mps": 0.026941865439275656,
+        "double_support": 0.15794481446241673,
+        "flight": 0.0,
+        "knee_range_deg": 22.204742885449456,
+        "arm_swing_deg": 1.1689141548887854
+      },
+      "yaw_drift": 0.011412824120095741,
+      "body_err": {
+        "height_m": 0.005665241387751589,
+        "waist_rad": 0.008384922903240147,
+        "arm_rad": 0.0074238353147807095
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 9,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10146792556609976,
+      "ang_err": 0.16769189814850638,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.20857232702266165,
+        "swing_s": 0.32603773584905654,
+        "foot_lift_m": 0.04570949408153353,
+        "stance_foot_speed_mps": 0.07419032713561735,
+        "sole_slip_mps": 0.029225976971174416,
+        "double_support": 0.16841103710751665,
+        "flight": 0.0,
+        "knee_range_deg": 21.86094375665651,
+        "arm_swing_deg": 1.1375900114231836
+      },
+      "yaw_drift": 0.032720682723358784,
+      "body_err": {
+        "height_m": 0.005602015784020678,
+        "waist_rad": 0.008545705540382626,
+        "arm_rad": 0.007123970950516292
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 10,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10044036461101868,
+      "ang_err": 0.16260920931772826,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.19956953758089707,
+        "swing_s": 0.3279245283018868,
+        "foot_lift_m": 0.04509039870134851,
+        "stance_foot_speed_mps": 0.0717278098534764,
+        "sole_slip_mps": 0.03240279257577499,
+        "double_support": 0.1636536631779258,
+        "flight": 0.0,
+        "knee_range_deg": 22.085253856644442,
+        "arm_swing_deg": 1.1247692332270662
+      },
+      "yaw_drift": 0.026474783160825136,
+      "body_err": {
+        "height_m": 0.005761178605789859,
+        "waist_rad": 0.008452163083370887,
+        "arm_rad": 0.0072557936266275415
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 11,
+      "fell": true,
+      "fall_time_s": 17.04,
+      "duration_s": 23.0,
+      "lin_err": 0.1990862608290888,
+      "ang_err": 0.319424827514232,
+      "gait": null,
+      "yaw_drift": null,
+      "body_err": null
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 12,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10714398314606181,
+      "ang_err": 0.17982256865635698,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.20812025384018898,
+        "swing_s": 0.32339622641509436,
+        "foot_lift_m": 0.04649206054047858,
+        "stance_foot_speed_mps": 0.07737425952349171,
+        "sole_slip_mps": 0.03174242818194051,
+        "double_support": 0.17507136060894388,
+        "flight": 0.0,
+        "knee_range_deg": 21.825995706250318,
+        "arm_swing_deg": 1.1315395564545492
+      },
+      "yaw_drift": 0.04745897912303185,
+      "body_err": {
+        "height_m": 0.005895302943696839,
+        "waist_rad": 0.008596149239789342,
+        "arm_rad": 0.00715883335085721
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 13,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09463687757238799,
+      "ang_err": 0.15646428334236231,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.19848128451398112,
+        "swing_s": 0.33461538461538465,
+        "foot_lift_m": 0.04527286403947918,
+        "stance_foot_speed_mps": 0.06810432654387445,
+        "sole_slip_mps": 0.02931097590036973,
+        "double_support": 0.1636536631779258,
+        "flight": 0.0,
+        "knee_range_deg": 22.101308398632877,
+        "arm_swing_deg": 1.1348068475148247
+      },
+      "yaw_drift": -0.0008185824547591288,
+      "body_err": {
+        "height_m": 0.0056585642973387175,
+        "waist_rad": 0.008558801471776544,
+        "arm_rad": 0.007309265292822017
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 14,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.0931008561465001,
+      "ang_err": 0.15262079257466257,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20208472099217234,
+        "swing_s": 0.3357692307692307,
+        "foot_lift_m": 0.04543836342012056,
+        "stance_foot_speed_mps": 0.06757972225717883,
+        "sole_slip_mps": 0.02821940188815046,
+        "double_support": 0.16079923882017128,
+        "flight": 0.0,
+        "knee_range_deg": 22.167864285372122,
+        "arm_swing_deg": 1.1654531509231485
+      },
+      "yaw_drift": -0.004739556787509385,
+      "body_err": {
+        "height_m": 0.005584482099523486,
+        "waist_rad": 0.008397924603823445,
+        "arm_rad": 0.007265550369482508
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 15,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.08963840832277598,
+      "ang_err": 0.1600236495536475,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20478709889731947,
+        "swing_s": 0.33423076923076916,
+        "foot_lift_m": 0.044971241818659184,
+        "stance_foot_speed_mps": 0.07055397386414379,
+        "sole_slip_mps": 0.031240876142507756,
+        "double_support": 0.16460513796384396,
+        "flight": 0.0,
+        "knee_range_deg": 22.121294522932324,
+        "arm_swing_deg": 0.8932179887521096
+      },
+      "yaw_drift": -0.028031095033895802,
+      "body_err": {
+        "height_m": 0.005586927945676539,
+        "waist_rad": 0.008452262460094504,
+        "arm_rad": 0.007123672741231763
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 16,
+      "fell": true,
+      "fall_time_s": 8.700000000000001,
+      "duration_s": 23.0,
+      "lin_err": 0.26316725417288533,
+      "ang_err": 0.4147772955123262,
+      "gait": null,
+      "yaw_drift": null,
+      "body_err": null
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 17,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.08923590149726905,
+      "ang_err": 0.1522734724041841,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20418378220307293,
+        "swing_s": 0.33653846153846145,
+        "foot_lift_m": 0.04563681441687662,
+        "stance_foot_speed_mps": 0.06675580412340269,
+        "sole_slip_mps": 0.02771699539904375,
+        "double_support": 0.15794481446241673,
+        "flight": 0.0,
+        "knee_range_deg": 22.238999453178806,
+        "arm_swing_deg": 1.2897499948412683
+      },
+      "yaw_drift": -0.01995006880150281,
+      "body_err": {
+        "height_m": 0.005308577556372696,
+        "waist_rad": 0.00831181226818347,
+        "arm_rad": 0.007240744297186525
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 18,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10390103969345066,
+      "ang_err": 0.16814930868547848,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.1946814590458199,
+        "swing_s": 0.3267924528301887,
+        "foot_lift_m": 0.04438317060182403,
+        "stance_foot_speed_mps": 0.06946415277928496,
+        "sole_slip_mps": 0.02958592388757768,
+        "double_support": 0.16745956232159848,
+        "flight": 0.0,
+        "knee_range_deg": 22.10397955681681,
+        "arm_swing_deg": 1.0590100733607477
+      },
+      "yaw_drift": 0.03210379648048836,
+      "body_err": {
+        "height_m": 0.0059507654468402855,
+        "waist_rad": 0.008743403144449146,
+        "arm_rad": 0.007331094997849716
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 19,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10209801286409428,
+      "ang_err": 0.15301004970941998,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20737624685127876,
+        "swing_s": 0.33884615384615385,
+        "foot_lift_m": 0.04546403422527342,
+        "stance_foot_speed_mps": 0.06731743333620345,
+        "sole_slip_mps": 0.02809589259747487,
+        "double_support": 0.15413891531874405,
+        "flight": 0.0,
+        "knee_range_deg": 22.009934728499747,
+        "arm_swing_deg": 1.1710943569287215
+      },
+      "yaw_drift": 0.042849274532766865,
+      "body_err": {
+        "height_m": 0.005737171269378463,
+        "waist_rad": 0.00854455792115894,
+        "arm_rad": 0.007189914357664391
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 20,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.11229114538616523,
+      "ang_err": 0.20877058186563918,
+      "gait": {
+        "step_rate_hz": 2.5689819219790677,
+        "step_length_m": 0.20414145108414974,
+        "swing_s": 0.3114814814814814,
+        "foot_lift_m": 0.04698036747005833,
+        "stance_foot_speed_mps": 0.08976399537666292,
+        "sole_slip_mps": 0.03906410482832565,
+        "double_support": 0.18839200761179828,
+        "flight": 0.0009514747859181732,
+        "knee_range_deg": 21.53437941096141,
+        "arm_swing_deg": 1.1675224428614557
+      },
+      "yaw_drift": 0.08563737968241406,
+      "body_err": {
+        "height_m": 0.006118023313959173,
+        "waist_rad": 0.008861167026497845,
+        "arm_rad": 0.007237701739585842
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 21,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09747552548188461,
+      "ang_err": 0.16029635998822123,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.20191775907414022,
+        "swing_s": 0.3283018867924528,
+        "foot_lift_m": 0.04507761513045654,
+        "stance_foot_speed_mps": 0.07157481636884487,
+        "sole_slip_mps": 0.0312897863590145,
+        "double_support": 0.16270218839200762,
+        "flight": 0.0,
+        "knee_range_deg": 22.19172808190519,
+        "arm_swing_deg": 1.077116595153455
+      },
+      "yaw_drift": 0.008138972190849738,
+      "body_err": {
+        "height_m": 0.005673661562849866,
+        "waist_rad": 0.008385132913175296,
+        "arm_rad": 0.0072340830369141676
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 22,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.08989729172717464,
+      "ang_err": 0.15221970793179612,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2124354118376536,
+        "swing_s": 0.3376923076923076,
+        "foot_lift_m": 0.04653843514868305,
+        "stance_foot_speed_mps": 0.07211122566653688,
+        "sole_slip_mps": 0.031488461911752114,
+        "double_support": 0.1560418648905804,
+        "flight": 0.0,
+        "knee_range_deg": 22.19228763163798,
+        "arm_swing_deg": 1.3063829466609405
+      },
+      "yaw_drift": -0.018572672396383758,
+      "body_err": {
+        "height_m": 0.005306578640141046,
+        "waist_rad": 0.008237377169656255,
+        "arm_rad": 0.0071453271351765105
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 23,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10400197086523506,
+      "ang_err": 0.1724779776698699,
+      "gait": {
+        "step_rate_hz": 2.5689819219790677,
+        "step_length_m": 0.19295964920252195,
+        "swing_s": 0.3185185185185185,
+        "foot_lift_m": 0.04500780271050195,
+        "stance_foot_speed_mps": 0.07540902429886401,
+        "sole_slip_mps": 0.033778783109524715,
+        "double_support": 0.17221693625118933,
+        "flight": 0.0,
+        "knee_range_deg": 22.1200655142013,
+        "arm_swing_deg": 1.2585191527038817
+      },
+      "yaw_drift": 0.03081215228450769,
+      "body_err": {
+        "height_m": 0.005967595962799191,
+        "waist_rad": 0.008665876612273181,
+        "arm_rad": 0.0074230711563494905
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 24,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.0957255972315451,
+      "ang_err": 0.15123758367680598,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2074042961882006,
+        "swing_s": 0.33961538461538454,
+        "foot_lift_m": 0.04604722079528438,
+        "stance_foot_speed_mps": 0.06809092167445689,
+        "sole_slip_mps": 0.027337455514391044,
+        "double_support": 0.1522359657469077,
+        "flight": 0.0,
+        "knee_range_deg": 22.086841636771613,
+        "arm_swing_deg": 1.1614398025515567
+      },
+      "yaw_drift": 0.023776357290670496,
+      "body_err": {
+        "height_m": 0.005453171061621865,
+        "waist_rad": 0.008360646170816024,
+        "arm_rad": 0.007153366731263991
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 25,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.0947254764911038,
+      "ang_err": 0.15618095569942725,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.19739578413517558,
+        "swing_s": 0.3326923076923076,
+        "foot_lift_m": 0.044684672018671684,
+        "stance_foot_speed_mps": 0.06733302676278723,
+        "sole_slip_mps": 0.02857163874364314,
+        "double_support": 0.16936251189343482,
+        "flight": 0.0,
+        "knee_range_deg": 22.17221361457649,
+        "arm_swing_deg": 1.0371786724868373
+      },
+      "yaw_drift": -0.010284473015908138,
+      "body_err": {
+        "height_m": 0.005653681394654764,
+        "waist_rad": 0.008383638808124937,
+        "arm_rad": 0.007318318447975419
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 26,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10443430402201924,
+      "ang_err": 0.17834130640998144,
+      "gait": {
+        "step_rate_hz": 2.664129400570885,
+        "step_length_m": 0.19391101453104195,
+        "swing_s": 0.3117857142857143,
+        "foot_lift_m": 0.04365637467115426,
+        "stance_foot_speed_mps": 0.07353116863027011,
+        "sole_slip_mps": 0.03276229240175576,
+        "double_support": 0.16175071360608945,
+        "flight": 0.0,
+        "knee_range_deg": 21.97963220827573,
+        "arm_swing_deg": 0.9605698170450456
+      },
+      "yaw_drift": 0.03863727052167885,
+      "body_err": {
+        "height_m": 0.006219551927479708,
+        "waist_rad": 0.00884692232666044,
+        "arm_rad": 0.007237673264742251
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 27,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09336659413391904,
+      "ang_err": 0.1599832909781434,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2051609694019829,
+        "swing_s": 0.3326923076923076,
+        "foot_lift_m": 0.04582043927981376,
+        "stance_foot_speed_mps": 0.07305021715607618,
+        "sole_slip_mps": 0.031938551702982314,
+        "double_support": 0.16841103710751665,
+        "flight": 0.0,
+        "knee_range_deg": 22.08622554960879,
+        "arm_swing_deg": 1.2014005328817705
+      },
+      "yaw_drift": -0.012793490071499193,
+      "body_err": {
+        "height_m": 0.00558422951115689,
+        "waist_rad": 0.008518502872144687,
+        "arm_rad": 0.0072096144460175446
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 28,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09268691155635263,
+      "ang_err": 0.15470562334399346,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20337124723940217,
+        "swing_s": 0.3342307692307692,
+        "foot_lift_m": 0.044705529819504895,
+        "stance_foot_speed_mps": 0.06722063444337459,
+        "sole_slip_mps": 0.028143762014999248,
+        "double_support": 0.1636536631779258,
+        "flight": 0.0,
+        "knee_range_deg": 22.171538294303055,
+        "arm_swing_deg": 1.009742984488004
+      },
+      "yaw_drift": -0.006962807090411464,
+      "body_err": {
+        "height_m": 0.005409070357918359,
+        "waist_rad": 0.008153889289162356,
+        "arm_rad": 0.007153842260068889
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 29,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09480893500871188,
+      "ang_err": 0.16557518016866662,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.2049333307800197,
+        "swing_s": 0.32566037735849057,
+        "foot_lift_m": 0.04559976424754748,
+        "stance_foot_speed_mps": 0.0783176683699923,
+        "sole_slip_mps": 0.0363232466992886,
+        "double_support": 0.16841103710751665,
+        "flight": 0.0,
+        "knee_range_deg": 22.15268312238335,
+        "arm_swing_deg": 1.094465859860672
+      },
+      "yaw_drift": -0.0006318502564047703,
+      "body_err": {
+        "height_m": 0.005750918129836502,
+        "waist_rad": 0.008501934297627843,
+        "arm_rad": 0.007201310290971655
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 30,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09854373590149786,
+      "ang_err": 0.1567905876111404,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20391033321003585,
+        "swing_s": 0.33384615384615385,
+        "foot_lift_m": 0.04471185295186609,
+        "stance_foot_speed_mps": 0.06918592526000954,
+        "sole_slip_mps": 0.029661789762819198,
+        "double_support": 0.1665080875356803,
+        "flight": 0.0,
+        "knee_range_deg": 22.047181688093502,
+        "arm_swing_deg": 1.0229283305910968
+      },
+      "yaw_drift": 0.011415599406046126,
+      "body_err": {
+        "height_m": 0.00556031530340673,
+        "waist_rad": 0.008367933377860876,
+        "arm_rad": 0.007198482202579472
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 31,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.0884031981483028,
+      "ang_err": 0.15422153141952938,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20103513951616642,
+        "swing_s": 0.3346153846153846,
+        "foot_lift_m": 0.044825147814960234,
+        "stance_foot_speed_mps": 0.06847275376408822,
+        "sole_slip_mps": 0.029934078477720453,
+        "double_support": 0.1636536631779258,
+        "flight": 0.0,
+        "knee_range_deg": 22.2467782519818,
+        "arm_swing_deg": 1.0051533976172138
+      },
+      "yaw_drift": -0.030517327316266767,
+      "body_err": {
+        "height_m": 0.005418038493915854,
+        "waist_rad": 0.008284665373489535,
+        "arm_rad": 0.0072259447480799936
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 32,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09608929434429013,
+      "ang_err": 0.16290165380442054,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.21746063862522463,
+        "swing_s": 0.33615384615384614,
+        "foot_lift_m": 0.046791311436918476,
+        "stance_foot_speed_mps": 0.07295467561595775,
+        "sole_slip_mps": 0.02969392120157968,
+        "double_support": 0.16079923882017128,
+        "flight": 0.0,
+        "knee_range_deg": 22.011800300836313,
+        "arm_swing_deg": 1.003973356389487
+      },
+      "yaw_drift": 0.01557441195326682,
+      "body_err": {
+        "height_m": 0.005456352888955737,
+        "waist_rad": 0.008280228437259184,
+        "arm_rad": 0.006916869978791787
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 33,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09345291039188869,
+      "ang_err": 0.1512877752737757,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20693716150166155,
+        "swing_s": 0.3384615384615384,
+        "foot_lift_m": 0.04587658441058381,
+        "stance_foot_speed_mps": 0.06790119471303531,
+        "sole_slip_mps": 0.028416993714786457,
+        "double_support": 0.15509039010466222,
+        "flight": 0.0,
+        "knee_range_deg": 22.25424667007073,
+        "arm_swing_deg": 1.2620765363232642
+      },
+      "yaw_drift": 0.0027734977827261276,
+      "body_err": {
+        "height_m": 0.005371348026027297,
+        "waist_rad": 0.00817829820210316,
+        "arm_rad": 0.007180816588981868
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 34,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.0978316707156213,
+      "ang_err": 0.17307153535791447,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.19982812460207594,
+        "swing_s": 0.32452830188679244,
+        "foot_lift_m": 0.045250268470906414,
+        "stance_foot_speed_mps": 0.07321954329561695,
+        "sole_slip_mps": 0.0316469835167077,
+        "double_support": 0.1731684110371075,
+        "flight": 0.0,
+        "knee_range_deg": 22.064411480944884,
+        "arm_swing_deg": 1.0499075982198454
+      },
+      "yaw_drift": 0.010072905345293735,
+      "body_err": {
+        "height_m": 0.005790241088778025,
+        "waist_rad": 0.008545300134960675,
+        "arm_rad": 0.007248271000927523
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 35,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.0970501583243261,
+      "ang_err": 0.16137500914951772,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.20557859623954305,
+        "swing_s": 0.3294339622641509,
+        "foot_lift_m": 0.04580287586789448,
+        "stance_foot_speed_mps": 0.07082784384174502,
+        "sole_slip_mps": 0.029416775017846977,
+        "double_support": 0.15889628924833493,
+        "flight": 0.0,
+        "knee_range_deg": 22.220410818355525,
+        "arm_swing_deg": 1.2020890519090404
+      },
+      "yaw_drift": 0.009250159432146418,
+      "body_err": {
+        "height_m": 0.005656001983858919,
+        "waist_rad": 0.008451476326054273,
+        "arm_rad": 0.007209758539510911
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 36,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09237423758591212,
+      "ang_err": 0.16086273580571206,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.19977008621046097,
+        "swing_s": 0.3334615384615385,
+        "foot_lift_m": 0.044642189819615395,
+        "stance_foot_speed_mps": 0.06678528542687438,
+        "sole_slip_mps": 0.02763932356656658,
+        "double_support": 0.16555661274976213,
+        "flight": 0.0,
+        "knee_range_deg": 22.149431362069997,
+        "arm_swing_deg": 0.925313045259655
+      },
+      "yaw_drift": -0.02387462698565694,
+      "body_err": {
+        "height_m": 0.005643604195917524,
+        "waist_rad": 0.008388900556400661,
+        "arm_rad": 0.007186224904529787
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 37,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09523858852752867,
+      "ang_err": 0.15844293884422414,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2203654951324568,
+        "swing_s": 0.33499999999999996,
+        "foot_lift_m": 0.04697366795982502,
+        "stance_foot_speed_mps": 0.07632067837437058,
+        "sole_slip_mps": 0.032553503489145846,
+        "double_support": 0.1636536631779258,
+        "flight": 0.0,
+        "knee_range_deg": 22.039793029623223,
+        "arm_swing_deg": 1.2015544838792642
+      },
+      "yaw_drift": 0.004407805922042231,
+      "body_err": {
+        "height_m": 0.005362412234708937,
+        "waist_rad": 0.008189784169160722,
+        "arm_rad": 0.00698580312108718
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 38,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09325293338573779,
+      "ang_err": 0.14939493690645103,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2009836347781471,
+        "swing_s": 0.3373076923076922,
+        "foot_lift_m": 0.04537894462395401,
+        "stance_foot_speed_mps": 0.06745113260963198,
+        "sole_slip_mps": 0.02869300011307879,
+        "double_support": 0.15794481446241673,
+        "flight": 0.0,
+        "knee_range_deg": 22.171774284590366,
+        "arm_swing_deg": 1.1865117482076761
+      },
+      "yaw_drift": -0.0017045305938928664,
+      "body_err": {
+        "height_m": 0.005510178988955085,
+        "waist_rad": 0.00829343153204878,
+        "arm_rad": 0.007264509366245286
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 39,
+      "fell": true,
+      "fall_time_s": 12.780000000000001,
+      "duration_s": 23.0,
+      "lin_err": 0.2185685726155407,
+      "ang_err": 0.32280436230486065,
+      "gait": null,
+      "yaw_drift": null,
+      "body_err": null
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 40,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09733346162323221,
+      "ang_err": 0.16540801231793512,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.20010568293593178,
+        "swing_s": 0.32754716981132076,
+        "foot_lift_m": 0.04520801471767215,
+        "stance_foot_speed_mps": 0.07353425488841142,
+        "sole_slip_mps": 0.03260415755759958,
+        "double_support": 0.16460513796384396,
+        "flight": 0.0,
+        "knee_range_deg": 21.987320389683145,
+        "arm_swing_deg": 1.1373665982461725
+      },
+      "yaw_drift": 0.014738634889755247,
+      "body_err": {
+        "height_m": 0.005916802387885945,
+        "waist_rad": 0.00867416213832255,
+        "arm_rad": 0.007308286514330815
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 41,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10681076440060844,
+      "ang_err": 0.17325927897395982,
+      "gait": {
+        "step_rate_hz": 2.5689819219790677,
+        "step_length_m": 0.21150421035762734,
+        "swing_s": 0.32259259259259254,
+        "foot_lift_m": 0.0464702408527406,
+        "stance_foot_speed_mps": 0.0762856347755853,
+        "sole_slip_mps": 0.03106370885148549,
+        "double_support": 0.16175071360608945,
+        "flight": 0.0,
+        "knee_range_deg": 22.112928580920002,
+        "arm_swing_deg": 1.2294501376591869
+      },
+      "yaw_drift": 0.04524387733345803,
+      "body_err": {
+        "height_m": 0.0057943559367406635,
+        "waist_rad": 0.008428287824004198,
+        "arm_rad": 0.007135572254673315
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 42,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09271138242351176,
+      "ang_err": 0.16014175598625774,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20991847357304588,
+        "swing_s": 0.3357692307692307,
+        "foot_lift_m": 0.046318600682676715,
+        "stance_foot_speed_mps": 0.07146004896931309,
+        "sole_slip_mps": 0.03111056341395688,
+        "double_support": 0.1598477640342531,
+        "flight": 0.0,
+        "knee_range_deg": 22.097049798823676,
+        "arm_swing_deg": 1.0289109180895994
+      },
+      "yaw_drift": 0.002885803229034444,
+      "body_err": {
+        "height_m": 0.005427649565610423,
+        "waist_rad": 0.008400531203283792,
+        "arm_rad": 0.007066827281494071
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 43,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.08742719640403815,
+      "ang_err": 0.1580519076939051,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20113822738330678,
+        "swing_s": 0.33384615384615385,
+        "foot_lift_m": 0.04498955202385483,
+        "stance_foot_speed_mps": 0.06984874801320923,
+        "sole_slip_mps": 0.030925689948483253,
+        "double_support": 0.16555661274976213,
+        "flight": 0.0,
+        "knee_range_deg": 22.211065706872695,
+        "arm_swing_deg": 0.9630279439291096
+      },
+      "yaw_drift": -0.031608927862381876,
+      "body_err": {
+        "height_m": 0.005556191677411907,
+        "waist_rad": 0.00841202852605357,
+        "arm_rad": 0.0071815626355288395
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 44,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10117898346189375,
+      "ang_err": 0.16267402234001238,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.19765740157109224,
+        "swing_s": 0.3275471698113207,
+        "foot_lift_m": 0.044625315404806506,
+        "stance_foot_speed_mps": 0.07161222954451804,
+        "sole_slip_mps": 0.031933855736309844,
+        "double_support": 0.16555661274976213,
+        "flight": 0.0,
+        "knee_range_deg": 22.112806927184494,
+        "arm_swing_deg": 1.1058362250829439
+      },
+      "yaw_drift": 0.02530575252423494,
+      "body_err": {
+        "height_m": 0.005833495535738807,
+        "waist_rad": 0.008545873960103922,
+        "arm_rad": 0.007346662134450497
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 45,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09526406393232036,
+      "ang_err": 0.1604138297367497,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.2020017203631452,
+        "swing_s": 0.32867924528301884,
+        "foot_lift_m": 0.045093233133770075,
+        "stance_foot_speed_mps": 0.07131470197197792,
+        "sole_slip_mps": 0.031088312288407995,
+        "double_support": 0.16175071360608945,
+        "flight": 0.0,
+        "knee_range_deg": 22.123071629191575,
+        "arm_swing_deg": 1.1878313823272069
+      },
+      "yaw_drift": -0.0036818507734799966,
+      "body_err": {
+        "height_m": 0.0056180808261611604,
+        "waist_rad": 0.008355442261439935,
+        "arm_rad": 0.007271188127931223
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 46,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10408397835833948,
+      "ang_err": 0.16867012251143254,
+      "gait": {
+        "step_rate_hz": 2.616555661274976,
+        "step_length_m": 0.1817316545611082,
+        "swing_s": 0.3152727272727272,
+        "foot_lift_m": 0.043611289555722244,
+        "stance_foot_speed_mps": 0.0694852221356078,
+        "sole_slip_mps": 0.03093468548525789,
+        "double_support": 0.16555661274976213,
+        "flight": 0.0,
+        "knee_range_deg": 22.180387308332516,
+        "arm_swing_deg": 1.2014684438172425
+      },
+      "yaw_drift": 0.0407569847279804,
+      "body_err": {
+        "height_m": 0.006179518409708519,
+        "waist_rad": 0.008813693966058434,
+        "arm_rad": 0.007561051366248613
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 47,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09992114241197984,
+      "ang_err": 0.1665688448410913,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.2011405224643676,
+        "swing_s": 0.32716981132075473,
+        "foot_lift_m": 0.04487694291432655,
+        "stance_foot_speed_mps": 0.07091524558215649,
+        "sole_slip_mps": 0.030850634130331313,
+        "double_support": 0.16555661274976213,
+        "flight": 0.0,
+        "knee_range_deg": 22.170573199550926,
+        "arm_swing_deg": 1.0221935897985515
+      },
+      "yaw_drift": 0.02035097829789844,
+      "body_err": {
+        "height_m": 0.00579478449045745,
+        "waist_rad": 0.008443382116927588,
+        "arm_rad": 0.007214896830536605
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 48,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09571630198508915,
+      "ang_err": 0.1647404261962034,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.2014871641555479,
+        "swing_s": 0.3267924528301886,
+        "foot_lift_m": 0.0451451566743279,
+        "stance_foot_speed_mps": 0.07386035898463386,
+        "sole_slip_mps": 0.0327285129863685,
+        "double_support": 0.1665080875356803,
+        "flight": 0.0,
+        "knee_range_deg": 22.110073742875667,
+        "arm_swing_deg": 1.0545963624657284
+      },
+      "yaw_drift": 0.0011719642306163476,
+      "body_err": {
+        "height_m": 0.005800476337505804,
+        "waist_rad": 0.008525159563716826,
+        "arm_rad": 0.007253974969892001
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 49,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09531281051179834,
+      "ang_err": 0.1578742954217317,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2107901058034427,
+        "swing_s": 0.33499999999999996,
+        "foot_lift_m": 0.045895334511634966,
+        "stance_foot_speed_mps": 0.07250841489803173,
+        "sole_slip_mps": 0.031139762856096466,
+        "double_support": 0.16270218839200762,
+        "flight": 0.0,
+        "knee_range_deg": 22.085993782407556,
+        "arm_swing_deg": 1.1021118647242962
+      },
+      "yaw_drift": 0.004634997976872015,
+      "body_err": {
+        "height_m": 0.005546805421553869,
+        "waist_rad": 0.008305713576818377,
+        "arm_rad": 0.007095421193413963
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 50,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.0979687302990618,
+      "ang_err": 0.16598547161121846,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.19542762654974913,
+        "swing_s": 0.3283018867924528,
+        "foot_lift_m": 0.04480035933510049,
+        "stance_foot_speed_mps": 0.06757813385268877,
+        "sole_slip_mps": 0.02918670175300245,
+        "double_support": 0.16270218839200762,
+        "flight": 0.0,
+        "knee_range_deg": 22.08996444764493,
+        "arm_swing_deg": 1.1004610489573403
+      },
+      "yaw_drift": 0.013237278112587453,
+      "body_err": {
+        "height_m": 0.005801196033669124,
+        "waist_rad": 0.008582679228498409,
+        "arm_rad": 0.0072855379274694015
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 51,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10204751714725412,
+      "ang_err": 0.16300592242940865,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2179637750681397,
+        "swing_s": 0.33538461538461534,
+        "foot_lift_m": 0.0465254976893142,
+        "stance_foot_speed_mps": 0.07262393791606193,
+        "sole_slip_mps": 0.02925581110870981,
+        "double_support": 0.16270218839200762,
+        "flight": 0.0,
+        "knee_range_deg": 21.86090452518553,
+        "arm_swing_deg": 1.072506343372731
+      },
+      "yaw_drift": 0.034034310642427415,
+      "body_err": {
+        "height_m": 0.005575865886476025,
+        "waist_rad": 0.008336560924532162,
+        "arm_rad": 0.00699355549060135
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 52,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09717551296221619,
+      "ang_err": 0.16276366296931255,
+      "gait": {
+        "step_rate_hz": 2.5689819219790677,
+        "step_length_m": 0.20191299024837747,
+        "swing_s": 0.3233333333333333,
+        "foot_lift_m": 0.04457285450357421,
+        "stance_foot_speed_mps": 0.07049414423356955,
+        "sole_slip_mps": 0.029437145357635947,
+        "double_support": 0.16175071360608945,
+        "flight": 0.0,
+        "knee_range_deg": 22.28294040526712,
+        "arm_swing_deg": 1.0014333168609622
+      },
+      "yaw_drift": 0.0009294147338566859,
+      "body_err": {
+        "height_m": 0.005738299886230478,
+        "waist_rad": 0.008315043850117502,
+        "arm_rad": 0.007146678755063121
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 53,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09404548753101422,
+      "ang_err": 0.15089611596661856,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2214518924835872,
+        "swing_s": 0.34076923076923066,
+        "foot_lift_m": 0.046956761868255883,
+        "stance_foot_speed_mps": 0.06911382134961544,
+        "sole_slip_mps": 0.027301069751137063,
+        "double_support": 0.1493815413891532,
+        "flight": 0.0,
+        "knee_range_deg": 22.160729202089083,
+        "arm_swing_deg": 1.2033857639590375
+      },
+      "yaw_drift": 0.0006007864144499809,
+      "body_err": {
+        "height_m": 0.005259243622896653,
+        "waist_rad": 0.008060253003584825,
+        "arm_rad": 0.006952870672535634
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 54,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09642264858050244,
+      "ang_err": 0.16237718102963,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.21426096621352578,
+        "swing_s": 0.3373076923076923,
+        "foot_lift_m": 0.046396582268421235,
+        "stance_foot_speed_mps": 0.07119226365509969,
+        "sole_slip_mps": 0.029474503389694606,
+        "double_support": 0.15794481446241673,
+        "flight": 0.0,
+        "knee_range_deg": 22.0904514030852,
+        "arm_swing_deg": 0.9810512976632684
+      },
+      "yaw_drift": 0.017429869554328986,
+      "body_err": {
+        "height_m": 0.005471879478696503,
+        "waist_rad": 0.008286729795653107,
+        "arm_rad": 0.0069757657230385215
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 55,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.0872050093592717,
+      "ang_err": 0.15282089398969112,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2067009384031624,
+        "swing_s": 0.33653846153846145,
+        "foot_lift_m": 0.045314427483461865,
+        "stance_foot_speed_mps": 0.06792439791770287,
+        "sole_slip_mps": 0.02770063700369731,
+        "double_support": 0.1598477640342531,
+        "flight": 0.0,
+        "knee_range_deg": 22.255946965873733,
+        "arm_swing_deg": 1.1391288606041512
+      },
+      "yaw_drift": -0.035609617791125855,
+      "body_err": {
+        "height_m": 0.005338990066764608,
+        "waist_rad": 0.008176207177139494,
+        "arm_rad": 0.0071693080762270335
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 56,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.08793597229954583,
+      "ang_err": 0.15377323380954377,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.18983030937245418,
+        "swing_s": 0.33499999999999996,
+        "foot_lift_m": 0.04429816003703675,
+        "stance_foot_speed_mps": 0.06445661376838614,
+        "sole_slip_mps": 0.02749736246222142,
+        "double_support": 0.1636536631779258,
+        "flight": 0.0,
+        "knee_range_deg": 22.178773518220023,
+        "arm_swing_deg": 1.1412178855757347
+      },
+      "yaw_drift": -0.02972699135421473,
+      "body_err": {
+        "height_m": 0.005488868430612064,
+        "waist_rad": 0.008437083880620956,
+        "arm_rad": 0.007378422110472122
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 57,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.1007685861283132,
+      "ang_err": 0.16682036843837492,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.21832020037591784,
+        "swing_s": 0.33115384615384613,
+        "foot_lift_m": 0.047064617829976556,
+        "stance_foot_speed_mps": 0.07797447552368116,
+        "sole_slip_mps": 0.0330333920293075,
+        "double_support": 0.17126546146527116,
+        "flight": 0.0,
+        "knee_range_deg": 21.853981314912335,
+        "arm_swing_deg": 1.1419333173056985
+      },
+      "yaw_drift": 0.024933201287441357,
+      "body_err": {
+        "height_m": 0.005508758503489829,
+        "waist_rad": 0.008319728863010616,
+        "arm_rad": 0.007022961769252225
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 58,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.0914500501345957,
+      "ang_err": 0.15301334858599042,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.19305432234534498,
+        "swing_s": 0.32999999999999996,
+        "foot_lift_m": 0.04364722288041551,
+        "stance_foot_speed_mps": 0.0679422773103474,
+        "sole_slip_mps": 0.031236127907318046,
+        "double_support": 0.17507136060894388,
+        "flight": 0.0,
+        "knee_range_deg": 22.202586054902465,
+        "arm_swing_deg": 1.0627077364501023
+      },
+      "yaw_drift": -0.016364792641004062,
+      "body_err": {
+        "height_m": 0.005489573125820217,
+        "waist_rad": 0.008344997541099988,
+        "arm_rad": 0.007356886142334619
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 59,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09234463250790949,
+      "ang_err": 0.1514910837153667,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.1950589562184302,
+        "swing_s": 0.3342307692307692,
+        "foot_lift_m": 0.044183037015367035,
+        "stance_foot_speed_mps": 0.06570251363166509,
+        "sole_slip_mps": 0.028362830172658362,
+        "double_support": 0.16460513796384396,
+        "flight": 0.0,
+        "knee_range_deg": 22.17353171636014,
+        "arm_swing_deg": 1.1173177004800392
+      },
+      "yaw_drift": -0.011167233389457824,
+      "body_err": {
+        "height_m": 0.005544147204365061,
+        "waist_rad": 0.008357796443063165,
+        "arm_rad": 0.007376331288989505
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 60,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10391584287657951,
+      "ang_err": 0.17828100499877636,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.20828331454080837,
+        "swing_s": 0.3252830188679245,
+        "foot_lift_m": 0.046022334934753335,
+        "stance_foot_speed_mps": 0.07471583019516578,
+        "sole_slip_mps": 0.030313188917755557,
+        "double_support": 0.17221693625118933,
+        "flight": 0.0,
+        "knee_range_deg": 22.073383714428502,
+        "arm_swing_deg": 1.0356846440594059
+      },
+      "yaw_drift": 0.041635776547002505,
+      "body_err": {
+        "height_m": 0.00578478883493684,
+        "waist_rad": 0.008365789914697485,
+        "arm_rad": 0.007091655133372931
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 61,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.08810590419456985,
+      "ang_err": 0.15633306314237222,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2097018025880306,
+        "swing_s": 0.3353846153846154,
+        "foot_lift_m": 0.045673264819119944,
+        "stance_foot_speed_mps": 0.07121686564019977,
+        "sole_slip_mps": 0.030564996102245317,
+        "double_support": 0.16079923882017128,
+        "flight": 0.0,
+        "knee_range_deg": 22.260718310607636,
+        "arm_swing_deg": 1.0086413764726039
+      },
+      "yaw_drift": -0.02848173550861787,
+      "body_err": {
+        "height_m": 0.005443390516037717,
+        "waist_rad": 0.008212061058977121,
+        "arm_rad": 0.007033744683941437
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 62,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09333244461570175,
+      "ang_err": 0.16087456028532346,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20581706819088832,
+        "swing_s": 0.3357692307692307,
+        "foot_lift_m": 0.04579730019278531,
+        "stance_foot_speed_mps": 0.06927338479934551,
+        "sole_slip_mps": 0.029189767492893343,
+        "double_support": 0.16175071360608945,
+        "flight": 0.0,
+        "knee_range_deg": 22.088382860808675,
+        "arm_swing_deg": 0.9458383729299663
+      },
+      "yaw_drift": 0.00357463027648314,
+      "body_err": {
+        "height_m": 0.005470339300205547,
+        "waist_rad": 0.008382148155150343,
+        "arm_rad": 0.007098480165613748
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 63,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09289810214395375,
+      "ang_err": 0.15828235072523694,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2149265279248463,
+        "swing_s": 0.33538461538461534,
+        "foot_lift_m": 0.046215115938722295,
+        "stance_foot_speed_mps": 0.07415382636956559,
+        "sole_slip_mps": 0.032271248501249475,
+        "double_support": 0.16270218839200762,
+        "flight": 0.0,
+        "knee_range_deg": 21.976678717012938,
+        "arm_swing_deg": 1.1523810774622623
+      },
+      "yaw_drift": -0.008508358881795417,
+      "body_err": {
+        "height_m": 0.005414987873618125,
+        "waist_rad": 0.008375737320444868,
+        "arm_rad": 0.007035579509756019
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 64,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09936382691775818,
+      "ang_err": 0.16357144359466233,
+      "gait": {
+        "step_rate_hz": 2.5689819219790677,
+        "step_length_m": 0.21146940263307729,
+        "swing_s": 0.32407407407407407,
+        "foot_lift_m": 0.04559500702227539,
+        "stance_foot_speed_mps": 0.07588899818387902,
+        "sole_slip_mps": 0.031908554856261546,
+        "double_support": 0.1598477640342531,
+        "flight": 0.0,
+        "knee_range_deg": 21.962179249461805,
+        "arm_swing_deg": 1.135608821348053
+      },
+      "yaw_drift": 0.017843997823756435,
+      "body_err": {
+        "height_m": 0.005625829685433245,
+        "waist_rad": 0.008327889722038854,
+        "arm_rad": 0.007063930618999457
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 65,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10483082576870781,
+      "ang_err": 0.16436860721660437,
+      "gait": {
+        "step_rate_hz": 2.5689819219790677,
+        "step_length_m": 0.19670595683390826,
+        "swing_s": 0.3229629629629629,
+        "foot_lift_m": 0.043892675681760814,
+        "stance_foot_speed_mps": 0.07124412825641803,
+        "sole_slip_mps": 0.03087277262827299,
+        "double_support": 0.16270218839200762,
+        "flight": 0.0,
+        "knee_range_deg": 21.989560832224235,
+        "arm_swing_deg": 1.0567753497201229
+      },
+      "yaw_drift": 0.03379260660719942,
+      "body_err": {
+        "height_m": 0.005969221034106876,
+        "waist_rad": 0.008615381462455237,
+        "arm_rad": 0.0072951989490333225
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 66,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10358895858475278,
+      "ang_err": 0.16239783089945647,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.19966326143249313,
+        "swing_s": 0.32867924528301884,
+        "foot_lift_m": 0.044547955068848684,
+        "stance_foot_speed_mps": 0.07101920313969218,
+        "sole_slip_mps": 0.031536033325499396,
+        "double_support": 0.16079923882017128,
+        "flight": 0.0,
+        "knee_range_deg": 22.135488535337533,
+        "arm_swing_deg": 1.0199999612189317
+      },
+      "yaw_drift": 0.03627247246585925,
+      "body_err": {
+        "height_m": 0.0059599004061152904,
+        "waist_rad": 0.008654472457551498,
+        "arm_rad": 0.007262196452611708
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 67,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09378593287623774,
+      "ang_err": 0.1496725124863816,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.21492281900410096,
+        "swing_s": 0.3384615384615384,
+        "foot_lift_m": 0.046394430164127545,
+        "stance_foot_speed_mps": 0.0725023560797165,
+        "sole_slip_mps": 0.03175304467362597,
+        "double_support": 0.15318744053282587,
+        "flight": 0.0,
+        "knee_range_deg": 22.10979095393194,
+        "arm_swing_deg": 1.2202604618642507
+      },
+      "yaw_drift": 0.0013563984151421873,
+      "body_err": {
+        "height_m": 0.005230911020439612,
+        "waist_rad": 0.008155859450060199,
+        "arm_rad": 0.007089262550882562
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 68,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09202499979228516,
+      "ang_err": 0.15049118990293436,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20732188874342267,
+        "swing_s": 0.3388461538461538,
+        "foot_lift_m": 0.045776202340576874,
+        "stance_foot_speed_mps": 0.06828834443691992,
+        "sole_slip_mps": 0.028944541236449694,
+        "double_support": 0.15413891531874405,
+        "flight": 0.0,
+        "knee_range_deg": 22.237984148780576,
+        "arm_swing_deg": 1.180824864303834
+      },
+      "yaw_drift": -0.00929544606691126,
+      "body_err": {
+        "height_m": 0.005363396919333434,
+        "waist_rad": 0.008247833047437553,
+        "arm_rad": 0.007158795342389984
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 69,
+      "fell": true,
+      "fall_time_s": 8.74,
+      "duration_s": 23.0,
+      "lin_err": 0.2769164882519829,
+      "ang_err": 0.4227611250152448,
+      "gait": null,
+      "yaw_drift": null,
+      "body_err": null
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 70,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.08780479702376198,
+      "ang_err": 0.1531413827599684,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2138136958794247,
+        "swing_s": 0.33538461538461534,
+        "foot_lift_m": 0.045956789951913025,
+        "stance_foot_speed_mps": 0.07363075443829982,
+        "sole_slip_mps": 0.032767418994137404,
+        "double_support": 0.1598477640342531,
+        "flight": 0.0,
+        "knee_range_deg": 22.235614988426484,
+        "arm_swing_deg": 1.1138288885799141
+      },
+      "yaw_drift": -0.03413177431557669,
+      "body_err": {
+        "height_m": 0.005305570807863478,
+        "waist_rad": 0.008169505496691699,
+        "arm_rad": 0.007047448097559421
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 71,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.0960762675262777,
+      "ang_err": 0.15131869603324266,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.1935420152750579,
+        "swing_s": 0.3373076923076923,
+        "foot_lift_m": 0.04473444112135395,
+        "stance_foot_speed_mps": 0.06446390177521816,
+        "sole_slip_mps": 0.026947731876742827,
+        "double_support": 0.15794481446241673,
+        "flight": 0.0,
+        "knee_range_deg": 22.17938278802251,
+        "arm_swing_deg": 1.141489056970792
+      },
+      "yaw_drift": 0.017705995086816848,
+      "body_err": {
+        "height_m": 0.005679516454958159,
+        "waist_rad": 0.008468045850062942,
+        "arm_rad": 0.007360318624141064
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 72,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10066827835926334,
+      "ang_err": 0.16788286003478833,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20818315903708343,
+        "swing_s": 0.3357692307692307,
+        "foot_lift_m": 0.04683344522652953,
+        "stance_foot_speed_mps": 0.06977862694798981,
+        "sole_slip_mps": 0.025939565304308125,
+        "double_support": 0.16175071360608945,
+        "flight": 0.0,
+        "knee_range_deg": 22.19620622344186,
+        "arm_swing_deg": 1.2347170314182523
+      },
+      "yaw_drift": 0.030077018532325573,
+      "body_err": {
+        "height_m": 0.00574151249524395,
+        "waist_rad": 0.008438349761285713,
+        "arm_rad": 0.007198650310892404
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 73,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.0927187400225568,
+      "ang_err": 0.15235715082952697,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.21681973811613042,
+        "swing_s": 0.3384615384615385,
+        "foot_lift_m": 0.04640100209134079,
+        "stance_foot_speed_mps": 0.07045716634356479,
+        "sole_slip_mps": 0.027928797198339312,
+        "double_support": 0.15509039010466222,
+        "flight": 0.0,
+        "knee_range_deg": 22.19604734864871,
+        "arm_swing_deg": 1.1361422028233186
+      },
+      "yaw_drift": -0.004353648040944598,
+      "body_err": {
+        "height_m": 0.005333646404446982,
+        "waist_rad": 0.008104044755386404,
+        "arm_rad": 0.006996945099754417
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 74,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09806139489769036,
+      "ang_err": 0.1609198624059279,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.21260048811818533,
+        "swing_s": 0.329811320754717,
+        "foot_lift_m": 0.046055656598311775,
+        "stance_foot_speed_mps": 0.07161673401771577,
+        "sole_slip_mps": 0.02755381074265179,
+        "double_support": 0.15794481446241673,
+        "flight": 0.0,
+        "knee_range_deg": 22.2555536952787,
+        "arm_swing_deg": 1.1905894865129718
+      },
+      "yaw_drift": 0.008351821981779877,
+      "body_err": {
+        "height_m": 0.005514774166559338,
+        "waist_rad": 0.008201613530884163,
+        "arm_rad": 0.007114867979252467
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 75,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.094594701338544,
+      "ang_err": 0.14956508979800284,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.19478812957647876,
+        "swing_s": 0.3376923076923077,
+        "foot_lift_m": 0.04456849103072474,
+        "stance_foot_speed_mps": 0.0637559568320965,
+        "sole_slip_mps": 0.026628954799888103,
+        "double_support": 0.15699333967649856,
+        "flight": 0.0,
+        "knee_range_deg": 22.201705458845556,
+        "arm_swing_deg": 1.153862372882205
+      },
+      "yaw_drift": 0.0007265465534057867,
+      "body_err": {
+        "height_m": 0.005611539863059091,
+        "waist_rad": 0.008404473386407534,
+        "arm_rad": 0.007389618932724888
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 76,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10214117713045964,
+      "ang_err": 0.15885098949027038,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.21008131043009795,
+        "swing_s": 0.33538461538461534,
+        "foot_lift_m": 0.04618140610398218,
+        "stance_foot_speed_mps": 0.07146238096962454,
+        "sole_slip_mps": 0.03020619965974632,
+        "double_support": 0.16270218839200762,
+        "flight": 0.0,
+        "knee_range_deg": 21.971313678668853,
+        "arm_swing_deg": 1.1862422725755863
+      },
+      "yaw_drift": 0.03108499400421654,
+      "body_err": {
+        "height_m": 0.005660845116190088,
+        "waist_rad": 0.008396496722319657,
+        "arm_rad": 0.007149880487178844
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 77,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10021144879420837,
+      "ang_err": 0.1520022730355711,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.1882651441798142,
+        "swing_s": 0.33461538461538454,
+        "foot_lift_m": 0.044030440407417944,
+        "stance_foot_speed_mps": 0.06312014803303412,
+        "sole_slip_mps": 0.026768562846211496,
+        "double_support": 0.16460513796384396,
+        "flight": 0.0,
+        "knee_range_deg": 22.171170677509018,
+        "arm_swing_deg": 1.1415589615087096
+      },
+      "yaw_drift": 0.024420429733260005,
+      "body_err": {
+        "height_m": 0.005821911962381775,
+        "waist_rad": 0.008600815609071126,
+        "arm_rad": 0.007501349774526945
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 78,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10428027945881119,
+      "ang_err": 0.16331620632327987,
+      "gait": {
+        "step_rate_hz": 2.5689819219790677,
+        "step_length_m": 0.20051055212246702,
+        "swing_s": 0.3196296296296296,
+        "foot_lift_m": 0.0449387387681725,
+        "stance_foot_speed_mps": 0.07496121620952928,
+        "sole_slip_mps": 0.03270301812614956,
+        "double_support": 0.16936251189343482,
+        "flight": 0.0,
+        "knee_range_deg": 22.012354209405537,
+        "arm_swing_deg": 1.2422647867370675
+      },
+      "yaw_drift": 0.024590760002621805,
+      "body_err": {
+        "height_m": 0.00583272922360833,
+        "waist_rad": 0.008512869304899744,
+        "arm_rad": 0.0072921278131581075
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 79,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09134786014409446,
+      "ang_err": 0.16330835095251223,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.21754593822694765,
+        "swing_s": 0.3330769230769231,
+        "foot_lift_m": 0.04705643928249458,
+        "stance_foot_speed_mps": 0.07600492653962675,
+        "sole_slip_mps": 0.030857258344557884,
+        "double_support": 0.16745956232159848,
+        "flight": 0.0,
+        "knee_range_deg": 22.087088645051384,
+        "arm_swing_deg": 1.1975955812348837
+      },
+      "yaw_drift": -0.01316005033073177,
+      "body_err": {
+        "height_m": 0.005324733725122921,
+        "waist_rad": 0.00833623711010636,
+        "arm_rad": 0.007051316193540696
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 80,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.08957577265357494,
+      "ang_err": 0.15286789666992764,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2114760496423031,
+        "swing_s": 0.33499999999999996,
+        "foot_lift_m": 0.04596735140419687,
+        "stance_foot_speed_mps": 0.07051428045395251,
+        "sole_slip_mps": 0.029813365580575034,
+        "double_support": 0.16175071360608945,
+        "flight": 0.0,
+        "knee_range_deg": 22.230611093595243,
+        "arm_swing_deg": 1.2167541670583906
+      },
+      "yaw_drift": -0.02348020352636228,
+      "body_err": {
+        "height_m": 0.005274533799287987,
+        "waist_rad": 0.008226541699725441,
+        "arm_rad": 0.007108598745723834
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 81,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09593925900039066,
+      "ang_err": 0.1522648297291008,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20537583508637064,
+        "swing_s": 0.336153846153846,
+        "foot_lift_m": 0.045337403690149186,
+        "stance_foot_speed_mps": 0.0698626964937098,
+        "sole_slip_mps": 0.030608013463613002,
+        "double_support": 0.16079923882017128,
+        "flight": 0.0,
+        "knee_range_deg": 22.06420894760658,
+        "arm_swing_deg": 1.089954842443965
+      },
+      "yaw_drift": 0.008066550415487952,
+      "body_err": {
+        "height_m": 0.0056289358353622905,
+        "waist_rad": 0.008381083479736906,
+        "arm_rad": 0.00720371669238951
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 82,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.0894324427097076,
+      "ang_err": 0.15583837144811508,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20766215682098987,
+        "swing_s": 0.3376923076923077,
+        "foot_lift_m": 0.045952072739966196,
+        "stance_foot_speed_mps": 0.06816402404840209,
+        "sole_slip_mps": 0.027804084732933113,
+        "double_support": 0.15699333967649856,
+        "flight": 0.0,
+        "knee_range_deg": 22.238975564549875,
+        "arm_swing_deg": 1.0551172000530906
+      },
+      "yaw_drift": -0.015752262243185315,
+      "body_err": {
+        "height_m": 0.0054558489653966065,
+        "waist_rad": 0.008387573876704628,
+        "arm_rad": 0.007104962700001345
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 83,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.08892197538650375,
+      "ang_err": 0.15971114484671878,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20390526842778645,
+        "swing_s": 0.33423076923076916,
+        "foot_lift_m": 0.045191083308003595,
+        "stance_foot_speed_mps": 0.06846740436371863,
+        "sole_slip_mps": 0.02910881674434436,
+        "double_support": 0.16460513796384396,
+        "flight": 0.0,
+        "knee_range_deg": 22.188471112167406,
+        "arm_swing_deg": 1.022804046598847
+      },
+      "yaw_drift": -0.02207478497376177,
+      "body_err": {
+        "height_m": 0.005409350853097905,
+        "waist_rad": 0.008318404133415065,
+        "arm_rad": 0.0071517333042267804
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 84,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10094908423338207,
+      "ang_err": 0.15901134027967337,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.19531384003200958,
+        "swing_s": 0.3315384615384615,
+        "foot_lift_m": 0.04467478803714446,
+        "stance_foot_speed_mps": 0.06833192437491023,
+        "sole_slip_mps": 0.0299101077356364,
+        "double_support": 0.17221693625118933,
+        "flight": 0.0,
+        "knee_range_deg": 22.061629404458497,
+        "arm_swing_deg": 1.127943767654616
+      },
+      "yaw_drift": 0.013068708022841916,
+      "body_err": {
+        "height_m": 0.005766455063277949,
+        "waist_rad": 0.008642732767442516,
+        "arm_rad": 0.007369986579991991
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 85,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09904834865969697,
+      "ang_err": 0.15870419021501428,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.19297829636154554,
+        "swing_s": 0.32716981132075473,
+        "foot_lift_m": 0.04475376912708385,
+        "stance_foot_speed_mps": 0.07170953340445675,
+        "sole_slip_mps": 0.032767151506383985,
+        "double_support": 0.16555661274976213,
+        "flight": 0.0,
+        "knee_range_deg": 22.18898799350351,
+        "arm_swing_deg": 1.2276629271966155
+      },
+      "yaw_drift": 0.020734439319059002,
+      "body_err": {
+        "height_m": 0.005701140533968891,
+        "waist_rad": 0.008506137799595612,
+        "arm_rad": 0.007434554070627224
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 86,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09427654345453089,
+      "ang_err": 0.16464573441590044,
+      "gait": {
+        "step_rate_hz": 2.5689819219790677,
+        "step_length_m": 0.18912177482330586,
+        "swing_s": 0.3214814814814815,
+        "foot_lift_m": 0.04372126878196597,
+        "stance_foot_speed_mps": 0.06888375838724889,
+        "sole_slip_mps": 0.030730260916217274,
+        "double_support": 0.16555661274976213,
+        "flight": 0.0,
+        "knee_range_deg": 22.219079696107194,
+        "arm_swing_deg": 1.1010081129545024
+      },
+      "yaw_drift": -0.003781344600325346,
+      "body_err": {
+        "height_m": 0.00586948312436388,
+        "waist_rad": 0.008637023972697016,
+        "arm_rad": 0.007425035710115179
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 87,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09388997648150403,
+      "ang_err": 0.16340863229105218,
+      "gait": {
+        "step_rate_hz": 2.5689819219790677,
+        "step_length_m": 0.189323854612744,
+        "swing_s": 0.3214814814814815,
+        "foot_lift_m": 0.04353011667340567,
+        "stance_foot_speed_mps": 0.06646312361585194,
+        "sole_slip_mps": 0.027215065241705135,
+        "double_support": 0.1665080875356803,
+        "flight": 0.0,
+        "knee_range_deg": 22.232240562072214,
+        "arm_swing_deg": 1.0241061474067523
+      },
+      "yaw_drift": -0.009441432381742073,
+      "body_err": {
+        "height_m": 0.005859305806763141,
+        "waist_rad": 0.00850647286955897,
+        "arm_rad": 0.007324993483813362
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 88,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09701642785585189,
+      "ang_err": 0.15804567926645705,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2015459852192022,
+        "swing_s": 0.33384615384615385,
+        "foot_lift_m": 0.04531665113892844,
+        "stance_foot_speed_mps": 0.07049296460753784,
+        "sole_slip_mps": 0.030754451978269055,
+        "double_support": 0.1665080875356803,
+        "flight": 0.0,
+        "knee_range_deg": 22.038903461034376,
+        "arm_swing_deg": 1.1133224143841864
+      },
+      "yaw_drift": 0.0047596927487122565,
+      "body_err": {
+        "height_m": 0.005731110079499104,
+        "waist_rad": 0.00860035335303858,
+        "arm_rad": 0.007296731140563756
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 89,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.1060129547200774,
+      "ang_err": 0.1703102867065374,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.20615706648044688,
+        "swing_s": 0.32188679245283014,
+        "foot_lift_m": 0.04542500689710525,
+        "stance_foot_speed_mps": 0.07783916116848494,
+        "sole_slip_mps": 0.0338047228521597,
+        "double_support": 0.17982873453853473,
+        "flight": 0.0,
+        "knee_range_deg": 21.779261385390555,
+        "arm_swing_deg": 1.243271145711153
+      },
+      "yaw_drift": 0.028719940426930057,
+      "body_err": {
+        "height_m": 0.005904584890776154,
+        "waist_rad": 0.008709644363029347,
+        "arm_rad": 0.00727549816675279
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 90,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10360718317485439,
+      "ang_err": 0.17614718136902843,
+      "gait": {
+        "step_rate_hz": 2.664129400570885,
+        "step_length_m": 0.19612145660466873,
+        "swing_s": 0.30964285714285716,
+        "foot_lift_m": 0.04406796645440421,
+        "stance_foot_speed_mps": 0.07454074029875199,
+        "sole_slip_mps": 0.03132937905286923,
+        "double_support": 0.16745956232159848,
+        "flight": 0.0,
+        "knee_range_deg": 22.071434097837873,
+        "arm_swing_deg": 0.9575071265286362
+      },
+      "yaw_drift": 0.03979256764163962,
+      "body_err": {
+        "height_m": 0.006020606379336044,
+        "waist_rad": 0.008569480785035472,
+        "arm_rad": 0.007153385191786579
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 91,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10301809189271248,
+      "ang_err": 0.17023561647292038,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.19847326839060458,
+        "swing_s": 0.32301886792452833,
+        "foot_lift_m": 0.045447212338339725,
+        "stance_foot_speed_mps": 0.07377637223825578,
+        "sole_slip_mps": 0.032447469687669914,
+        "double_support": 0.1779257849666984,
+        "flight": 0.0,
+        "knee_range_deg": 22.176104293880595,
+        "arm_swing_deg": 1.2247859333465199
+      },
+      "yaw_drift": 0.03735163471619656,
+      "body_err": {
+        "height_m": 0.005735917711389782,
+        "waist_rad": 0.008438636612418424,
+        "arm_rad": 0.0072988653952430465
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 92,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09262146878957381,
+      "ang_err": 0.15522949965433785,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.1956253717575248,
+        "swing_s": 0.3342307692307692,
+        "foot_lift_m": 0.04478249849969311,
+        "stance_foot_speed_mps": 0.06797425505684698,
+        "sole_slip_mps": 0.03015391554874673,
+        "double_support": 0.16460513796384396,
+        "flight": 0.0,
+        "knee_range_deg": 22.10478168409991,
+        "arm_swing_deg": 1.134236251077845
+      },
+      "yaw_drift": -0.009535325301028767,
+      "body_err": {
+        "height_m": 0.005636705721609284,
+        "waist_rad": 0.0085488545702628,
+        "arm_rad": 0.0073167780190068945
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 93,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.0893017872245479,
+      "ang_err": 0.15121054017235247,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.20367183869902325,
+        "swing_s": 0.3361538461538461,
+        "foot_lift_m": 0.04475757554552225,
+        "stance_foot_speed_mps": 0.06730966847022497,
+        "sole_slip_mps": 0.02822575224127198,
+        "double_support": 0.16079923882017128,
+        "flight": 0.0,
+        "knee_range_deg": 22.314229280815344,
+        "arm_swing_deg": 1.0303708967052856
+      },
+      "yaw_drift": -0.03131930322971347,
+      "body_err": {
+        "height_m": 0.005360636041435881,
+        "waist_rad": 0.008096620764881072,
+        "arm_rad": 0.0071982681268620684
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 94,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09847328824371718,
+      "ang_err": 0.1580160592335095,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.1975068955926888,
+        "swing_s": 0.33538461538461534,
+        "foot_lift_m": 0.04519777526900987,
+        "stance_foot_speed_mps": 0.06651043772635079,
+        "sole_slip_mps": 0.02732182623840287,
+        "double_support": 0.16270218839200762,
+        "flight": 0.0,
+        "knee_range_deg": 22.189511309536215,
+        "arm_swing_deg": 1.1151664612657355
+      },
+      "yaw_drift": 0.02475613825390591,
+      "body_err": {
+        "height_m": 0.005648776404306214,
+        "waist_rad": 0.008411317988083528,
+        "arm_rad": 0.007278804579001634
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 95,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.08670620956424827,
+      "ang_err": 0.15959351846771114,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.2047587198958224,
+        "swing_s": 0.3346153846153846,
+        "foot_lift_m": 0.04544629079662199,
+        "stance_foot_speed_mps": 0.0681538133607901,
+        "sole_slip_mps": 0.02759233788374574,
+        "double_support": 0.16270218839200762,
+        "flight": 0.0,
+        "knee_range_deg": 22.18730029679597,
+        "arm_swing_deg": 1.0164987062042856
+      },
+      "yaw_drift": -0.032131639374594186,
+      "body_err": {
+        "height_m": 0.005499500254213672,
+        "waist_rad": 0.008455171560226394,
+        "arm_rad": 0.007140736267370272
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 96,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09541895815742463,
+      "ang_err": 0.16023576681070337,
+      "gait": {
+        "step_rate_hz": 2.5689819219790677,
+        "step_length_m": 0.19209575837213733,
+        "swing_s": 0.32185185185185183,
+        "foot_lift_m": 0.04334258006847642,
+        "stance_foot_speed_mps": 0.065483466048026,
+        "sole_slip_mps": 0.025769755017174326,
+        "double_support": 0.16555661274976213,
+        "flight": 0.0,
+        "knee_range_deg": 22.195513978963636,
+        "arm_swing_deg": 1.0378776587298035
+      },
+      "yaw_drift": -0.004709507515287352,
+      "body_err": {
+        "height_m": 0.005672698572428311,
+        "waist_rad": 0.008352663559120208,
+        "arm_rad": 0.007334097788230518
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 97,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.10403241397955833,
+      "ang_err": 0.16425136523838962,
+      "gait": {
+        "step_rate_hz": 2.47383444338725,
+        "step_length_m": 0.19908670052078065,
+        "swing_s": 0.3323076923076923,
+        "foot_lift_m": 0.04545538557301772,
+        "stance_foot_speed_mps": 0.0698654353155044,
+        "sole_slip_mps": 0.029325400322515387,
+        "double_support": 0.170313986679353,
+        "flight": 0.0,
+        "knee_range_deg": 22.07486852873899,
+        "arm_swing_deg": 1.1465480623242947
+      },
+      "yaw_drift": 0.04317725230827878,
+      "body_err": {
+        "height_m": 0.005801276875173692,
+        "waist_rad": 0.008561532213077943,
+        "arm_rad": 0.007269119051994709
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 98,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.09748199607136965,
+      "ang_err": 0.1617113893365674,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.18708783991209604,
+        "swing_s": 0.3256603773584905,
+        "foot_lift_m": 0.04403646619960936,
+        "stance_foot_speed_mps": 0.06906706464477541,
+        "sole_slip_mps": 0.031021366143316745,
+        "double_support": 0.16936251189343482,
+        "flight": 0.0,
+        "knee_range_deg": 22.253782746069486,
+        "arm_swing_deg": 1.083188492614709
+      },
+      "yaw_drift": 0.0051045589466656585,
+      "body_err": {
+        "height_m": 0.00581075438886678,
+        "waist_rad": 0.008473424739956492,
+        "arm_rad": 0.00745218919581874
+      }
+    },
+    {
+      "model": "menagerie",
+      "scenario": "walk_0.5",
+      "seed": 99,
+      "fell": false,
+      "fall_time_s": null,
+      "duration_s": 23.0,
+      "lin_err": 0.100397059168304,
+      "ang_err": 0.16790351043651375,
+      "gait": {
+        "step_rate_hz": 2.521408182683159,
+        "step_length_m": 0.20716311850489705,
+        "swing_s": 0.3252830188679245,
+        "foot_lift_m": 0.04566418201290482,
+        "stance_foot_speed_mps": 0.07672020645513852,
+        "sole_slip_mps": 0.03308382554902343,
+        "double_support": 0.17221693625118933,
+        "flight": 0.0,
+        "knee_range_deg": 22.06394850797784,
+        "arm_swing_deg": 1.0215022082218626
+      },
+      "yaw_drift": 0.02637457097060664,
+      "body_err": {
+        "height_m": 0.005670887695834081,
+        "waist_rad": 0.00841790605687629,
+        "arm_rad": 0.007102582138343411
+      }
+    }
+  ],
+  "provenance": {
+    "time_utc": "2026-11-04T06:01:47+00:00",
+    "git": {
+      "commit": "5ea97c6e606ed54aab3f28779609d55dcbac0191",
+      "dirty": false,
+      "changes": []
+    },
+    "source": {
+      "sha256": "22d93c3094766a249f2a07c26742903b28ba48cd9078694e86d00b406f5780a8",
+      "files": 29
+    },
+    "python": "3.12.3",
+    "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.39",
+    "host": "godzilla",
+    "packages": {
+      "pi-wbc": "0.0.1",
+      "isaaclab": "3.0.0",
+      "isaacsim": null,
+      "newton": "1.6.1",
+      "warp-lang": "1.17.0",
+      "torch": "2.11.0+cu130",
+      "rsl-rl-lib": "5.5.1",
+      "mujoco": "3.12.0",
+      "onnxruntime": "1.31.1",
+      "numpy": "2.5.4"
+    },
+    "torch_cuda": null,
+    "gpus": [
+      {
+        "name": "NVIDIA GeForce RTX 4070",
+        "driver": "595.99.02",
+        "memory_mib": "12282"
+      }
+    ]
+  }
+}
