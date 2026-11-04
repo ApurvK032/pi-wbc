@@ -53,7 +53,7 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 | [D-043](#d-043-how-the-head-camera-video-is-rendered-and-randomized-2026-11-04) | How the head-camera video is rendered and randomized (lens amended by D-044) | 2026-11-04 |
 | [D-044](#d-044-the-head-cameras-lens-is-87-degrees-wide-2026-11-04) | The head camera's lens is 87 degrees wide | 2026-11-04 |
 | [D-045](#d-045-the-datasets-export-format-gr00t-flavoured-lerobot-v21-and-lerobot-v30-2026-11-04) | The dataset's export format: GR00T-flavoured LeRobot v2.1, and LeRobot v3.0 | 2026-11-04 |
-| [D-046](#d-046-nvidias-controller-as-the-tasks-low-level-2026-11-04) | NVIDIA's controller as the task's low level | 2026-11-04 |
+| [D-046](#d-046-nvidias-controller-as-the-tasks-low-level-2026-11-04) | NVIDIA's controller as the task's low level, and its matched set | 2026-11-04 |
 | [D-047](#d-047-training-set-v2-and-a-validation-set-2026-11-04) | Training set v2 and a validation set | 2026-11-04 |
 | [D-048](#d-048-50-frames-per-second-versions-of-the-datasets-2026-11-04) | 50 frames-per-second versions of the datasets | 2026-11-04 |
 | [D-049](#d-049-results-record-the-code-their-run-started-with-2026-11-04) | Results record the code their run started with | 2026-11-04 |
@@ -1169,6 +1169,17 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 - **Cost:** the height offset and the waist-as-torso mapping are this project's adapter
   choices, not NVIDIA's; its released checkpoints have no training code here to check them
   against.
+- **The matched set (added the same day).** The expert through NVIDIA's controller on the
+  training set's own layouts, seeds 10,000-11,087: 1,049 of 1,088 succeed (96.4%, 95% interval
+  95.1-97.4%), against 1,010 (92.8%, 91.1-94.2%) through ours. On the same layouts 986 succeed
+  with both, 63 only with NVIDIA's, 24 only with ours, 15 with neither (p = 3.5e-5). The gap is
+  other objects pushed during the retract: 45 episodes with ours, 4 with NVIDIA's (the cause is
+  not traced yet; a stage 5 lead). Every recording passes the replay check's first second, and
+  974 of the 1,000 chosen episodes also succeed when their commands are replayed open loop
+  (97.4%), against 695 of 1,000 with ours (D-042): small differences between runs grow far less
+  under NVIDIA's controller. **NVIDIA's training set v1** = the first 1,000 qualifying episodes
+  (seeds 10,000-11,036; 936 layouts shared with ours), by D-042's rule:
+  results/stage3/dataset/train-v1-nvidia-manifest.json.
 
 ## D-047: Training set v2 and a validation set (2026-11-04)
 

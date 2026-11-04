@@ -13,7 +13,10 @@ records the commit, package versions and GPU it came from.
 - [The task and the scripted expert](#the-task-and-the-scripted-expert)
 - [The demonstrations](#the-demonstrations)
 - [Rendering the head camera](#rendering-the-head-camera)
-- [Still to do in stage 3](#still-to-do-in-stage-3)
+- [The export and its loader checks](#the-export-and-its-loader-checks)
+- [NVIDIA's controller under the expert](#nvidias-controller-under-the-expert)
+- [The evaluation loop, and what the command rate costs](#the-evaluation-loop-and-what-the-command-rate-costs)
+- [What stage 3 leaves for later](#what-stage-3-leaves-for-later)
 
 ## Grasp test: can the Dex3 hand hold the task's objects in Newton?
 
@@ -254,6 +257,21 @@ over the first second, which separates recordings that belong to their commands 
 replayed open loop to the end (69.5%, 95% CI 66.6-72.3%): the expert corrects small
 differences as it goes, a replay of its commands can't.
 
+**More data, and a validation set** (D-047). The expert also recorded training seeds
+11,088-12,239 and validation seeds 40,000-40,255 (training-range seeds kept apart from training).
+[scripts/build_dataset_manifest.py](../../scripts/build_dataset_manifest.py) applies D-042's
+rule (it rebuilds v1's manifest exactly):
+
+| | Recorded | Successful | Replay check passed | In the set |
+|---|---:|---:|---:|---:|
+| Training seeds 11,088-12,239 | 1,152 | 1,076 (93.4%, CI 91.8-94.7%) | 1,147 | |
+| **Training set v2** (seeds 10,000-12,155) | | | | **2,000** (v1 plus 1,000): right hand 1,484, left 516 |
+| **Validation set v1** (seeds 40,000-40,255) | 256 | 241 (94.1%) | 256 | **241**: right 172, left 69 |
+
+Files: [dataset/train-v2-manifest.json](dataset/train-v2-manifest.json),
+[dataset/val-v1-manifest.json](dataset/val-v1-manifest.json). Stage 4 can measure what the
+second 1,000 episodes add, and follow a validation loss on layouts it never trains on.
+
 ## Rendering the head camera
 
 [scripts/render_episodes.py](../../scripts/render_episodes.py) renders each training episode
@@ -278,7 +296,12 @@ bin colours stay fixed, since the instructions name them.
 | Sun height | 30, 40, 50, 60, 70, 80 degrees: 163, 169, 170, 176, 171, 151 episodes |
 
 Every video's frame count was checked against its recording. Each episode's look, frame count
-and file hash: [render/train-v1-render.json.gz](render/train-v1-render.json.gz).
+and file hash: [render/train-v1-render.json.gz](render/train-v1-render.json.gz). Training set v2
+(2,000 episodes, 1,581,058 frames, 6.0 GB, 59 min with other jobs on the GPU) and the validation
+set (241 episodes, 191,375 frames, 0.7 GB) are rendered the same way. An episode rendered twice
+keeps its look but not its exact pixels: of the 1,000 v1 episodes rendered again inside v2, 16
+gave byte-identical videos and the rest differ by 0.02-0.84 grey levels on average, at edges
+(D-043, amended).
 
 **The lens is 87 degrees across** (D-044). The first render used Isaac Lab's default, 60.4
 degrees, and lost the held object: the expert carries it beside the body.
@@ -297,8 +320,97 @@ with the object in the picture ([render/view_check.json](render/view_check.json)
 The colour image is therefore wider than the real D435's colour camera; that would matter on
 the real robot, which this project doesn't claim.
 
-## Still to do in stage 3
+## The export and its loader checks
 
-- Export to the formats GR00T N1.6 (LeRobot v2 with GR00T's `modality.json`) and LeRobot's
-  current `pi05` policy read, checked with each one's own loader.
-- The matched demonstration set through NVIDIA's controller (D-032), for stage 5.
+[scripts/export_dataset.py](../../scripts/export_dataset.py) writes each set in the layout
+GR00T N1.6 reads (LeRobot v2.1 plus GR00T's `meta/modality.json`), with the names of GR00T's own
+`unitree_g1` data config (D-045). One row per video frame:
+
+| Column | What |
+|---|---|
+| `observation.images.ego_view` | the head camera (the episode's video) |
+| `observation.state` (43) | joint positions: legs, waist, left arm, left hand, right arm, right hand, in the order of NVIDIA's G1 datasets |
+| `action` (35) | the expert's commands at that control step: arm and hand joint targets (28), waist yaw, roll and pitch goals (3), pelvis height goal (1), forward and sideways speed and turn rate (3) |
+| `annotation.human.task_description` | the instruction (index into `meta/tasks.jsonl`) |
+
+LeRobot's own converter makes a LeRobot v3.0 copy, with the quantile statistics LeRobot's
+π0.5 normalizes by. Each copy is checked with its framework's own loader:
+
+| Check | Training set v1 | Validation set v1 |
+|---|---|---|
+| GR00T's `LeRobotEpisodeLoader`, `unitree_g1` config ([script](../../scripts/check_groot_dataset.py)): sizes, values, instruction, frames equal to ffmpeg's, 30-step training chunks | 1,000 of 1,000 episodes | 241 of 241 |
+| LeRobot's `LeRobotDataset` on the v3.0 copy ([script](../../scripts/check_lerobot_dataset.py)): rows, 50-step chunks with end padding, images equal to the source frames | 12 of 12 | 12 of 12 |
+
+Before stage 4: LeRobot's π0.5 takes at most 32 state and 32 action values (ours: 43 and 35).
+The working hand's 7 targets are exactly open + s x (closed - open) in every recorded step, and
+the idle hand keeps its default pose, so a π0.5 copy can use 31 state values (without the legs)
+and 23 action values (one closing value per hand) without losing anything.
+
+## NVIDIA's controller under the expert
+
+The task takes NVIDIA's Decoupled WBC as its low level under the same commands (D-046,
+[src/pi_wbc/stage3/nvidia_wbc.py](../../src/pi_wbc/stage3/nvidia_wbc.py)): its observation is
+built from the task's commands (velocity; pelvis height relative to each controller's nominal,
+0.78 against 0.74 m; waist goals as its torso command), and its leg and waist targets are
+applied exactly ([check](../../scripts/check_nvidia_targets.py): largest difference 0.0 rad).
+The expert, unchanged, on the same 384 training layouts:
+
+| Low level | Success | Failures | Median episode |
+|---|---|---|---:|
+| Ours (stage 1, seed 1) | 361 of 384 (94.0%, CI 91.2-96.0%) | 18 other objects pushed (10 in the retract), 4 missed grasps, 1 target knocked | 31.4 s |
+| NVIDIA's | 367 of 384 (95.6%, CI 93.0-97.2%) | 15 other objects pushed (8 while the hand comes down, 4 over the bin), 2 missed grasps | 37.7 s |
+
+Paired: 352 layouts succeed with both, 15 only with NVIDIA's, 9 only with ours, 8 with neither
+(exact test p = 0.31), so no difference is shown. Files:
+[expert/train-1000-1383.json](expert/train-1000-1383.json),
+[nvidia_wbc/expert-train-1000-1383.json](nvidia_wbc/expert-train-1000-1383.json).
+
+**The matched set** (D-046). The expert through NVIDIA's controller on the training set's own
+layouts (seeds 10,000-11,087):
+
+| | Ours | NVIDIA's |
+|---|---:|---:|
+| Successful | 1,010 of 1,088 (92.8%, CI 91.1-94.2%) | 1,049 (96.4%, CI 95.1-97.4%) |
+| Other objects pushed during the retract | 45 | 4 |
+| Other objects pushed elsewhere, missed grasps, drops | 33 | 35 |
+| Passed the replay check's first second | 1,086 | 1,088 |
+| Chosen episodes that also succeed replayed open loop | 695 of 1,000 (69.5%) | 974 of 1,000 (97.4%) |
+| Median successful episode | 31.5 s | 37.7 s |
+
+Paired on the same layouts: 986 succeed with both, 63 only with NVIDIA's, 24 only with ours, 15
+with neither (p = 3.5e-5). Nearly all of the gap is other objects pushed while the arm withdraws
+from the bin with our controller under the robot; why is not traced yet (a stage 5 lead). Under
+NVIDIA's controller small differences between runs also grow far less: replaying its recorded
+commands reproduces 97% of successes, ours 70%. NVIDIA's training set v1 is the first 1,000
+qualifying episodes (seeds 10,000-11,036, 936 of them on the same layouts as ours):
+[dataset/train-v1-nvidia-manifest.json](dataset/train-v1-nvidia-manifest.json), rendered and
+exported like ours.
+
+## The evaluation loop, and what the command rate costs
+
+[scripts/vla_eval.py](../../scripts/vla_eval.py) is stage 4's closed-loop test, ready before any
+model: our controller keeps the robot balanced, the head camera is rendered live with each
+episode's look, and a policy (a GR00T policy server, or the expert's recorded commands for
+testing) sends the commands. An episode succeeds once the target rests in the named bin, no
+other object has moved more than 2 cm and the robot is up, for 1 s, within 60 s. Replaying the
+expert's own commands open loop through it, on the 241 validation episodes (D-048):
+
+| Commands sent | Success | 95% CI |
+|---|---:|---|
+| every control step's (50 Hz) | 171 (71.0%) | 65-76% |
+| the 25 fps dataset's, each held for two control steps | 120 (49.8%) | 44-56% |
+| the 25 fps dataset's, the second step the mean of it and the next | 143 (59.3%) | 53-65% |
+
+Paired, every difference is significant (p from 5e-8 to 0.019): a 25 Hz command stream loses
+much of the expert's step-by-step correction. The datasets are therefore also exported at 50
+frames per second, NVIDIA's own G1 data rate. The 50 Hz result agrees with the replay check's 162
+of 241 (67%), so the loop itself adds no loss. Files: [eval/](eval/).
+
+## What stage 3 leaves for later
+
+- **The ideal-body low level** (design section 7: the pelvis follows the commands exactly), the
+  "perfect controller" row of stage 5's grid: an earlier attempt to pin the pelvis in Newton
+  failed (the pinned root ignores resets, and rewriting its pose every step shakes the grip).
+- **Why our controller pushes objects during the retract** where NVIDIA's doesn't (D-046).
+- **OVRTX renders** of a few episodes for the front page (D-031); the dataset itself uses
+  Newton's renderer.
