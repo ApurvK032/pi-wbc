@@ -2,11 +2,11 @@
 
     .venv/bin/python scripts/bench_inputs.py JOBS.json [EXTRA ...]
 
-Writes, next to the job list, `upload.txt` (for `rsync --files-from`: every policy, policy_io
-and model file the jobs name, the folder of each MuJoCo scene (it holds the meshes), the job
-list itself and any EXTRA paths) and `inputs.sha256` (the SHA-256 of every input file, for
-`sha256sum -c` on the cluster before submitting). Paths are relative to the repository root,
-where this must run.
+Writes, next to the job list, `upload.txt` (for `rsync --files-from`: every policy with its
+external weight file (`policy.onnx.data`), every policy_io and model file the jobs name, the
+folder of each MuJoCo scene (it holds the meshes), the job list itself and any EXTRA paths)
+and `inputs.sha256` (the SHA-256 of every input file, for `sha256sum -c` on the cluster before
+submitting). Paths are relative to the repository root, where this must run.
 """
 
 from __future__ import annotations
@@ -27,6 +27,8 @@ def main() -> None:
         for flag, value in itertools.pairwise(args):
             if flag in ("--policy", "--policy-io"):
                 files.add(value)
+            if flag == "--policy":  # an ONNX file's weights may sit beside it (policy.onnx.data)
+                files.update(str(f) for f in Path(value).parent.glob(Path(value).name + ".*"))
             elif flag == "--model":
                 files.add(value.split("=", 1)[1])
     missing = [f for f in sorted(files) if not Path(f).is_file()]
