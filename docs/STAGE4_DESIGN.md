@@ -57,9 +57,11 @@ keeps the robot balanced. Stage 4 is done when:
 - **Launcher.** [scripts/groot_finetune.py](../scripts/groot_finetune.py): GR00T's launch steps
   and defaults, with our arguments recorded next to the checkpoints. GR00T resumes from its last
   checkpoint in the output folder, so a 24 h job is resubmitted with `afterany` until done.
-- **Not yet checked:** a fine-tune on this PC ran out of memory at batch 4 (the 12 GB card held
-  1.6 GB for other jobs; GR00T asks for 40 GB or more to fine-tune). A batch-1 smoke test on the
-  idle card is the last check before MSI.
+- **Not yet checked:** a fine-tune on this PC. It runs out of memory with 9.63 GiB allocated
+  at batch 1 and 4, also with only the language model's top layers training (201 million
+  parameters), while another job held 1.6 GB; GR00T asks for 40 GB or more to fine-tune. Data
+  loading, the forward pass and our launcher all ran. The first MSI job is therefore a 50-step
+  smoke run that saves a checkpoint, which `scripts/groot_inference_test.py` then loads here.
 
 ## 5. MSI setup
 
