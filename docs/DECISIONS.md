@@ -1223,9 +1223,10 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   itself adds no loss. The loss is not our controller's alone: NVIDIA's recorded commands (D-046), on
   241 of its matched set's episodes, succeed on 233 (96.7%, 93.6-98.3%) at 50 Hz and 173 (71.8%,
   65.8-77.1%) at 25 Hz held (66 against 6 episodes, p = 7e-14).
-- **Cost:** twice the rendering (about 40 minutes per 1,000 episodes on the RTX 4070) and twice
-  the video storage (about 6 GB per 1,000 episodes); twice the policy calls in closed loop if a
-  50 fps model re-plans as often in frames.
+- **Cost:** twice the frames to render (training set v1: 1,579,583, in 68 min with other jobs
+  on the GPU; its 25 fps render took 21 min alone), but only 1.3 times the video storage (3.9 GB
+  against 3.0 GB: H.264 compresses the extra frames well); twice the policy calls in closed loop
+  if a 50 fps model re-plans as often in frames.
 
 ## D-049: Results record the code their run started with (2026-11-04)
 
