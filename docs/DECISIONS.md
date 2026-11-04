@@ -57,6 +57,7 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 | [D-047](#d-047-training-set-v2-and-a-validation-set-2026-11-04) | Training set v2 and a validation set | 2026-11-04 |
 | [D-048](#d-048-50-frames-per-second-versions-of-the-datasets-2026-11-04) | 50 frames-per-second versions of the datasets | 2026-11-04 |
 | [D-049](#d-049-results-record-the-code-their-run-started-with-2026-11-04) | Results record the code their run started with | 2026-11-04 |
+| [D-050](#d-050-stage-3-closes-2026-11-04) | Stage 3 closes | 2026-11-04 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -1240,6 +1241,29 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   checkout during a run would have recorded code the run never used.
 - **Cost:** results saved before this change record the state at save time; the runs of
   2026-11-04 that crossed a commit are listed where they are used (D-047).
+
+## D-050: Stage 3 closes (2026-11-04)
+
+- **What:** stage 3's finish line ([STAGE3_DESIGN.md](STAGE3_DESIGN.md) section 1) is met:
+  - **The expert:** 364 of 384 unused test layouts (94.8%, 95% interval 92.1-96.6%), a table of
+    failure causes and GIFs (D-041; [results](../results/stage3/README.md)). The interval's lower
+    end clears 90%; the 95% target is met only to rounding.
+  - **The dataset:** manifests with the layout seeds, split, commits, package versions, GPU and
+    checksums (SHA-256 of every recording, and of every video in its render manifest); the
+    replay check on every recorded episode (D-042); training set v1 (1,000 episodes), v2 (2,000),
+    a validation set (241) and NVIDIA's matched set (1,000), at 25 frames per second, and v1 and
+    the validation set also at 50 (D-047, D-048).
+  - **The loaders:** GR00T N1.6's `LeRobotEpisodeLoader` loads every episode of training set v1
+    (25 fps), v2, the validation set (25 and 50 fps) and NVIDIA's set, 4,482 episodes; LeRobot's
+    `LeRobotDataset` loads the v3.0 copies of v1, the validation set (25 and 50 fps) and NVIDIA's
+    set (12 episodes each, compared row by row). v1 at 50 fps and v2's LeRobot copy were still
+    being checked when this was written (D-045).
+- **Beyond the finish line:** NVIDIA's controller as the task's low level and the matched set
+  (D-046), the closed-loop evaluation loop and the command-rate test (D-048), a GR00T fine-tune
+  launcher, configs and cluster job for stage 4 (draft: [STAGE4_DESIGN.md](STAGE4_DESIGN.md)).
+- **Left open:** the ideal-body low level (design section 7); why our controller pushes objects
+  during the retract where NVIDIA's does not (D-046); OVRTX renders for the front page.
+- **Why close now:** what stage 4 needs is in place and checked; the open items belong to stage 5.
 
 ## Open items
 

@@ -10,7 +10,7 @@ under a vision-language-action model.</b></p>
   <img src="https://img.shields.io/badge/MuJoCo-3.12-1f6feb" alt="MuJoCo 3.12">
   <img src="https://img.shields.io/badge/robot-Unitree%20G1%2C%2029%20DoF-555" alt="Robot: Unitree G1, 29 DoF">
   <img src="https://img.shields.io/badge/RL-PPO%20%28rsl__rl%29-8250df" alt="RL: PPO (rsl_rl)">
-  <img src="https://img.shields.io/badge/stage%201%20of%205-done-2ea44f" alt="Stage 1 of 5: done">
+  <img src="https://img.shields.io/badge/stages%201%20and%203%20of%205-done-2ea44f" alt="Stages 1 and 3 of 5: done">
   <img src="https://img.shields.io/badge/license-all%20rights%20reserved-lightgrey" alt="License: all rights reserved">
 </p>
 
@@ -31,10 +31,13 @@ Training seed 2, recording seed 0, the first take, on the fixed bench (D-040).</
 |:---:|:---:|:---:|:---:|
 | fall in 66,000 MuJoCo test episodes without kicks, with low friction, 1 kg in each hand, extra delay and sensor noise included | simulators the same policy runs in without retraining: Isaac Lab (Newton), Isaac Sim (PhysX) and MuJoCo | the largest kick survived at least 95% of the time on every training seed (98.6%-99.4% of kicks) | of training for one seed on one L40S GPU, 4096 robots in parallel (seed 3: teacher 2.5 h, student 0.7 h) |
 
-> **Status: stage 1 of 5, the whole-body controller, is done.** A student policy that sees only
-> what a real G1 measures walks, turns, crouches, leans and keeps its balance while its arms
-> move, under randomized physics and kicks. All transfer here is sim-to-sim; nothing has run on
-> hardware. Next: the pick-and-place task and the VLA on top ([roadmap](#roadmap)).
+> **Status: stages 1 and 3 of 5 are done.** Stage 1, the whole-body controller: a student policy
+> that sees only what a real G1 measures walks, turns, crouches, leans and keeps its balance
+> while its arms move, under randomized physics and kicks. Stage 3, the task and the data: a
+> scripted expert walks the robot to a table and puts the named object in the named bin through
+> that controller on 94.8% of unused test layouts, and 2,000 of its episodes, rendered from the
+> head camera, load in GR00T's own data loader. All transfer here is sim-to-sim;
+> nothing has run on hardware. Next: fine-tuning GR00T on the demonstrations ([roadmap](#roadmap)).
 
 **Contents:** [Highlights](#highlights) · [The project](#the-project) ·
 [How it works](#how-it-works) · [Results](#results) ·
@@ -58,10 +61,19 @@ Training seed 2, recording seed 0, the first take, on the fixed bench (D-040).</
   An ablation switches each one off in turn, on three training seeds, and measures what it buys:
   without kicks in training, 95% of episodes with 1 m/s kicks end in a fall; without any
   randomization, sensor noise alone floors the robot in 31% of episodes.
+- **A pick-and-place task with data a VLA can train on** ([stage 3](results/stage3/README.md)).
+  A scripted expert, sending only the commands a VLA will send, succeeds on 364 of 384 unused
+  test layouts (94.8%, 95% CI 92.1-96.6%). 2,000 of its episodes (and 241 for validation) are
+  rendered from the head camera with randomized floors, tables, walls, light and camera mount,
+  exported in GR00T N1.6's and LeRobot's formats (at 25 frames per second, and v1 and the
+  validation set also at 50), and checked with GR00T's loader on every episode and LeRobot's on
+  samples. Under the same commands NVIDIA's controller lets the expert succeed
+  more often (96.4% against 92.8% on the same 1,088 layouts): nearly all of the gap is objects
+  pushed aside while our controller's robot withdraws its arm, a first look at stage 5's question.
 - **Evaluated like a study, not a demo.** Three training seeds per configuration, development
   seeds for choices and frozen test seeds reported in full for every candidate recipe (one
   problem first seen there led to D-024), 95% Wilson intervals, and result files stamped with
-  their commit, code hash, package versions and GPU. 48 decisions are logged with what each one
+  their commit, code hash, package versions and GPU. 50 decisions are logged with what each one
   cost.
 - **Debugged in the open.** Four problems were found and fixed on the way (slow walking, falls at
   full arm ranges, too short a history, lost turning), each traced to its cause with an
@@ -302,6 +314,19 @@ uv run pytest
 `{seed}` stands for the seed. For lint and unit tests only (no GPU, small download):
 `uv sync --no-group sim`.
 
+Stage 3, from recording to the formats a VLA trains on (each step's options in the script's
+docstring; times on the RTX 4070):
+
+| Step | Command | Time |
+|---|---|---|
+| Record the expert (1,088 episodes) | `uv run python scripts/expert_rollout.py --num-envs 64 --first-seed 10000 --episodes 1088 --record logs/dataset/train-v1 --out logs/expert/train-v1.json --viz none` | about 40 min |
+| Replay check | `uv run python scripts/replay_check.py --episodes logs/dataset/train-v1 --num-envs 64 --out logs/replay/train-v1.json --viz none` | about 20 min |
+| Choose the episodes (D-042) | `uv run python scripts/build_dataset_manifest.py --name v1 --run logs/expert/train-v1.json logs/replay/train-v1.json logs/dataset/train-v1 --count 1000 --out manifest.json` | seconds |
+| Render the head camera | `uv run python scripts/render_episodes.py --episodes logs/dataset/train-v1 --seeds manifest.json --out logs/render/train-v1 --viz none` (`--fps 50` for D-048) | about 20 min (40 at 50 fps) |
+| Export for GR00T | `uv run python scripts/export_dataset.py --recordings logs/dataset/train-v1 --render logs/render/train-v1 --seeds manifest.json --out logs/export/train-v1` | about 1 min |
+| Check with GR00T's and LeRobot's loaders | `scripts/check_groot_dataset.py`, `scripts/check_lerobot_dataset.py` (in their own environments) | minutes |
+| Check everything from disk | `uv run python scripts/verify_files.py --recordings ... --render ... --export ...` | seconds |
+
 ## Repository layout
 
 | Path | What |
@@ -309,10 +334,12 @@ uv run pytest
 | [`src/pi_wbc/tasks/`](src/pi_wbc/tasks/) | Isaac Lab tasks: gait, whole body, randomization, teacher and student; ONNX export |
 | [`src/pi_wbc/sim2sim/`](src/pi_wbc/sim2sim/) | the MuJoCo bench: robot models, observation history, test conditions, gait metrics, GIFs |
 | [`src/pi_wbc/isaac_eval.py`](src/pi_wbc/isaac_eval.py) | the same tests in Isaac Lab, on Newton or PhysX |
+| [`src/pi_wbc/stage3/`](src/pi_wbc/stage3/) | the pick-and-place task's layouts, scripted expert, recorder, rendering looks, export, NVIDIA's controller as a low level |
+| [`configs/groot/`](configs/groot/) | GR00T data configs for stage 4 |
 | [`scripts/`](scripts/) | training and test runs, the ablation queue, figures and tables |
 | [`msi/`](msi/) | Apptainer container and Slurm jobs ([docs/MSI.md](docs/MSI.md)) |
 | [`results/`](results/) | every result in the write-ups, stamped with the commit, package versions and GPU |
-| [`docs/`](docs/) | [project plan](docs/PROJECT_PLAN.md), [stage 1 design](docs/STAGE1_DESIGN.md), [decision log](docs/DECISIONS.md) |
+| [`docs/`](docs/) | [project plan](docs/PROJECT_PLAN.md), [stage 1 design](docs/STAGE1_DESIGN.md), [stage 3 design](docs/STAGE3_DESIGN.md), [stage 4 draft](docs/STAGE4_DESIGN.md), [decision log](docs/DECISIONS.md) |
 
 ## Limitations
 
@@ -327,6 +354,8 @@ uv run pytest
   0.4% on Newton: the controller's push recovery is partly tuned to its training physics.
 - **The arms are position-controlled.** They follow joint targets; there is no wrist-pose or
   force control yet, and in training the hands only move to random poses.
+- **Rendered images are plain.** The demonstrations come from Newton's ray tracer: one sun,
+  no reflections, generated patterns (D-043); they are not photorealistic.
 - **Three seeds per configuration.** Enough to trust differences seen on every seed, which is
   the only kind claimed; not enough to rank small effects.
 
@@ -337,7 +366,7 @@ uv run pytest
 | 0 | Setup: Isaac Lab training, MuJoCo sim-to-sim bench, cluster jobs ([results](results/stage0/README.md)) | done |
 | 1 | Whole-body controller: PPO, rewards, curriculum, domain randomization, teacher-student ([results](results/stage1/README.md)) | done |
 | 2 | Human motion imitation from retargeted motion capture | planned |
-| 3 | Pick-and-place task, scripted expert, rendered demonstrations | in progress |
+| 3 | Pick-and-place task, scripted expert, rendered demonstrations ([results](results/stage3/README.md)) | done |
 | 4 | VLA fine-tuning (GR00T N1.6, π0.5) and closed-loop evaluation | planned |
 | 5 | Failure attribution study and controller swap against NVIDIA's controller | planned |
 
