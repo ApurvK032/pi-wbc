@@ -1,7 +1,7 @@
 # Stage 4 design (draft for review): the VLA on top
 
-Drafted 2026-11-04 from what stage 3 left ready. Nothing here is decided until Apurv accepts
-it; each choice below becomes a D-NNN entry then.
+Drafted 2026-11-04 from what stage 3 left ready. Nothing here is decided until it is
+accepted; each choice below becomes a D-NNN entry then.
 
 ## 1. Goal and finish line
 
@@ -17,12 +17,12 @@ keeps the robot balanced. Stage 4 is done when:
 
 | | |
 |---|---|
-| Training data | v1: 1,000 episodes (790,046 frames at 25 fps); v2: 2,000 (contains v1); validation: 241, from layouts never trained on (D-047); v1 and validation also at 50 fps (D-048) |
-| Evaluation loop | [scripts/vla_eval.py](../scripts/vla_eval.py): live head camera, GR00T policy server client; replaying the expert's own commands open loop succeeds on 71% of validation episodes at 50 Hz, 50% at the 25 fps dataset's rate (D-048) |
+| Training data | v1: 1,000 episodes (790,046 frames at 25 fps); v2: 2,000 (contains v1); validation: 241, from layouts never trained on (D-047); v1, v2 and validation also at 50 fps (D-048) |
+| Evaluation loop | [scripts/vla_eval.py](../scripts/vla_eval.py): live head camera, a GR00T policy server client (written to the server's message format, not yet run against a server); replaying the expert's own commands open loop succeeds on 71% of validation episodes at 50 Hz, 50% at the 25 fps dataset's rate (D-048) |
 | Formats | GR00T-flavoured LeRobot v2.1 with GR00T's `unitree_g1` names; LeRobot v3.0 with quantile statistics (D-045) |
-| Loader checks | GR00T's loader on all 1,000 v1 episodes; LeRobot's `LeRobotDataset` (D-045) |
+| Loader checks | GR00T's loader on every episode of each export (v2 at 50 fps: a 12-episode sample); LeRobot's `LeRobotDataset` on 12-episode samples (D-045, D-050) |
 | GR00T on this PC | N1.6 environment (`third_party/Isaac-GR00T-n1d6`, branch n1d6); NVIDIA's G1 checkpoint runs on our observations: 6,830 MiB of GPU memory at batch 1 (7,154 at batch 8), 79 ms per call at batch 1, 377 ms at batch 8 (GPU shared with other jobs while measured) |
-| Matched set | the same layouts through NVIDIA's controller (D-046), for the controller swap of stage 5 |
+| Matched set | the training layouts through NVIDIA's controller (936 of its 1,000 episodes share a layout with ours; D-046), for the controller swap of stage 5 |
 | Expert reference | 94.8% on test layouts 60384-60767 (D-041) |
 
 ## 3. Model: GR00T N1.6 first
@@ -33,7 +33,7 @@ keeps the robot balanced. Stage 4 is done when:
   The base checkpoint has a G1 embodiment slot but no G1 statistics; fine-tuning computes them
   from our data (done: `meta/stats.json`).
 - **N1.7** (GR00T's main branch since 2026): newer backbone (Cosmos-Reason2-2B, a gated model:
-  Apurv must request access on Hugging Face), relative end-effector actions by default, which
+  access must be requested on Hugging Face), relative end-effector actions by default, which
   would need hand poses in the data. A later comparison, not the first run.
 
 ## 4. Fine-tuning (MSI, one L40S)
@@ -69,9 +69,11 @@ keeps the robot balanced. Stage 4 is done when:
   (prebuilt wheel), installed with `uv sync --frozen` from the n1d6 checkout (MSI's driver
   580 supports CUDA 12.8). DeepSpeed is only used with more than one GPU; its import needs
   `CUDA_HOME` (module load cuda), or it can be removed as on this PC.
-- Data: the v1 export is 3.2 GB in 2,000 files (one table and one video per episode). The MSI
+- Data: the first run's export (v1 at 50 fps) is 4.3 GiB in 2,008 files (one table and one
+  video per episode, plus metadata); v1 at 25 fps is 3.2 GiB. The MSI
   group's file count is its tight quota; check it before uploading (`du --inodes`).
-- Checkpoints: size with optimizer state to be measured in the smoke test; keep the last 2.
+- Checkpoints: size with optimizer state to be measured in the smoke test; the launcher keeps
+  the last 5.
 
 ## 6. Closed-loop evaluation (this PC)
 
@@ -79,16 +81,21 @@ keeps the robot balanced. Stage 4 is done when:
   (Python 3.12, PyTorch 2.11), so the evaluation uses GR00T's policy server (`run_gr00t_server.py`,
   ZeroMQ) and a client in our task: every few control steps the head camera is rendered live
   (Newton, each episode's look from its seed), the client sends image, joint state and
-  instruction, and executes the returned chunk at 25 Hz (each command held for two 50 Hz
-  control steps).
+  instruction, and executes the returned chunk at the dataset's rate (50 Hz for the first run's
+  50 fps data; with 25 fps data each command is held for two 50 Hz control steps).
 - Lighting: the render-only trick of turning the whole scene for the sun's direction
   (D-043) can't be used with live physics; each batch gets a random global sun direction
   instead.
-- Success and failure labels: the expert's judge (object resting in the named bin, no other
-  object moved more than 2 cm), plus the robot's falls; 60 s limit, as for the expert.
+- Success and failure labels: one judge shared by the expert, the replay check and this loop
+  (object resting in the named bin, no other object moved more than 2 cm until the arm has
+  withdrawn, the robot's falls; 60 s limit), and timeouts labelled as timeouts. Not yet so: the
+  loop stops 1 s after the object comes to rest, so it misses pushes during the retract, and it
+  labels a timeout "dropped" (D-051). Fixed before any VLA is scored.
 - Layouts: checkpoint choice on validation layouts (40000-40255, never trained on); the reported
   number on test layouts 60384-60767, the expert's official set, so every layout has the
-  expert's outcome beside the VLA's.
+  expert's outcome beside the VLA's. The expert's 94.8% there predates D-042's zero-velocity
+  start and single layouts change outcome between runs, so the expert is run there again with
+  the current code and the shared judge for that comparison.
 
 ## 7. π0.5 (after GR00T)
 

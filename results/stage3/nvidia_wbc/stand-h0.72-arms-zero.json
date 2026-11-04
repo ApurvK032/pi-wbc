@@ -1,14 +1,30 @@
 {
   "controller": "NVIDIA Decoupled WBC (GR00T-WholeBodyControl, Balance + Walk)",
   "policy_commit": "1e1ec4f5f27e6c3e03048f693bd7c60cce04afda",
-  "physics": "newton_mjwarp",
-  "substeps": 1,
+  "physics": {
+    "config": "NewtonCfg",
+    "solver": "MJWarpSolverCfg",
+    "num_substeps": 2,
+    "solver_substeps": 2,
+    "solver_dt": 0.0025,
+    "integrator": "implicitfast",
+    "use_mujoco_contacts": false,
+    "cone": "pyramidal",
+    "impratio": 1.0,
+    "njmax": 1000,
+    "nconmax": 300,
+    "ke": 160000.0,
+    "kd": 1100.0,
+    "margin": 0.0
+  },
+  "substeps": 2,
   "seeds_per_scenario": 10,
   "seed": 0,
   "duration_s": 20.0,
   "settle_s": 2.0,
   "nominal_height_command": 0.72,
   "arms": "zero",
+  "heel_x": null,
   "summary": [
     {
       "scenario": "stand",
@@ -18,14 +34,14 @@
         0.0,
         0.2775328030260577
       ],
-      "lin_err_mean": 0.2697375452675753,
-      "ang_err_mean": 0.3091239742905948,
+      "lin_err_mean": 0.2906008313004341,
+      "ang_err_mean": 0.2770132812077548,
       "velocity_mean": [
-        -0.26140309745673507,
-        -0.01709506658035136,
-        0.01669192013380962
+        -0.28355997434630986,
+        -0.008874709055266269,
+        -0.008376615765688863
       ],
-      "pelvis_z_mean": 0.7062645254333815,
+      "pelvis_z_mean": 0.7034525615175564,
       "command": {
         "velocity": [
           0.0,
@@ -44,19 +60,19 @@
     {
       "scenario": "arms_stand",
       "episodes": 10,
-      "falls": 2,
+      "falls": 3,
       "fall_rate_ci95": [
-        0.05668215093776685,
-        0.5098375308778678
+        0.10779126655639398,
+        0.6032218546540291
       ],
-      "lin_err_mean": 0.19781158931407844,
-      "ang_err_mean": 0.13919919356397892,
+      "lin_err_mean": 0.2000608505391505,
+      "ang_err_mean": 0.12331860034118512,
       "velocity_mean": [
-        -0.18493998447550186,
-        -0.003154903015272339,
-        -0.006626520501517159
+        -0.18876654579710234,
+        -0.002898196730922107,
+        -0.003540657639328019
       ],
-      "pelvis_z_mean": 0.7203362392054664,
+      "pelvis_z_mean": 0.7179325612480678,
       "command": {
         "velocity": [
           0.0,
@@ -74,18 +90,30 @@
     }
   ],
   "provenance": {
-    "time_utc": "2026-11-03T12:50:02+00:00",
+    "time_utc": "2026-11-04T21:54:33+00:00",
     "git": {
-      "commit": "f9096e009ad509c0604f98119aa10dc6945ed2cf",
-      "dirty": false,
-      "changes": []
+      "commit": "9b5bd6588b5e995f7a5ac3f611b427c3a0682500",
+      "dirty": true,
+      "changes": [
+        "README.md",
+        "docs/DECISIONS.md",
+        "docs/STAGE3_DESIGN.md",
+        "docs/STAGE4_DESIGN.md",
+        "msi/jobs/groot_finetune.sbatch"
+      ]
+    },
+    "code_recorded_at": "process start",
+    "source": {
+      "sha256": "51c8ecca95b4989ac07e659a61732f21d3ae79bc657d0f9297d2b4818808dfe9",
+      "files": 34
     },
     "python": "3.12.3",
-    "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+    "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.39",
     "host": "godzilla",
     "packages": {
       "pi-wbc": "0.0.1",
       "isaaclab": "3.0.0",
+      "isaacsim": null,
       "newton": "1.6.1",
       "warp-lang": "1.17.0",
       "torch": "2.11.0+cu130",

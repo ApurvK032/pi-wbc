@@ -1,7 +1,7 @@
 # Stage 3 design: the pick-and-place task, the scripted expert and the demonstrations
 
-**Status: accepted (2026-11-03).** All decisions of section 13 were accepted by Apurv on
-2026-11-03 and are recorded as D-030 to D-038 in [DECISIONS.md](DECISIONS.md). Where the work
+**Status: accepted (2026-11-03).** All decisions of section 13 were accepted on 2026-11-03
+and are recorded as D-030 to D-038 in [DECISIONS.md](DECISIONS.md). Where the work
 changes a detail below, the change is logged there. Results:
 [results/stage3](../results/stage3/README.md).
 
@@ -54,6 +54,11 @@ spheres sit 3 cm further forward than in Unitree's URDF, NVIDIA's models and MuJ
 any of the 11 test commands and stands still; ours is unchanged (no falls in 1,100 robots, 550
 more with kicks) except for turning in place a little more slowly (0.64 against 0.70 rad/s).
 So the scenes use the URDF's heel for every controller (D-038).
+
+(Both tests above ran on Isaac Lab's default physics rather than training's. Rerun on training's
+settings, square objects hold too and the grasp works at 2 substeps, and on the asset's heel
+NVIDIA's controller drifts at 0.32-0.35 m/s at its nominal height and does not fall standing when
+its arms hang; the choices stand for stage 3's data. D-051.)
 
 ## 3. The scene
 
@@ -137,14 +142,14 @@ with the ideal body (section 7): a failure there is the expert's.
 
 ## 6. Which controller records the demonstrations
 
-Both, over the same layouts. The main set goes through stage 1's controller, seed 1 (the only
-seed that met the turning target, D-029); a matched set goes through NVIDIA's controller, now
-that it stands with the URDF's heel (section 2). Recording is cheap, since rendering comes
-afterwards (section 8). Stage 4 then chooses what the VLA trains on: our demonstrations only,
-both mixed, or one VLA per controller, which measures the confound of D-032 directly. The
-expert is the same for both; if it succeeds much less often through NVIDIA's controller, that
-is itself a stage 5 result. The other two seeds of ours and the ablation controllers are used
-in stage 5 for evaluation, not for recording.
+Both, over the same layouts. The main set goes through stage 1's controller, seed 1 (chosen in D-029
+as the only seed that met the turning target; on D-040's corrected bench none does); a matched set
+goes through NVIDIA's controller, now that it stands with the URDF's heel (section 2). Recording is
+cheap, since rendering comes afterwards (section 8). Stage 4 then chooses what the VLA trains on:
+our demonstrations only, both mixed, or one VLA per controller, which measures the confound of D-032
+directly. The expert is the same for both; if it succeeds much less often through NVIDIA's
+controller, that is itself a stage 5 result. The other two seeds of ours and the ablation
+controllers are used in stage 5 for evaluation, not for recording.
 
 ## 7. The low-level layers for the stage 5 grid
 
@@ -184,7 +189,7 @@ the instructions name them. OVRTX re-renders a few episodes for the front page.
 - **Size**: 1,000 training episodes to start (stage 4 decides whether more help), from train
   seeds; development and test layouts are never in the dataset. Few large files (one video per
   episode), since the MSI group's file count is its tight quota.
-- Both loaders are installed in their own environments, after Apurv's OK (sizes stated first).
+- Both loaders are installed in their own environments.
 
 ## 10. Compute
 
@@ -194,7 +199,7 @@ objects in the loop is measured in step 2; a rough guess is one to two hours. Re
 replays with Newton's renderer: about 750,000 head-camera frames, roughly 10-20 minutes at the
 renderer test's rate. Everything fits on the
 workstation; MSI is needed only for stage 4's fine-tuning (and possibly the stage 2 runs in
-parallel). Long unattended runs on the workstation still need Apurv's OK.
+parallel).
 
 ## 11. Order of work
 
@@ -219,7 +224,7 @@ parallel). Long unattended runs on the workstation still need Apurv's OK.
   pelvis; a slower close.
 - **The controller at 4 substeps** behaves a little differently from training. If it gets worse,
   use 4 substeps only near the grasp (not possible within one run) or tune the grasp for 2
-  substeps (24/27 held there).
+  substeps (24/27 held there on the first runs' default physics; 27/27 on training's, D-051).
 - **Tight grasp tolerance for the VLA.** About 1 cm of tolerance is demanding for a learned
   policy; stage 4 may see grasp misses dominate. That is a finding for stage 5, and the failure
   labels will show it.
@@ -231,7 +236,7 @@ parallel). Long unattended runs on the workstation still need Apurv's OK.
 
 ## 13. Decisions
 
-All accepted by Apurv on 2026-11-03:
+All accepted on 2026-11-03:
 
 - **D-030**: stage 3 now, stage 2 (motion imitation) later, alongside it on MSI.
 - **D-031**: Newton's renderer for the dataset and for closed-loop testing; states recorded

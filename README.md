@@ -35,8 +35,9 @@ Training seed 2, recording seed 0, the first take, on the fixed bench (D-040).</
 > that sees only what a real G1 measures walks, turns, crouches, leans and keeps its balance
 > while its arms move, under randomized physics and kicks. Stage 3, the task and the data: a
 > scripted expert walks the robot to a table and puts the named object in the named bin through
-> that controller on 94.8% of unused test layouts, and 2,000 of its episodes, rendered from the
-> head camera, load in GR00T's and LeRobot's own data loaders. All transfer here is sim-to-sim;
+> that controller on 94.8% of unused test layouts (the target was 95%), and 2,000 of its
+> episodes, rendered from the head camera, load in GR00T's own data loader (and LeRobot's, checked
+> on samples). All transfer here is sim-to-sim;
 > nothing has run on hardware. Next: fine-tuning GR00T on the demonstrations ([roadmap](#roadmap)).
 
 **Contents:** [Highlights](#highlights) · [The project](#the-project) ·
@@ -65,14 +66,16 @@ Training seed 2, recording seed 0, the first take, on the fixed bench (D-040).</
   A scripted expert, sending only the commands a VLA will send, succeeds on 364 of 384 unused
   test layouts (94.8%, 95% CI 92.1-96.6%). 2,000 of its episodes (and 241 for validation) are
   rendered from the head camera with randomized floors, tables, walls, light and camera mount,
-  exported in GR00T N1.6's and LeRobot's formats at 25 and 50 frames per second, and checked
-  with GR00T's loader and LeRobot's. Under the same commands NVIDIA's controller lets the expert succeed
+  exported for GR00T N1.6 at 25 and 50 frames per second, with LeRobot v3.0 copies of all but
+  the 2,000 at 50 fps. GR00T's loader checked every episode, apart from a 12-episode sample of
+  the 2,000 at 50 fps; LeRobot's checked 12-episode samples. Under the same commands NVIDIA's
+  controller lets the expert succeed
   more often (96.4% against 92.8% on the same 1,088 layouts): nearly all of the gap is objects
   pushed aside while our controller's robot withdraws its arm, a first look at stage 5's question.
 - **Evaluated like a study, not a demo.** Three training seeds per configuration, development
   seeds for choices and frozen test seeds reported in full for every candidate recipe (one
   problem first seen there led to D-024), 95% Wilson intervals, and result files stamped with
-  their commit, code hash, package versions and GPU. 50 decisions are logged with what each one
+  their commit, code hash, package versions and GPU. 51 decisions are logged with what each one
   cost.
 - **Debugged in the open.** Four problems were found and fixed on the way (slow walking, falls at
   full arm ranges, too short a history, lost turning), each traced to its cause with an
@@ -321,7 +324,7 @@ docstring; times on the RTX 4070):
 | Record the expert (1,088 episodes) | `uv run python scripts/expert_rollout.py --num-envs 64 --first-seed 10000 --episodes 1088 --record logs/dataset/train-v1 --out logs/expert/train-v1.json --viz none` | about 40 min |
 | Replay check | `uv run python scripts/replay_check.py --episodes logs/dataset/train-v1 --num-envs 64 --out logs/replay/train-v1.json --viz none` | about 20 min |
 | Choose the episodes (D-042) | `uv run python scripts/build_dataset_manifest.py --name v1 --run logs/expert/train-v1.json logs/replay/train-v1.json logs/dataset/train-v1 --count 1000 --out manifest.json` | seconds |
-| Render the head camera | `uv run python scripts/render_episodes.py --episodes logs/dataset/train-v1 --seeds manifest.json --out logs/render/train-v1 --viz none` (`--fps 50` for D-048) | about 20 min (40 at 50 fps) |
+| Render the head camera | `uv run python scripts/render_episodes.py --episodes logs/dataset/train-v1 --seeds manifest.json --out logs/render/train-v1 --viz none` (`--fps 50` for D-048) | about 20 min (about 65 at 50 fps) |
 | Export for GR00T | `uv run python scripts/export_dataset.py --recordings logs/dataset/train-v1 --render logs/render/train-v1 --seeds manifest.json --out logs/export/train-v1` | about 1 min |
 | Check with GR00T's and LeRobot's loaders | `scripts/check_groot_dataset.py`, `scripts/check_lerobot_dataset.py` (in their own environments) | minutes |
 | Check everything from disk | `uv run python scripts/verify_files.py --recordings ... --render ... --export ...` | seconds |
@@ -400,8 +403,13 @@ against NVIDIA's under the same VLA.
 Built on [Isaac Lab](https://github.com/isaac-sim/IsaacLab) and Newton,
 [rsl_rl](https://github.com/leggedrobotics/rsl_rl), [MuJoCo](https://mujoco.org/) and
 [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie)'s Unitree G1 model. The
-gait rewards follow Unitree's G1 training setup, and the joint gains are NVIDIA's Decoupled WBC
-values. Each keeps its own license.
+robot models (the G1 and its Dex3 hands) are Unitree's, and the gait rewards follow Unitree's G1
+training setup. NVIDIA's [GR00T-WholeBodyControl](https://github.com/NVlabs/GR00T-WholeBodyControl)
+gives the joint gains and the baseline controller (code Apache-2.0, weights under the NVIDIA Open
+Model License; downloaded at run time, not redistributed here). The demonstrations are exported
+for [Isaac-GR00T](https://github.com/NVIDIA/Isaac-GR00T) (GR00T N1.6) and
+[LeRobot](https://github.com/huggingface/lerobot), whose loaders check them. Each keeps its own
+license, and none of their code or weights is included in this repository.
 
 ## License
 

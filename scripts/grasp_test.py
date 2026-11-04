@@ -87,7 +87,7 @@ parser.add_argument("--video", action="store_true", help="camera frames of robot
 parser.add_argument("--out", type=Path, required=True)
 add_launcher_args(parser)
 args_cli = parser.parse_args()
-args_cli.physics = "newton_mjwarp"
+# the launcher's physics argument stays unset: it would replace the preset (bench_physics, D-051)
 
 import isaaclab.sim as sim_utils  # noqa: E402
 import numpy as np  # noqa: E402
@@ -97,9 +97,9 @@ from isaaclab.scene import InteractiveSceneCfg  # noqa: E402
 from isaaclab.sensors import CameraCfg, ContactSensorCfg  # noqa: E402
 from isaaclab.utils import configclass, instantiate, replace  # noqa: E402
 from isaaclab.utils.math import compute_pose_error, quat_from_matrix  # noqa: E402
-from isaaclab_tasks.core.velocity.velocity_env_cfg import RoughPhysicsCfg  # noqa: E402
 
 from pi_wbc import provenance  # noqa: E402
+from pi_wbc.stage3 import bench_physics  # noqa: E402
 from pi_wbc.stage3.arm_ik import ArmIK, arm_joint_names  # noqa: E402
 from pi_wbc.tasks.g1_gait import G1_29DOF_GAIT_CFG as G1_CFG  # noqa: E402  (stage 1's robot)
 
@@ -233,7 +233,7 @@ HAND_CONTACTS = ContactSensorCfg(
 @configclass
 class GraspTestCfg:
     sim: sim_utils.SimulationCfg = sim_utils.SimulationCfg(
-        dt=0.005, render_interval=4, physics=RoughPhysicsCfg()
+        dt=0.005, render_interval=4, physics=bench_physics.newton()
     )
     scene: SceneCfg = SceneCfg(num_envs=NUM_ENVS, env_spacing=2.5)
 
@@ -354,6 +354,9 @@ def main() -> None:
         sim.reset()
         dev = sim.device
         dt = sim.get_physics_dt() * cfg.sim.render_interval  # control step, 50 Hz
+        physics = bench_physics.record(cfg.sim.physics)
+        bench_physics.check(physics, mujoco_contacts=args_cli.mujoco_contacts)
+        print(f"[grasp] physics: {physics}")
         robot, obj = scene["robot"], scene["obj"]
         origins = scene.env_origins
         if args_cli.shapes:  # print Newton's collision shapes of hand and object, then stop
@@ -545,7 +548,8 @@ def main() -> None:
             "robots": NUM_ENVS, "rows": rows,
             "frame_marks": marks,
         }  # fmt: skip
-        result.update({"substeps": cfg.sim.physics.num_substeps, "schedule": args_cli.schedule,
+        result.update({"substeps": physics["solver_substeps"], "physics": physics,
+                       "schedule": args_cli.schedule,
                        "mujoco_contacts": args_cli.mujoco_contacts,
                        "controller_export": str(args_cli.export)})  # fmt: skip
         provenance.save_json(args_cli.out / "result.json", result)

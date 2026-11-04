@@ -11,7 +11,7 @@
 # image has no CUDA toolkit, and DeepSpeed, used only with several GPUs, fails to import
 # without one, so it is removed):
 #   git clone --depth 1 -b n1d6 https://github.com/NVIDIA/Isaac-GR00T.git third_party/Isaac-GR00T-n1d6
-#   (cd third_party/Isaac-GR00T-n1d6 && git checkout 9b37aa1)   # the commit checked on Godzilla
+#   (cd third_party/Isaac-GR00T-n1d6 && git checkout 9b37aa1)   # the commit checked locally
 #   apptainer exec ~/containers/pi-wbc.sif env UV_PYTHON=3.10 UV_PYTHON_DOWNLOADS=automatic \
 #       uv sync --frozen --project third_party/Isaac-GR00T-n1d6
 #   apptainer exec ~/containers/pi-wbc.sif uv pip uninstall \
@@ -22,7 +22,8 @@
 # Submit from the repository root; account and partition stay on the command line:
 #   mkdir -p logs/slurm
 #   sbatch -A <account> -p <gpu partition> --gres=gpu:l40s:1 msi/jobs/groot_finetune.sbatch \
-#       --base-model nvidia/GR00T-N1.6-3B --dataset logs/export/pi_wbc_g1_pick_place_train_v1 \
+#       --base-model nvidia/GR00T-N1.6-3B \
+#       --dataset logs/export/pi_wbc_g1_pick_place_train_v1_50fps \
 #       --tag UNITREE_G1 --output logs/groot/<run name> --max-steps 10000 --batch 64
 #
 # Job log: logs/slurm/piwbc-groot-<job>.out

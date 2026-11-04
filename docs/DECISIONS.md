@@ -4,7 +4,8 @@ Each entry says what was decided, why, and what it costs. Entries are numbered D
 deleted; a later entry that replaces one says so, and the old one is marked superseded.
 
 **Index** (stage 0: D-001 to D-011; stage 1: D-012 to D-029; stage 3: D-030 onwards, with
-D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open-items)):
+D-039 and D-040 correcting stage 1's MuJoCo bench and D-051 stage 3's benches and statements; open
+items at the [end](#open-items)):
 
 | Decision | What | Date |
 |---|---|---|
@@ -39,25 +40,26 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 | [D-029](#d-029-stage-1-closes-with-the-turning-target-met-on-one-seed-of-three-2026-11-03) | Stage 1 closes with the turning target met on one seed of three (amended by D-040: met on none) | 2026-11-03 |
 | [D-030](#d-030-stage-3-before-stage-2-2026-11-03) | Stage 3 before stage 2 | 2026-11-03 |
 | [D-031](#d-031-newtons-renderer-for-the-demonstrations-recorded-as-states-and-rendered-afterwards-2026-11-03) | Newton's renderer for the demonstrations, recorded as states and rendered afterwards | 2026-11-03 |
-| [D-032](#d-032-the-perfect-layer-grid-for-stage-5-and-demonstrations-recorded-with-our-controller-2026-11-03) | The perfect-layer grid for stage 5, and demonstrations recorded with our controller | 2026-11-03 |
+| [D-032](#d-032-the-perfect-layer-grid-for-stage-5-and-demonstrations-recorded-with-our-controller-2026-11-03) | The perfect-layer grid for stage 5, and demonstrations recorded with our controller (amended by D-051) | 2026-11-03 |
 | [D-033](#d-033-dex3-confirmed-for-gr00t-n16-hands-move-between-open-and-closed-poses-2026-11-03) | Dex3 confirmed for GR00T N1.6; hands move between open and closed poses | 2026-11-03 |
-| [D-034](#d-034-the-grasp-a-side-grasp-from-above-round-objects-4-physics-substeps-2026-11-03) | The grasp: a side grasp from above, round objects, 4 physics substeps | 2026-11-03 |
-| [D-035](#d-035-the-task-one-table-three-round-objects-two-bins-frozen-seed-ranges-2026-11-03) | The task: one table, three round objects, two bins, frozen seed ranges | 2026-11-03 |
-| [D-036](#d-036-the-scripted-expert-a-state-machine-over-the-true-state-no-retries-2026-11-03) | The scripted expert: a state machine over the true state, no retries | 2026-11-03 |
-| [D-037](#d-037-the-dataset-1000-episodes-per-controller-head-camera-replay-check-2026-11-03) | The dataset: 1,000 episodes per controller, head camera, replay check | 2026-11-03 |
-| [D-038](#d-038-the-g1s-heel-contact-spheres-at-unitrees-urdf-position-from-stage-3-on-2026-11-03) | The G1's heel contact spheres at Unitree's URDF position from stage 3 on | 2026-11-03 |
+| [D-034](#d-034-the-grasp-a-side-grasp-from-above-round-objects-4-physics-substeps-2026-11-03) | The grasp: a side grasp from above, round objects, 4 physics substeps (amended by D-051) | 2026-11-03 |
+| [D-035](#d-035-the-task-one-table-three-round-objects-two-bins-frozen-seed-ranges-2026-11-03) | The task: one table, three round objects, two bins, frozen seed ranges (amended by D-041 and D-051) | 2026-11-03 |
+| [D-036](#d-036-the-scripted-expert-a-state-machine-over-the-true-state-no-retries-2026-11-03) | The scripted expert: a state machine over the true state, no retries (amended by D-051) | 2026-11-03 |
+| [D-037](#d-037-the-dataset-1000-episodes-per-controller-head-camera-replay-check-2026-11-03) | The dataset: 1,000 episodes per controller, head camera, replay check (amended by D-042, D-048 and D-051) | 2026-11-03 |
+| [D-038](#d-038-the-g1s-heel-contact-spheres-at-unitrees-urdf-position-from-stage-3-on-2026-11-03) | The G1's heel contact spheres at Unitree's URDF position from stage 3 on (amended by D-051) | 2026-11-03 |
 | [D-039](#d-039-erratum-on-menageries-model-the-mujoco-benchs-feet-stood-on-friction-06-2026-11-03) | Erratum: on Menagerie's model the MuJoCo bench's feet stood on friction 0.6 (amended by D-040) | 2026-11-03 |
 | [D-040](#d-040-seven-more-mujoco-bench-fixes-and-stage-1s-bench-numbers-rerun-on-the-fixed-bench-2026-11-04) | Seven more MuJoCo-bench fixes, and stage 1's bench numbers rerun on the fixed bench | 2026-11-04 |
-| [D-041](#d-041-the-experts-hand-choice-retract-and-success-rule-and-its-official-test-range-2026-11-04) | The expert's hand choice, retract and success rule, and its official test range | 2026-11-04 |
-| [D-042](#d-042-the-replay-check-tests-each-episodes-first-second-and-the-training-sets-seeds-2026-11-04) | The replay check tests each episode's first second, and the training set's seeds | 2026-11-04 |
-| [D-043](#d-043-how-the-head-camera-video-is-rendered-and-randomized-2026-11-04) | How the head-camera video is rendered and randomized (lens amended by D-044) | 2026-11-04 |
+| [D-041](#d-041-the-experts-hand-choice-retract-and-success-rule-and-its-official-test-range-2026-11-04) | The expert's hand choice, retract and success rule, and its official test range (amended by D-051) | 2026-11-04 |
+| [D-042](#d-042-the-replay-check-tests-each-episodes-first-second-and-the-training-sets-seeds-2026-11-04) | The replay check tests each episode's first second, and the training set's seeds (amended by D-051) | 2026-11-04 |
+| [D-043](#d-043-how-the-head-camera-video-is-rendered-and-randomized-2026-11-04) | How the head-camera video is rendered and randomized (lens amended by D-044, speed by D-051) | 2026-11-04 |
 | [D-044](#d-044-the-head-cameras-lens-is-87-degrees-wide-2026-11-04) | The head camera's lens is 87 degrees wide | 2026-11-04 |
 | [D-045](#d-045-the-datasets-export-format-gr00t-flavoured-lerobot-v21-and-lerobot-v30-2026-11-04) | The dataset's export format: GR00T-flavoured LeRobot v2.1, and LeRobot v3.0 | 2026-11-04 |
-| [D-046](#d-046-nvidias-controller-as-the-tasks-low-level-2026-11-04) | NVIDIA's controller as the task's low level, and its matched set | 2026-11-04 |
-| [D-047](#d-047-training-set-v2-and-a-validation-set-2026-11-04) | Training set v2 and a validation set | 2026-11-04 |
-| [D-048](#d-048-50-frames-per-second-versions-of-the-datasets-2026-11-04) | 50 frames-per-second versions of the datasets | 2026-11-04 |
-| [D-049](#d-049-results-record-the-code-their-run-started-with-2026-11-04) | Results record the code their run started with | 2026-11-04 |
-| [D-050](#d-050-stage-3-closes-2026-11-04) | Stage 3 closes | 2026-11-04 |
+| [D-046](#d-046-nvidias-controller-as-the-tasks-low-level-2026-11-04) | NVIDIA's controller as the task's low level, and its matched set (amended by D-051) | 2026-11-04 |
+| [D-047](#d-047-training-set-v2-and-a-validation-set-2026-11-04) | Training set v2 and a validation set (amended by D-051) | 2026-11-04 |
+| [D-048](#d-048-50-frames-per-second-versions-of-the-datasets-2026-11-04) | 50 frames-per-second versions of the datasets (amended by D-051) | 2026-11-04 |
+| [D-049](#d-049-results-record-the-code-their-run-started-with-2026-11-04) | Results record the code their run started with (amended by D-051) | 2026-11-04 |
+| [D-050](#d-050-stage-3-closes-2026-11-04) | Stage 3 closes (amended by D-051) | 2026-11-04 |
+| [D-051](#d-051-stage-3-reviewed-before-its-merge-the-bench-scenes-physics-and-corrections-2026-11-04) | Stage 3 reviewed before its merge: the bench scenes' physics, and corrections | 2026-11-04 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -777,6 +779,11 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   With the URDF's heel, NVIDIA's controller never fell in the 11 test commands and stands still
   ([results/stage3](../results/stage3/README.md)), so the second demonstration set is planned
   (D-038, with the foot geometry; [STAGE3_DESIGN.md](STAGE3_DESIGN.md), section 6).
+- **Amended by D-051 (2026-11-04):** the Newton test above ran on Isaac Lab's default physics,
+  not training's. On training's settings NVIDIA's controller walks (0.42-0.43 m/s for 0.5) and turns
+  in place at 0.75-0.79 rad/s; standing, it never falls with stage 1's hanging arms (0 of 10 at
+  every height command from 0.70 to 0.78 m) but drifts backwards at 0.32-0.35 m/s at its nominal
+  height, and with the arms at zero it falls at 0.76 and 0.78 m. The update's conclusion stands.
 
 ## D-033: Dex3 confirmed for GR00T N1.6; hands move between open and closed poses (2026-11-03)
 
@@ -806,6 +813,13 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 - **Check (2026-11-03, step 1):** at 4 substeps with the URDF's heel the controller is unchanged:
   3 falls against 2 in 4,950 robots over nominal, randomized and kicked conditions and three
   seeds, speed and turning within 0.02 ([results/stage3](../results/stage3/README.md), step 1).
+- **Amended by D-051 (2026-11-04):** the grasp test ran on Isaac Lab's default physics (soft
+  contacts, MuJoCo's collision detection), not training's. On training's settings, in two runs each:
+  the can and the bottle hold 27/27, the square block and the box 27/27 too (not 3 and 1), the can
+  at 2 substeps 27/27 with 1.6 cm of slip against 2.4 at 4, and fingers first 16/27 and 17/27. So
+  neither "round objects only" nor 4 substeps is needed for the grasp. Both stay for stage 3: every
+  recording, check and render is made with them, and the controller is unchanged at 4 substeps (the
+  check above was on training's physics). The expert leans 0.28 rad, not 0.25.
 
 ## D-035: The task: one table, three round objects, two bins, frozen seed ranges (2026-11-03)
 
@@ -817,6 +831,10 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 - **Why:** it is the project's task (walk to a table, pick the named object, put it in the named
   bin) within the reach and grasp the tests allow.
 - **Cost:** no left-hand grasps, no square objects, one table.
+- **Amended by D-041 and D-051 (2026-11-04):** the left hand joined in D-041 (when the target's
+  right side is crowded), so "right hand only" and "no left-hand grasps" no longer hold. The
+  test range was not used once: 60000-60383 was run twice while the success rule was fixed and
+  is retired (D-041); 60384-60767 was run once for the reported number.
 
 ## D-036: The scripted expert: a state machine over the true state, no retries (2026-11-03)
 
@@ -828,6 +846,11 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 - **Why:** an expert without retries gives an honest success rate through each controller, and
   its labels are stage 5's failure attribution.
 - **Cost:** the demonstrations contain no recoveries, so the VLA never sees one.
+- **Amended by D-051 (2026-11-04):** the code's labels (`LABELS` in
+  `src/pi_wbc/stage3/expert.py`) are fell, knocked (the target), knocked_other (D-041),
+  missed_grasp, dropped, wrong_bin, timed_out and no_plan (no stance found for the layout).
+  There is no wrong-object label: the expert picks by the true state. The ideal body is not
+  built yet (D-050).
 
 ## D-037: The dataset: 1,000 episodes per controller, head camera, replay check (2026-11-03)
 
@@ -840,6 +863,10 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 - **Why:** a size in line with GR00T and π0.5 fine-tuning practice, to be revised in stage 4;
   Newton on the GPU does not repeat runs exactly, so a re-run can only reproduce outcomes.
 - **Cost:** two data loaders to install for the load tests (asked first).
+- **Amended by D-042, D-048 and D-051 (2026-11-04):** the replay check became a check of each
+  episode's first second (D-042); re-running the commands ends the same way for 695 of the
+  1,000 chosen episodes, so "must give the same outcome" was dropped. The datasets also come at
+  50 frames per second (D-048). The matched set shares 936 of its 1,000 layouts with ours.
 
 ## D-038: The G1's heel contact spheres at Unitree's URDF position from stage 3 on (2026-11-03)
 
@@ -853,6 +880,11 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 - **Cost:** our controller runs on a foot it was not trained on: it turns in place a little
   more slowly (0.64 against 0.70 rad/s for 0.8). Stage 1's Newton numbers were taken on the
   asset's heel. Which position matches the real robot's sole was not checked.
+- **Amended by D-051 (2026-11-04):** NVIDIA's numbers above came from Isaac Lab's default physics.
+  On training's: on the asset's heel it drifts backwards at 0.32-0.35 m/s standing at its nominal
+  height and falls in 1 of 110 robots with either arm pose (while its arms move); on the URDF's it
+  never fell, in 220 robots at 2 substeps and 220 at 4, and stands still. The decision stands. Ours
+  (from `isaac_eval`, on training's physics throughout) is unchanged.
 
 ## D-039: Erratum: on Menagerie's model the MuJoCo bench's feet stood on friction 0.6 (2026-11-03)
 
@@ -1022,6 +1054,12 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   stricter rule lowers success relative to the old counting. The interval's lower end clears the
   design's 90%; the 95% goal is met only to rounding. Of the 20 test failures 16 are pushed
   neighbours: 7 while the hand comes down, 6 in the retract, 3 while carrying.
+- **Amended by D-051 (2026-11-04):** "met only to rounding" means missed: 364 of 384 is 94.8%,
+  one success short of 95%; the 90% floor is met. The second audit, which found the bin-wall
+  failures behind the hand rule, pooled the retired range's two runs with development runs, so
+  that range informed the hand rule as well as the success rule. The official run started at
+  f1dd315; its file records 53195ba, the commit when it was saved (before D-049), which changes
+  no code. Training layouts 1000-1383: 95% interval 91.2-96.0%.
 
 ## D-042: The replay check tests each episode's first second, and the training set's seeds (2026-11-04)
 
@@ -1046,6 +1084,12 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   share that does. The reset change came after D-041's official number; the expert's logic is
   unchanged (31 of 32 training episodes succeeded after it), and the next official number comes
   from fresh test seeds.
+- **Amended by D-051 (2026-11-04):** the separation (at most 2.7 mm against 17-124 mm) holds on the
+  31-episode trial only. Over all 1,088 v1 recordings the drift's median is 0.8 mm and 97 drift more
+  than 2.7 mm, up to 8.4 mm among those that pass; the 2 dropped (21.3 and 11.3 mm) are successes of
+  their own commands. In v2's recordings the passing ones reach 9.9 mm and the 7 that fail drift
+  10.3-21.3 mm (6 of them successes). The check therefore drops a few genuine recordings to
+  run-to-run variation; mismatched recordings would still fail it.
 
 ## D-043: How the head-camera video is rendered and randomized (2026-11-04)
 
@@ -1081,6 +1125,8 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 - **Cost:** the lighting is plainer than RTX: one light, no coloured shadows, no reflections.
   Patterns are generated greys, not photographs. The renderer's speed on the RTX 4070 is about
   660 frames per second for 32 episodes at once.
+- **Amended by D-051 (2026-11-04):** measured, the v1 render ran at about 620 frames per second
+  (790,046 frames in 21 min), not 660.
 
 ## D-044: The head camera's lens is 87 degrees wide (2026-11-04)
 
@@ -1190,6 +1236,12 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   under NVIDIA's controller. **NVIDIA's training set v1** = the first 1,000 qualifying episodes
   (seeds 10,000-11,036; 936 layouts shared with ours), by D-042's rule:
   results/stage3/dataset/train-v1-nvidia-manifest.json.
+- **Amended by D-051 (2026-11-04):** the 367 against 361 comparison mixes code versions: ours
+  ran before D-042's zero-velocity start, NVIDIA's after it. "Mostly chance" holds for which
+  layouts fail, not for the rate: 2 repeats in 8 is more than chance gives at our 4.1% rate
+  (p = 0.04), and the gap of 45 against 4 is not chance. NVIDIA's results file is committed as
+  results/stage3/nvidia_wbc/expert-train-1000-1383.json, the 8-layout rerun as
+  results/stage3/expert/retract-rerun.json.
 
 ## D-047: Training set v2 and a validation set (2026-11-04)
 
@@ -1208,6 +1260,12 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   and the commits between them added only export code they never import (the package's source
   hash is the same, e354b5f5d565). Two replay files say "dirty" for the same reason: two
   scripts they don't use were uncommitted.
+- **Amended by D-051 (2026-11-04):** the source hash does not show that the code was unchanged:
+  the digest covers every file in src/pi_wbc, eae88f1 adds src/pi_wbc/stage3/export.py, and the
+  digests differ (b86574820090 at 5d1eecd, e354b5f5d565 at eae88f1; the one recorded was taken
+  at save time). What shows it is `git diff 5d1eecd eae88f1`, which only adds files (the export
+  code, its scripts and tests). Three files say "dirty", not two (the validation recording's
+  too), and the validation runs started at eae88f1. Validation: 95% interval 90.6-96.4%.
 
 ## D-048: 50 frames-per-second versions of the datasets (2026-11-04)
 
@@ -1237,6 +1295,12 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   on the GPU; its 25 fps render took 21 min alone), but only 1.3 times the video storage (3.8 GiB
   against 3.0 GiB: H.264 compresses the extra frames well); twice the policy calls in closed loop
   if a 50 fps model re-plans as often in frames.
+- **Amended by D-051 (2026-11-04):** the loop and the replay check judge differently: the loop
+  stops 1 s after the object comes to rest and so misses pushes during the retract, and labels
+  a timeout "dropped"; the replay check judges at the end of the recording. On these 241
+  episodes they disagree on 75 (42 succeed only in the loop, 33 only in the check), so 71%
+  against 67% does not show that the loop adds no loss. The comparisons between command rates,
+  all under the loop's own rule, stand.
 
 ## D-049: Results record the code their run started with (2026-11-04)
 
@@ -1250,6 +1314,10 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   checkout during a run would have recorded code the run never used.
 - **Cost:** results saved before this change record the state at save time; the runs of
   2026-11-04 that crossed a commit are listed where they are used (D-047).
+- **Amended by D-051 (2026-11-04):** the runs that crossed a commit took 13-35 minutes, not
+  several hours, and besides D-047's, the expert's run on training layouts 1000-1383 (D-041)
+  started at f1dd315 and was saved at 53195ba. The source digest covers src/pi_wbc, not
+  scripts/, and showed nothing in D-047 (see its amendment).
 
 ## D-050: Stage 3 closes (2026-11-04)
 
@@ -1273,6 +1341,51 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 - **Left open:** the ideal-body low level (design section 7); why our controller pushes objects
   during the retract where NVIDIA's does not (D-046); OVRTX renders for the front page.
 - **Why close now:** what stage 4 needs is in place and checked; the open items belong to stage 5.
+- **Amended by D-051 (2026-11-04):** the finish line is met except in three points this entry
+  glossed: the expert's 94.8% misses the 95% target by one episode (the 90% floor is met); the
+  replay check is D-042's first-second check, not the design's "same outcome" (695 of 1,000
+  re-run to the same end); and the only third-person GIF of the expert shows an earlier version on a
+  development layout. Stage 3 still closes: stage 4 needs nothing from these.
+
+
+## D-051: Stage 3 reviewed before its merge: the bench scenes' physics, and corrections (2026-11-04)
+
+- **What:** four reviews of stage 3 before it went to main (the front page and results page;
+  this log and the designs; the code behind the numbers, with the unit tests; privacy and
+  licences) found one fault in the code and a set of statements stronger than their evidence.
+  - **The grasp test and NVIDIA's controller bench ran on Isaac Lab's default physics.** Both
+    scripts set the launcher's `physics` argument to `newton_mjwarp`, and Isaac Lab then
+    replaces the scene's physics config with a fresh default one: 1 substep instead of 2, Euler
+    integration, MuJoCo's contacts, a contact stiffness of 2,500 against 160,000. Everything
+    else (the task, the expert, the recordings, the replay check, the rendering, the evaluation
+    loop, `isaac_eval`) takes its physics from a task config and was not affected (checked field
+    by field). Both scripts now name the preset's config, record what the solver runs with and
+    refuse a run that differs (`pi_wbc.stage3.bench_physics`, with tests), and every run of
+    results/stage3/nvidia_wbc and results/stage3/grasp was redone (the first files stay in git
+    history). What changed is in D-032, D-034 and D-038: NVIDIA's controller does not fall
+    standing with hanging arms but still drifts on the asset's heel, and stands still on the
+    URDF's (D-038 holds); the grasp holds square objects and works at 2 substeps, so D-034's
+    reasons for round objects and 4 substeps fall away, while both stay for stage 3's data.
+  - **The evaluation loop and the replay check do not judge like the expert.** The loop stops
+    1 s after the object comes to rest (so it never sees pushes during the retract, our
+    controller's main failure), the replay check has no fall test, and both label a timeout
+    "dropped", which stage 5 would count against the controller. Not changed in stage 3's code;
+    one judge for all three, with timeouts labelled as such, comes first in stage 4.
+  - **Statements corrected** in their entries: D-035, D-036, D-037, D-041, D-042, D-043, D-046,
+    D-047, D-048, D-049 and D-050; on the results page and the front page, the replay check's
+    drift over the full sets, the grasp's misses, samples described as every episode, the
+    target of 95% (missed by one episode), "mostly chance", the render speed, the evaluation
+    loop's status, and the stage 4 draft's stale lines.
+  - **Added:** the loaders' check reports (results/stage3/export; the checks run in GR00T's
+    and LeRobot's own environments and record no commit, versions or GPU), the 8-layout retract
+    rerun (results/stage3/expert/retract-rerun.json), credits
+    for NVIDIA's GR00T-WholeBodyControl, Isaac-GR00T, LeRobot and Unitree on the front page.
+- **Why:** stage 1's bench faults were found after its merge (D-039, D-040); this review came
+  before, and its findings were checked against the files before anything was changed.
+- **Cost:** 16 minutes of GPU: 16 bench runs, a grasp GIF and two rounds of 7 grasp runs, done once
+  before the fix was committed and again from its commit (9b5bd65), whose files are the ones kept.
+  Not changed: the expert's 94.8%, the datasets and their checks, the matched set and the
+  command-rate test. Stage 4 starts with the judge.
 
 ## Open items
 

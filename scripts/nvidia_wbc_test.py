@@ -57,7 +57,7 @@ parser.add_argument(
 parser.add_argument("--out", type=Path, required=True)
 add_launcher_args(parser)
 args_cli = parser.parse_args()
-args_cli.physics = "newton_mjwarp"
+# the launcher's physics argument stays unset: it would replace the preset (bench_physics, D-051)
 
 import json  # noqa: E402
 
@@ -69,10 +69,10 @@ from isaaclab.assets import AssetBaseCfg  # noqa: E402
 from isaaclab.scene import InteractiveSceneCfg  # noqa: E402
 from isaaclab.utils import configclass, instantiate, replace  # noqa: E402
 from isaaclab.utils.math import quat_apply_inverse, yaw_quat  # noqa: E402
-from isaaclab_tasks.core.velocity.velocity_env_cfg import RoughPhysicsCfg  # noqa: E402
 
 from pi_wbc import provenance  # noqa: E402
 from pi_wbc.sim2sim.commands import ALL_SCENARIOS, UpperBodyMotion  # noqa: E402
+from pi_wbc.stage3 import bench_physics  # noqa: E402
 from pi_wbc.stats import wilson_interval  # noqa: E402
 from pi_wbc.tasks.g1_gait import G1_29DOF_GAIT_CFG as G1_CFG  # noqa: E402
 
@@ -118,7 +118,7 @@ class SceneCfg(InteractiveSceneCfg):
 @configclass
 class TestCfg:
     sim: sim_utils.SimulationCfg = sim_utils.SimulationCfg(
-        dt=0.005, render_interval=4, physics=RoughPhysicsCfg()
+        dt=0.005, render_interval=4, physics=bench_physics.newton()
     )
     scene: SceneCfg = SceneCfg(num_envs=N, env_spacing=2.0)
 
@@ -146,6 +146,9 @@ def main() -> None:
         sim.reset()
         dev = sim.device
         dt = sim.get_physics_dt() * cfg.sim.render_interval
+        physics = bench_physics.record(cfg.sim.physics)
+        bench_physics.check(physics)
+        print(f"[nvidia-wbc] physics: {physics}")
         robot = scene["robot"]
         if args_cli.heel_x is not None:
             from pi_wbc.stage3.feet import set_heel_x
@@ -279,8 +282,8 @@ def main() -> None:
             {
                 "controller": "NVIDIA Decoupled WBC (GR00T-WholeBodyControl, Balance + Walk)",
                 "policy_commit": (args_cli.policy_dir.parent / "COMMIT").read_text().strip(),
-                "physics": "newton_mjwarp",
-                "substeps": cfg.sim.physics.num_substeps,
+                "physics": physics,
+                "substeps": physics["solver_substeps"],
                 "seeds_per_scenario": args_cli.seeds,
                 "seed": args_cli.seed,
                 "duration_s": args_cli.duration_s,
