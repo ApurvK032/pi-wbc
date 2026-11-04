@@ -134,12 +134,29 @@ def torch_cuda() -> str | None:
     return getattr(torch.version, "cuda", None)
 
 
+# The code a run used is the code it started with: the git state and the source digest are taken
+# once, when this module is first imported (scripts import it at start), so a commit or an edit
+# made while a long run is going doesn't change what its results record. Before 2026-11-04 they
+# were taken when each result was saved (D-049).
+_START: dict[str, Any] = {}
+
+
+def start_state() -> dict[str, Any]:
+    """This process's git state and source digest, as they were when it started."""
+    if not _START:
+        _START.update(git=git_info(), source=source_digest())
+    return _START
+
+
 def collect(repo: Path | None = None, packages: Iterable[str] = DEFAULT_PACKAGES) -> dict[str, Any]:
-    """Full provenance record for a result file."""
+    """Full provenance record for a result file: the code as it was when the process started
+    (another `repo` is read now), the machine and packages as they are."""
+    start = start_state()
     return {
         "time_utc": datetime.now(UTC).isoformat(timespec="seconds"),
-        "git": git_info(repo),
-        "source": source_digest(),
+        "git": start["git"] if repo is None else git_info(repo),
+        "code_recorded_at": "process start" if repo is None else "save",
+        "source": start["source"],
         "python": platform.python_version(),
         "platform": platform.platform(),
         "host": platform.node(),
@@ -175,3 +192,6 @@ def load_json(path: str | Path) -> Any:
     if path.suffix == ".gz":
         raw = gzip.decompress(raw)
     return json.loads(raw)
+
+
+start_state()  # at import, i.e. when the process starts

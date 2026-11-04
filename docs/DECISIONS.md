@@ -56,6 +56,7 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 | [D-046](#d-046-nvidias-controller-as-the-tasks-low-level-2026-11-04) | NVIDIA's controller as the task's low level | 2026-11-04 |
 | [D-047](#d-047-training-set-v2-and-a-validation-set-2026-11-04) | Training set v2 and a validation set | 2026-11-04 |
 | [D-048](#d-048-50-frames-per-second-versions-of-the-datasets-2026-11-04) | 50 frames-per-second versions of the datasets | 2026-11-04 |
+| [D-049](#d-049-results-record-the-code-their-run-started-with-2026-11-04) | Results record the code their run started with | 2026-11-04 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -1212,6 +1213,19 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 - **Cost:** twice the rendering (about 40 minutes per 1,000 episodes on the RTX 4070) and twice
   the video storage (about 6 GB per 1,000 episodes); twice the policy calls in closed loop if a
   50 fps model re-plans as often in frames.
+
+## D-049: Results record the code their run started with (2026-11-04)
+
+- **What:** `pi_wbc.provenance` takes the git state and the package's source digest once, when it
+  is first imported (each script imports it at start), and every result the process saves
+  records those, marked `"code_recorded_at": "process start"`. Package versions, GPU and time
+  are still read at save time.
+- **Why:** they used to be read when each result was saved. Overnight runs of several hours
+  saved results stamped with commits made after they started (D-047): the code they ran was
+  unchanged, which the source digest showed, but the stamp misled, and a merge into the
+  checkout during a run would have recorded code the run never used.
+- **Cost:** results saved before this change record the state at save time; the runs of
+  2026-11-04 that crossed a commit are listed where they are used (D-047).
 
 ## Open items
 
