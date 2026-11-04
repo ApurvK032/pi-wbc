@@ -3,12 +3,14 @@
     uv run pi-wbc-isaac-eval --task PiWbc-G1-Teacher --checkpoint <run>/model_1399.pt \
         --seeds 10 --out results/stage1/<name>.json physics=newton_mjwarp
 
-Every scenario of the bench (`pi_wbc.sim2sim.commands`) gets `--seeds` robots, all in one
-Isaac Lab environment, each holding its scenario's commands for 20 s: velocity fixed (no
-resampling), the body pose moving to the scenario's at the training's rate limits, arms moving
-at full range only in the arm scenarios. Starts are Isaac Lab's reset randomization, seeded by
-`--seed`. A robot's first fall ends its count. Tracking errors are taken after 2 s, as in the
-bench: planar velocity in the heading frame, yaw rate, pelvis height, waist angles, arm joints.
+Every scenario of the bench (`pi_wbc.sim2sim.commands`) gets `--seeds` robots, all in one Isaac
+Lab environment, each holding its scenario's commands for the bench's episode length (20 s, or
+23 s with kicks; `episode_s`): velocity fixed (no resampling), the body pose moving to the
+scenario's at the training's rate limits, arms moving over their trained range
+(`g1_body.ARM_RANGES`) only in the arm scenarios. Starts are Isaac Lab's reset randomization,
+seeded by `--seed`. A robot's first fall ends its count. Tracking errors are taken after 2 s, as
+in the bench: planar velocity in the heading frame, yaw rate, pelvis height, waist angles, arm
+joints.
 
 By default the robots are nominal (`make_nominal`: no randomization, noise or delay) and are not
 pushed; `--randomized` keeps the task's randomization and pushes, and `--push-speed` kicks them
@@ -30,6 +32,18 @@ from pathlib import Path
 from typing import Any
 
 SETTLE_S = 2.0
+
+
+def episode_s(duration_s: float | None, push_speed: float) -> float:
+    """Episode length: `duration_s` if given, else the bench's: 20 s, or with kicks until
+    `KICK_WATCH_S` after the last kick (23 s), so the kick at 19 s is watched as long as the
+    others."""
+    if duration_s is not None:
+        return duration_s
+    from pi_wbc.sim2sim.commands import KICK_WATCH_S, Condition
+
+    condition = Condition()
+    return max(condition.push_times) + KICK_WATCH_S if push_speed > 0 else condition.episode_s
 
 
 def _repo_relative(path: Path) -> str:
@@ -56,14 +70,19 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--seeds", type=int, default=10, help="robots per scenario")
     parser.add_argument("--seed", type=int, default=0, help="seed of the reset randomization")
-    parser.add_argument("--duration-s", type=float, default=20.0)
+    parser.add_argument(
+        "--duration-s",
+        type=float,
+        default=None,
+        help="episode length (default: the bench's, 20 s or 23 s with kicks)",
+    )
     parser.add_argument("--randomized", action="store_true", help="keep randomization and pushes")
     parser.add_argument(
         "--arm-level",
         type=float,
         default=1.0,
-        help="arm-motion range as a curriculum level (1: full joint ranges; training stops at "
-        "its teacher's level)",
+        help="arm-motion range as a curriculum level (1: the full training ranges, "
+        "g1_body.ARM_RANGES; training stops at its teacher's level)",
     )
     parser.add_argument(
         "--push-speed",
@@ -76,6 +95,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--out", type=Path, required=True)
     add_launcher_args(parser)
     args, overrides = parser.parse_known_args(argv)
+    args.duration_s = episode_s(args.duration_s, args.push_speed)
 
     import gymnasium as gym
     import torch
