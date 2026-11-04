@@ -85,7 +85,7 @@ def finish(fig, ax, t, title, subtitle):
 
 def sweep_in_place(path: Path, policy_filter=None) -> dict[float, float]:
     """Mean turn rate reached over both MuJoCo models, per in-place command."""
-    rows = [r for r in json.loads(path.read_text()) if r["command"][0] == 0.0]
+    rows = [r for r in load_json(path)["rows"] if r["command"][0] == 0.0]
     if policy_filter:
         rows = [r for r in rows if policy_filter(r["policy"])]
     out: dict[float, list[float]] = {}
