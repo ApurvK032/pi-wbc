@@ -350,7 +350,7 @@ video's hash):
 | Set | Frames per second | Episodes | Rows | GR00T's loader | LeRobot's loader | From disk |
 |---|---:|---:|---:|---|---|---|
 | Training v1 | 25 | 1,000 | 790,046 | 1,000 of 1,000 | 12 of 12 | all match |
-| Training v1 | 50 | 1,000 | 1,579,583 | being checked | being checked | all match |
+| Training v1 | 50 | 1,000 | 1,579,583 | 1,000 of 1,000 | 12 of 12 | all match |
 | Training v2 | 25 | 2,000 | 1,581,058 | 2,000 of 2,000 | being checked | all match |
 | Validation v1 | 25 | 241 | 191,375 | 241 of 241 | 12 of 12 | all match |
 | Validation v1 | 50 | 241 | 382,630 | 241 of 241 | 12 of 12 | all match |
