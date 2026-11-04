@@ -933,6 +933,13 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 
   The development-seed tables of the earlier steps are kept as measured, as the record of the
   choices made then, and the stage 1 page says which numbers are which.
+
+  The fixes and reruns were made on the stage 3 branch and reached main first as copies with
+  new commit hashes (PR #3): `5ea97c6` is `99294d1` there, `a4a9da6` is `58ad2f0` and `9416351`
+  is `ec10a13`. With stage 3 merged both are in main's history; the result files record the
+  stage 3 hashes they ran from. The bench code (`src/pi_wbc/sim2sim/`) is the same in both; the
+  Isaac Lab test differs only by two stage 3 options that are off by default. The files' source
+  hash covers the whole package, stage 3's modules included, so it matches the stage 3 branch.
 - **What changes** (final controller, test seeds, Menagerie / Newton's model):
   - **Turning in place now misses on every seed:** turn-rate error at 0.8 rad/s 0.21 / 0.19 rad/s
     on seed 1 (0.19 / 0.19 before), 0.29 / 0.26 on seed 2 (0.25 / 0.24), 0.24 / 0.22 on seed 3
