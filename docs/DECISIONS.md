@@ -49,6 +49,7 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 | [D-039](#d-039-erratum-on-menageries-model-the-mujoco-benchs-feet-stood-on-friction-06-2026-11-03) | Erratum: on Menagerie's model the MuJoCo bench's feet stood on friction 0.6 (amended by D-040) | 2026-11-03 |
 | [D-040](#d-040-seven-more-mujoco-bench-fixes-and-stage-1s-bench-numbers-rerun-on-the-fixed-bench-2026-11-04) | Seven more MuJoCo-bench fixes, and stage 1's bench numbers rerun on the fixed bench | 2026-11-04 |
 | [D-041](#d-041-the-experts-hand-choice-retract-and-success-rule-and-its-official-test-range-2026-11-04) | The expert's hand choice, retract and success rule, and its official test range | 2026-11-04 |
+| [D-042](#d-042-the-replay-check-tests-each-episodes-first-second-and-the-training-sets-seeds-2026-11-04) | The replay check tests each episode's first second, and the training set's seeds | 2026-11-04 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -991,6 +992,30 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   stricter rule lowers success relative to the old counting. The interval's lower end clears the
   design's 90%; the 95% goal is met only to rounding. Of the 20 test failures 16 are pushed
   neighbours: 7 while the hand comes down, 6 in the retract, 3 while carrying.
+
+## D-042: The replay check tests each episode's first second, and the training set's seeds (2026-11-04)
+
+- **What:**
+  - **Replay check** (`scripts/replay_check.py`): each recorded episode's commands go through
+    the controller and the physics again, without the expert. An episode passes when the replay
+    stays within 1 cm of its recording (pelvis and target object) over the first second. How
+    often replays also end the same way is reported over the whole set and drops nothing. This
+    replaces design section 8's "episodes that fail it are dropped".
+  - **Every pick-place reset now samples the zero velocity command.** It drew a random one,
+    which the expert overwrote before the first step but which sat in the controller's first
+    observation and 25-step history, so no two runs of a layout started alike.
+  - **The training set:** the first 1,000 successful episodes, in seed order, from training seed
+    10,000 on. Every recorded episode, failures included, is kept with its label for stage 5.
+- **Why:** Newton on the GPU doesn't repeat a run exactly. The expert corrects small differences
+  as it goes; a replay of its commands can't. Of 31 recorded successes, 24-27 succeeded again on
+  each of three replays; 11 failed at least once but only 2 every time, and those that failed
+  looked no harder (hand, room beside the target, tilt). Dropping on the outcome would remove
+  about one good demonstration in five, by chance. The first second separates recordings that
+  belong to their commands (at most 2.7 mm of drift, median 0.6) from mismatched ones (17-124 mm).
+- **Cost:** the dataset can't claim that every episode reproduces end to end; it reports the
+  share that does. The reset change came after D-041's official number; the expert's logic is
+  unchanged (31 of 32 training episodes succeeded after it), and the next official number comes
+  from fresh test seeds.
 
 ## Open items
 
