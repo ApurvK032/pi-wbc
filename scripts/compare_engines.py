@@ -6,7 +6,8 @@
 
 Reads the Isaac Lab evaluations in results/stage1/physx/ (<prefix>-s<seed>-<engine>-<run>.json;
 50 robots per command, nominal and with kicks) and the MuJoCo bench's development-seed results
-(--mujoco, `{s}` for the seed; the B2 students' in results/stage1/speed_fix/ by default).
+(--mujoco, `{s}` for the seed; the B2 students' in results/stage1/speed_fix/fixed_bench/ by
+default, rerun on the fixed bench of D-040).
 """
 
 import argparse
@@ -15,7 +16,7 @@ import math
 
 SEEDS = (1, 2, 3)
 IL = "results/stage1/physx/b2-s{s}-{e}-{c}.json"
-MJ = "results/stage1/speed_fix/speed-fine05-s{s}-nominal.json"
+MJ = "results/stage1/speed_fix/fixed_bench/speed-fine05-s{s}-nominal.json"
 ROWS = [
     ("walk_0.5", "lin_err_mean", "Speed error, 0.5 m/s", 1.0),
     ("walk_1.0", "lin_err_mean", "Speed error, 1 m/s", 1.0),
