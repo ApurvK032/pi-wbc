@@ -261,10 +261,17 @@ class Expert:
         out = grasp - p.slide_in * rot[:, 1]  # 2.5 cm further from the object, then slide in
         up = np.array([0.0, 0.0, 1.0])
         pre = out + p.pre_up * up
-        pelvis = self._env_pos(self.robot.data.root_pos_w.torch)[i, :2].cpu().numpy()
+        pelvis_pos = self._env_pos(self.robot.data.root_pos_w.torch)[i].cpu().numpy()
+        self.notes[i]["pelvis_z_at_plan"] = round(float(pelvis_pos[2]), 3)
+        pelvis = pelvis_pos[:2]
         grasp_rel = rot[:2, :2].T @ (grasp[:2] - pelvis)  # the grasp in the robot's frame
         start = pre.copy()  # in front of the chest, on the grasp's line, at the descent's height
         start[:2] = pelvis + rot[:2, :2] @ np.array([p.raise_x, grasp_rel[1]])
+        self._ik_state(i)  # the IK's model at the measured body against the measured palm
+        q_now = self.robot.data.joint_pos.torch[i, self.arm_ids].cpu().numpy()
+        model_palm, _ = ik.palm_pose(q_now)
+        miss = self._palm_pose()[0][i].cpu().numpy() - model_palm
+        self.notes[i]["palm_model_err_cm"] = np.round(miss * 100, 1).tolist()
         self._ik_state(i, waist_pitch=p.lean)
         g = ik.solve(grasp, rot, self.q_hang, iters=400)
         if g.pos_err > 0.01 or g.rot_err > 0.05:
@@ -500,6 +507,9 @@ class Expert:
                         note["obj_in_palm_at_close_cm"] = np.round(rel * 100, 1).tolist()
                         note["palm_error_at_close_cm"] = np.round(e3 * 100, 1).tolist()
                         note["fine_grasp_s"] = round(k * dt, 2)
+                        cmd = hl.arm_hand[i, self.arm_slots].cpu().numpy()
+                        got = self.robot.data.joint_pos.torch[i, self.arm_ids].cpu().numpy()
+                        note["arm_target_minus_angle_rad"] = np.round(cmd - got, 3).tolist()
                     self._go(
                         i, {"fine_pre": "lower", "fine_out": "slide", "fine_grasp": "close"}[ph]
                     )
@@ -602,6 +612,9 @@ class Expert:
         for i in range(self.n):
             if PHASES[self.phase[i]] in ("done", "failed"):
                 continue
+            if P["raise"] <= self.phase[i] <= P["lift"]:  # the most the pelvis tipped back
+                note = self.notes[i]  # while the arm worked at the table (every episode)
+                note["back_tilt_max"] = round(max(note.get("back_tilt_max", -1.0), pitch[i]), 3)
             row = [int(self.phase[i]), int(self.t[i]), *np.round(rel[i], 1).tolist()]
             row += [round(float(moved[i]) * 100, 1), round(float(waist[i]), 3)]
             row.append(round(float(pitch[i]), 3))
@@ -681,8 +694,9 @@ class Expert:
             np.stack([targets[int(i)][1] for i in ids]), device=self.dev, dtype=torch.float32
         )
         q_tgt = quat_from_matrix(rots)
+        base = self.robot.num_base_dofs  # 6 for the floating base, 0 for a pinned (fixed) one
         jac = self.robot.data.body_link_jacobian_w.torch[ids, self.palm][
-            :, :, [6 + j for j in self.arm_ids]
+            :, :, [base + j for j in self.arm_ids]
         ]
         ep, eo = compute_pose_error(
             palm_pos[ids], palm_quat[ids], tgt, q_tgt, rot_error_type="axis_angle"
