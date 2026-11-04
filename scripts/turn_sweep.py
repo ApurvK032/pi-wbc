@@ -3,14 +3,15 @@
     python scripts/turn_sweep.py OUT.json NAME=EXPORTED_DIR...   (from the repository root)
 
 Development seeds 0-9, nominal condition, 20 s episodes; the steady rate is the bench's yaw
-drift (mean yaw rate after settling) plus the command.
+drift (mean yaw rate after settling) plus the command. OUT holds the rows, the settings and the
+provenance (commit, code hash, package versions).
 """
 
-import json
 import sys
 
 import numpy as np
 
+from pi_wbc import provenance
 from pi_wbc.sim2sim.commands import Scenario
 from pi_wbc.sim2sim.evaluate import OnnxPolicy, run_episode
 from pi_wbc.sim2sim.mujoco_g1 import G1MujocoSim, PolicyIO, build_model
@@ -57,5 +58,14 @@ for name, exp in POLICIES.items():
                 f" steps {row['step_rate_hz']:.1f}/s, falls {falls}",
                 flush=True,
             )
-with open(sys.argv[1], "w") as f:
-    json.dump(rows, f, indent=1)
+provenance.save_json(
+    sys.argv[1],
+    {
+        "policies": POLICIES,
+        "menagerie": MENAGERIE,
+        "condition": "nominal",
+        "seeds": list(SEEDS),
+        "duration_s": 20.0,
+        "rows": rows,
+    },
+)

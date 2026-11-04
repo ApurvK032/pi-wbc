@@ -30,6 +30,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, LogNorm
 
 from pi_wbc.provenance import load_json
+from pi_wbc.sim2sim.evaluate import kick_counts
 
 R = Path("results/stage1")
 OUT = Path("results/figures")
@@ -84,7 +85,7 @@ def finish(fig, ax, t, title, subtitle):
 
 def sweep_in_place(path: Path, policy_filter=None) -> dict[float, float]:
     """Mean turn rate reached over both MuJoCo models, per in-place command."""
-    rows = [r for r in json.loads(path.read_text()) if r["command"][0] == 0.0]
+    rows = [r for r in load_json(path)["rows"] if r["command"][0] == 0.0]
     if policy_filter:
         rows = [r for r in rows if policy_filter(r["policy"])]
     out: dict[float, list[float]] = {}
@@ -160,10 +161,7 @@ def kicks_survived(path: Path) -> float | None:
         d = load_json(path)
     except (OSError, ValueError):  # missing, or a run still going
         return None
-    times = d["condition_settings"]["push_times"]
-    eps = d["episodes"]
-    falls = sum(e["fell"] for e in eps)
-    given = sum(sum(1 for x in times if not e["fell"] or x <= e["fall_time_s"]) for e in eps)
+    falls, given = kick_counts(d["episodes"], d["condition_settings"]["push_times"])
     return 1 - falls / given
 
 

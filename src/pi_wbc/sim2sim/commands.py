@@ -63,6 +63,9 @@ class UpperBodyMotion:
         return self.current
 
 
+ARM_STREAM = 4  # random stream of the arm and hand motion: default_rng([seed, ARM_STREAM])
+
+
 class CommandDriver:
     """Feeds one scenario's body-pose and arm commands to a `G1MujocoSim`, step by step.
 
@@ -80,7 +83,10 @@ class CommandDriver:
         self.arms = None
         if scenario.arm_motion:
             default = sim._base_target0[sim.upper_ids]
-            self.arms = UpperBodyMotion(io.upper_body, default, np.random.default_rng(seed))
+            # its own stream: default_rng(seed) also draws the episode's start perturbation
+            # (evaluate.run_episode; noise and kicks use [seed, 2] and [seed, 3])
+            rng = np.random.default_rng([seed, ARM_STREAM])
+            self.arms = UpperBodyMotion(io.upper_body, default, rng)
 
     def before_step(self) -> None:
         sim = self.sim
@@ -138,13 +144,20 @@ class Condition:
     """What a test condition changes from nominal."""
 
     floor_friction: float = 1.0
-    robot_friction: float | None = None  # set too, or the robot's own friction (1.0) decides
+    robot_friction: float | None = None  # set too, or the robot's own friction decides (1.0;
+    # Menagerie's feet 0.6, so the larger, the floor's 1.0, applies when nominal)
     hand_payload_kg: float = 0.0
     delay_steps: int = 0  # physics steps the previous PD targets are kept after a new action
     noise: bool = False  # the training's observation noise
     push_speed: float = 0.0  # m/s, horizontal kicks to the pelvis in a random direction
     push_times: tuple[float, ...] = (3.0, 7.0, 11.0, 15.0, 19.0)  # s, when push_speed > 0
+    episode_s: float = 20.0  # episode length unless the command line sets one
 
+
+# A kicked robot falls up to about 2.4 s after the kick (90th percentile), so the last kick
+# gets 4 s before the episode ends; 20 s episodes missed falls from the kick at 19 s.
+KICK_WATCH_S = 4.0
+_KICK_TIMES = Condition().push_times
 
 CONDITIONS: dict[str, Condition] = {
     "nominal": Condition(),
@@ -152,5 +165,8 @@ CONDITIONS: dict[str, Condition] = {
     "payload_1kg": Condition(hand_payload_kg=1.0),
     "delay_20ms": Condition(delay_steps=4),
     "noise": Condition(noise=True),
-    **{f"push_{v}": Condition(push_speed=v) for v in (0.5, 1.0, 1.5, 2.0, 2.5, 3.0)},
+    **{
+        f"push_{v}": Condition(push_speed=v, episode_s=max(_KICK_TIMES) + KICK_WATCH_S)
+        for v in (0.5, 1.0, 1.5, 2.0, 2.5, 3.0)
+    },
 }

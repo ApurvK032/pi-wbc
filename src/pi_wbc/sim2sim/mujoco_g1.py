@@ -177,10 +177,16 @@ def build_model(
 
     The model's own actuators and keyframes are removed. Joint damping is set to 0 and joint
     friction, armature and effort limits come from `io`. Planes (the floor) get
-    `floor_friction`: Newton, like MuJoCo, uses the larger of two touching surfaces' friction,
-    and Isaac Lab's ground is 1.0. For a slippery floor, set `robot_friction` too (every other
-    geom), or the robot's own friction decides. `hand_payload_kg` is added to each palm (in
-    Menagerie's model, the wrist link the palm belongs to).
+    `floor_friction`, and Isaac Lab's ground is 1.0. For a slippery floor, set `robot_friction`
+    too (every other geom), or the robot's own friction decides.
+
+    Every geom gets contact priority 0. Training ran Newton's own collision detection, whose
+    contacts take their parameters by MuJoCo's rule (a port of MuJoCo Warp's contact_params):
+    the higher-priority geom's friction, solref and solimp; at equal priority, the larger
+    friction and solref and solimp mixed by solmix. Newton's training model gives every shape
+    priority 0. Menagerie's foot spheres have priority 1 and friction 0.6, so they decided on
+    their own until D-039: every Menagerie run stood on 0.6. `hand_payload_kg` is added to
+    each palm (in Menagerie's model, the wrist link the palm belongs to).
     """
     spec = mujoco.MjSpec.from_file(str(xml_path))
     for actuator in list(spec.actuators):
@@ -212,6 +218,7 @@ def build_model(
         actuator.set_to_position(kp=io.stiffness[name], kv=io.damping[name])
 
     for geom in spec.geoms:
+        geom.priority = 0  # as every shape in Newton's training model
         if geom.type == mujoco.mjtGeom.mjGEOM_PLANE:
             geom.friction = [floor_friction, geom.friction[1], geom.friction[2]]
         elif robot_friction is not None:
@@ -227,6 +234,58 @@ def build_model(
                 hand = match_name(bodies, f"{side}_wrist_yaw_link")
             model.body_mass[hand] += hand_payload_kg
     return model
+
+
+FOOT_BODIES = ("left_ankle_roll_link", "right_ankle_roll_link")
+
+
+def contact_settings(model: mujoco.MjModel) -> dict[str, Any]:
+    """The contact and solver settings a compiled model runs with, for result files.
+
+    Geoms that can collide are grouped into the floor (planes), the feet (geoms of the
+    ankle-roll links) and the rest; each group lists every distinct setting once, with how
+    many geoms have it.
+    """
+    bodies = [model.body(i).name for i in range(model.nbody)]
+    feet = {match_name(bodies, b) for b in FOOT_BODIES}
+    groups: dict[str, dict[str, int]] = {"floor": {}, "feet": {}, "other": {}}
+    for g in range(model.ngeom):
+        if model.geom_contype[g] == 0 and model.geom_conaffinity[g] == 0:
+            continue  # visual only
+        if model.geom_type[g] == mujoco.mjtGeom.mjGEOM_PLANE:
+            group = "floor"
+        elif model.geom_bodyid[g] in feet:
+            group = "feet"
+        else:
+            group = "other"
+        setting = {
+            "friction": [round(float(x), 6) for x in model.geom_friction[g]],
+            "priority": int(model.geom_priority[g]),
+            "condim": int(model.geom_condim[g]),
+            "solref": [round(float(x), 6) for x in model.geom_solref[g]],
+            "solimp": [round(float(x), 6) for x in model.geom_solimp[g]],
+            "solmix": round(float(model.geom_solmix[g]), 6),
+            "margin": round(float(model.geom_margin[g]), 6),
+            "gap": round(float(model.geom_gap[g]), 6),
+        }
+        key = json.dumps(setting, sort_keys=True)
+        groups[group][key] = groups[group].get(key, 0) + 1
+    opt = model.opt
+    return {
+        "geoms": {
+            name: [{**json.loads(k), "geoms": n} for k, n in found.items()]
+            for name, found in groups.items()
+        },
+        "solver": {
+            "timestep": float(opt.timestep),
+            "integrator": mujoco.mjtIntegrator(opt.integrator).name,
+            "cone": mujoco.mjtCone(opt.cone).name,
+            "iterations": int(opt.iterations),
+            "ls_iterations": int(opt.ls_iterations),
+            "impratio": float(opt.impratio),
+            "tolerance": float(opt.tolerance),
+        },
+    }
 
 
 class G1MujocoSim:
@@ -314,7 +373,7 @@ class G1MujocoSim:
         self.delay_steps = 0
         self.noise: dict[str, tuple[float, float]] = {}
         self.noise_rng = np.random.default_rng(0)
-        self._last_target: np.ndarray | None = None
+        self._last_target = self.base_target.copy()  # the previous action's PD targets
         self._history: list[np.ndarray] = []  # observation frames, oldest first
 
     # -- state -------------------------------------------------------------------------------
@@ -346,7 +405,7 @@ class G1MujocoSim:
             self.body_command = np.array(self.io.body_pose["nominal"], dtype=float)
         self.last_action = np.zeros(len(self.policy_ids))
         self.steps = 0
-        self._last_target = None
+        self._last_target = self.base_target.copy()
         self._history = []
         mujoco.mj_forward(m, d)
 
@@ -417,11 +476,20 @@ class G1MujocoSim:
             target[self.pose_ids] += [
                 np.interp(height, self.pose_heights, row) for row in self.pose_offsets
             ]
-        # a delay of k physics steps keeps the previous targets for k x num_substeps MuJoCo steps
-        held = self.delay_steps * self.io.num_substeps if self._last_target is not None else 0
+        # A delay of k physics steps keeps the previous action's targets for k x num_substeps
+        # MuJoCo steps. As in training (pi_wbc.tasks.mdp), only the joints the policy drives are
+        # delayed: arm and hand targets come from a command, and after a reset the "previous"
+        # targets are the reset pose.
+        held = self.delay_steps * self.io.num_substeps
+        previous = target.copy()
+        previous[self.policy_ids] = self._last_target[self.policy_ids]
         for i in range(self.steps_per_action):
-            self.data.ctrl[self.actuator_ids] = self._last_target if i < held else target
+            self.data.ctrl[self.actuator_ids] = previous if i < held else target
             mujoco.mj_step(self.model, self.data)
+        # mj_step leaves body frames, velocities and contacts at the start of its last substep
+        # (only qpos and qvel move on). Newton's state, which training observed, is the end of
+        # the step, so recompute them; the next mj_step recomputes them anyway.
+        mujoco.mj_forward(self.model, self.data)
         self._last_target = target
         self.last_action = action.copy()
         self.steps += 1
