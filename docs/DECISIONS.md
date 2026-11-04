@@ -1045,7 +1045,7 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   the recorded pelvis pose, joint positions and object poses are written in, giving 25 frames
   per second (frame k shows the state control step 2k's command was applied to). The head
   camera is design section 3's, 640 x 480 (its lens: D-044). Each episode's look comes from its layout seed
-  (`pi_wbc/stage3/appearance.py`, render seed 0), so any episode re-renders the same:
+  (`pi_wbc/stage3/appearance.py`, render seed 0), so any episode re-renders with the same look:
   - floor, table and walls: muted colours (saturation at most 0.2; the table's brightness
     0.3-0.8, so the white bottle and the black bin stand out on it) and patterns (plain a
     quarter of the time, else checker, tiles, planks, speckle or stripes at two scales each);
@@ -1064,6 +1064,11 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   else in the image. Episodes with the same sun height render together. Brightness and colour
   are a gain on the image in linear colour, which is what a brighter or warmer light does to
   diffuse surfaces. H.264 because every video decoder reads it; the export step can re-encode.
+- **Amended (2026-11-04, after D-047):** the same look, not the same pixels. Rendering the 1,000
+  v1 episodes again inside training set v2 gave byte-identical videos for 16 of them; the frames
+  of others differ by 0.02-0.84 grey levels on average, with 0.2-10% of pixels more than 2 levels
+  apart, at edges (GPU ray tracing in other batch slots is not bit-repeatable). Each dataset's
+  videos are hashed in its own render manifest.
 - **Cost:** the lighting is plainer than RTX: one light, no coloured shadows, no reflections.
   Patterns are generated greys, not photographs. The renderer's speed on the RTX 4070 is about
   660 frames per second for 32 episodes at once.
