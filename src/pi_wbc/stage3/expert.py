@@ -82,7 +82,11 @@ class ExpertParams:
     straighten_s: float = 0.8
     reach_bin_s: float = 2.0
     release_s: float = 1.5
-    retract_s: float = 1.5
+    retract_s: float = 1.5  # the last part of the retract: joint space down to hanging
+    retract_up: float = 0.15  # first the hand rises this much over the bin (was 0.10)
+    retract_rise_s: float = 0.8
+    retract_back: float = 0.15  # then moves this far back toward the body (heading frame), so
+    retract_back_s: float = 0.8  # lowering the arm doesn't sweep through the bin (was 0)
     walk_timeout_s: float = 30.0
     episode_timeout_s: float = 60.0
     body_smooth: float = 1.0  # per step (1: the IK follows the measured body; 0.1, a ~0.2 s
@@ -572,20 +576,27 @@ class Expert:
                 if k * dt >= p.release_s:
                     self._judge_place(i, obj[i].cpu().numpy())
                     self._go(i, "retract")
-            elif ph == "retract":  # rise clear of the bin, then back to the hanging pose
+            elif ph == "retract":  # clear the bin: up, back toward the body, then down
                 pl = self.plan[i]
-                rise = 0.6
-                if k * dt < rise:
-                    start = pl.get("release_end", pl["to"])
-                    target = start + _smooth(k * dt / rise) * np.array([0.0, 0.0, 0.10])
+                t_, t1 = k * dt, p.retract_rise_s
+                t2 = t1 + p.retract_back_s
+                start = pl.get("release_end", pl["to"])
+                up = start + np.array([0.0, 0.0, p.retract_up])
+                if t_ < t2:
+                    if t_ < t1:
+                        target = start + _smooth(t_ / t1) * (up - start)
+                    else:
+                        back = up - p.retract_back * pl["rot"][:, 0]
+                        target = up + _smooth((t_ - t1) / p.retract_back_s) * (back - up)
                     arm = self._ik_follow(i, target, pl["rot"], pl["q_rel"])
                     targets[i] = (target, pl["rot"])
                     pl["q_from"] = self.q_ik[i].copy()
                 else:
-                    s = _smooth((k * dt - rise) / p.retract_s)
+                    s = _smooth((t_ - t2) / p.retract_s)
                     arm = pl["q_from"] + s * (self.q_hang - pl["q_from"])
                     hl.body_goal[i, 3] = 0.0
-                    if k * dt >= rise + p.retract_s:
+                    if t_ >= t2 + p.retract_s:
+                        self._final_judge(i, obj[i].cpu().numpy())
                         self._go(i, "done")
             if ph in ("walk_bin", "lean_bin", "align_bin", "settle_bin"):
                 arm = self.plan[i]["q_hold"]  # the carry pose, joint angles held
@@ -684,6 +695,17 @@ class Expert:
         rot = _rz(yaw)
         xy = pose[:2].cpu().numpy() + rot[:2, :2] @ rel
         return np.array([xy[0], xy[1], z]), rot
+
+    def _final_judge(self, i: int, obj: np.ndarray) -> None:
+        """Judge the placement again when the episode ends: the label is the final state's (an
+        object placed and then knocked out of the bin during the retract is not a success)."""
+        note = self.notes[i]
+        note["label_at_release"] = self.label[i]
+        note["obj_at_release_rel_bin_cm"] = note.get("obj_at_judge_rel_bin_cm")
+        first = self.label[i]
+        self._judge_place(i, obj)
+        if first == "success" and self.label[i] != "success":
+            self.failed_in[i] = "retract"
 
     def _judge_place(self, i: int, obj: np.ndarray) -> None:
         lay = self.base.pick_place_layouts[i]

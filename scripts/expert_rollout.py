@@ -41,6 +41,13 @@ parser.add_argument(
     metavar="NAME=VALUE",
     help="override an ExpertParams field (number, comma list or None), e.g. lean=0.3",
 )
+parser.add_argument(
+    "--record",
+    type=Path,
+    default=None,
+    metavar="DIR",
+    help="record every episode (commands and simulator state per step) as DIR/<seed>.npz",
+)
 parser.add_argument("--out", type=Path, required=True)
 add_launcher_args(parser)
 args, overrides = parser.parse_known_args()
@@ -149,6 +156,13 @@ def main() -> None:
                 params[name] = float(value)
         expert_params = dataclasses.replace(ExpertParams(), **params)
         expert = Expert(env, hl, args.run / "exported", expert_params)
+        rec = None
+        if args.record is not None:
+            from pi_wbc.stage3.recorder import EpisodeRecorder
+
+            run_info = {"controller_run": str(args.run),
+                        "expert_params": dataclasses.asdict(expert_params)}  # fmt: skip
+            rec = EpisodeRecorder(env, hl, expert, args.record, run_info)
         dt = base.step_dt
         results, frames = [], []
         seed = args.first_seed
@@ -161,6 +175,9 @@ def main() -> None:
             base.pick_place_layouts = [L.sample(s) for s in seeds]
             base.reset()
             expert.reset(list(range(n)))
+            if rec is not None:
+                rec.reset()
+            in_batch = torch.arange(n).numpy() < m
             obs = venv.get_observations()
             clips = [collections.deque(maxlen=150) for _ in range(n)]
             saved = set()
@@ -171,6 +188,8 @@ def main() -> None:
                 for k in range(max_steps):
                     expert.step()
                     hl.apply()
+                    if rec is not None:  # this step's state and the commands applied to it
+                        rec.record(in_batch & ~expert.finished())
                     obs, _, _, _ = venv.step(policy(obs))
                     sim_steps += 1
                     if args.fail_gifs is not None and k % 3 == 0:
@@ -201,6 +220,9 @@ def main() -> None:
                       f"after {expert.age[i] * dt:5.1f} s  '{lay.instruction}'")  # fmt: skip
                 if expert.notes[i]:
                     print(f"         {expert.notes[i]}")
+                if rec is not None:
+                    rec.save(i, {"label": label, "failed_in": expert.failed_in[i],
+                                 "time_s": round(expert.age[i] * dt, 2)})  # fmt: skip
         wall = time.perf_counter() - t0
         counts = collections.Counter(r["label"] for r in results)
         ok = counts.get("success", 0)
