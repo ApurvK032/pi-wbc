@@ -720,6 +720,15 @@ def test_kick_conditions_watch_the_last_kick_for_4_s() -> None:
             assert condition.episode_s == 20.0, name
 
 
+def test_isaac_lab_kick_runs_watch_the_last_kick_as_the_bench() -> None:
+    """The Isaac Lab and PhysX test ran 20 s with kicks too, missing the 19 s kick's falls."""
+    from pi_wbc.isaac_eval import episode_s
+
+    assert episode_s(None, 2.0) == CONDITIONS["push_2.0"].episode_s == 23.0
+    assert episode_s(None, 0.0) == CONDITIONS["nominal"].episode_s == 20.0
+    assert episode_s(12.0, 2.0) == 12.0  # a length given on the command line wins
+
+
 def test_kick_counts_skip_a_kick_due_at_the_fall_time() -> None:
     dt = 0.005 * 4  # the policy step, as run_episode computes fall times
     times = [3.0, 7.0, 11.0, 15.0, 19.0]
