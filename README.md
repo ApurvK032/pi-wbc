@@ -36,7 +36,7 @@ Training seed 2, recording seed 0, the first take, on the fixed bench (D-040).</
 > while its arms move, under randomized physics and kicks. Stage 3, the task and the data: a
 > scripted expert walks the robot to a table and puts the named object in the named bin through
 > that controller on 94.8% of unused test layouts, and 2,000 of its episodes, rendered from the
-> head camera, load in GR00T's own data loader. All transfer here is sim-to-sim;
+> head camera, load in GR00T's and LeRobot's own data loaders. All transfer here is sim-to-sim;
 > nothing has run on hardware. Next: fine-tuning GR00T on the demonstrations ([roadmap](#roadmap)).
 
 **Contents:** [Highlights](#highlights) · [The project](#the-project) ·
@@ -65,9 +65,8 @@ Training seed 2, recording seed 0, the first take, on the fixed bench (D-040).</
   A scripted expert, sending only the commands a VLA will send, succeeds on 364 of 384 unused
   test layouts (94.8%, 95% CI 92.1-96.6%). 2,000 of its episodes (and 241 for validation) are
   rendered from the head camera with randomized floors, tables, walls, light and camera mount,
-  exported in GR00T N1.6's and LeRobot's formats (at 25 frames per second, and v1 and the
-  validation set also at 50), and checked with GR00T's loader on every episode and LeRobot's on
-  samples. Under the same commands NVIDIA's controller lets the expert succeed
+  exported in GR00T N1.6's and LeRobot's formats at 25 and 50 frames per second, and checked
+  with GR00T's loader and LeRobot's. Under the same commands NVIDIA's controller lets the expert succeed
   more often (96.4% against 92.8% on the same 1,088 layouts): nearly all of the gap is objects
   pushed aside while our controller's robot withdraws its arm, a first look at stage 5's question.
 - **Evaluated like a study, not a demo.** Three training seeds per configuration, development
