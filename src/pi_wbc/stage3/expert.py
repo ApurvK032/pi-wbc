@@ -614,7 +614,8 @@ class Expert:
                 continue
             if P["raise"] <= self.phase[i] <= P["lift"]:  # the most the pelvis tipped back
                 note = self.notes[i]  # while the arm worked at the table (every episode)
-                note["back_tilt_max"] = round(max(note.get("back_tilt_max", -1.0), pitch[i]), 3)
+                tilt = max(note.get("back_tilt_max", -1.0), float(pitch[i]))
+                note["back_tilt_max"] = round(tilt, 3)  # a Python float: the notes are JSON
             row = [int(self.phase[i]), int(self.t[i]), *np.round(rel[i], 1).tolist()]
             row += [round(float(moved[i]) * 100, 1), round(float(waist[i]), 3)]
             row.append(round(float(pitch[i]), 3))
