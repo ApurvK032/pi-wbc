@@ -152,6 +152,23 @@ def _rz(yaw: float) -> np.ndarray:
     return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
 
 
+def placement_label(lay: L.Layout, obj: np.ndarray) -> str:
+    """Where the target object ended up: "success" (resting inside the target bin), "wrong_bin"
+    or "dropped" (anywhere else). `obj` is its centre in the table frame."""
+    r = L.OBJECTS[lay.target_object]["radius"]
+    inner = (L.BIN_SIZE[0] / 2 - L.BIN_WALL[0], L.BIN_SIZE[1] / 2 - L.BIN_WALL[0])
+    resting = obj[2] < L.TABLE_TOP + 0.01 + L.OBJECTS[lay.target_object]["height"] / 2 + 0.03
+
+    def inside(bin_name: str) -> bool:
+        bx, by = lay.bin_xy(bin_name)
+        return abs(obj[0] - bx) < inner[0] - r / 2 and abs(obj[1] - by) < inner[1] - r / 2
+
+    if resting and inside(lay.target_bin):
+        return "success"
+    other = next(b for b in lay.bins if b != lay.target_bin)
+    return "wrong_bin" if resting and inside(other) else "dropped"
+
+
 def _side_room(lay: L.Layout) -> dict[str, float]:
     """Free space beside the target object on its right (-y) and left (+y) side: from its centre
     to the nearest other object's edge or bin wall (the bins' inner walls face the table at
@@ -818,20 +835,6 @@ class Expert:
 
     def _judge_place(self, i: int, obj: np.ndarray) -> None:
         lay = self.base.pick_place_layouts[i]
-        r = L.OBJECTS[lay.target_object]["radius"]
-        inner = (L.BIN_SIZE[0] / 2 - L.BIN_WALL[0], L.BIN_SIZE[1] / 2 - L.BIN_WALL[0])
-
-        def inside(bin_name):
-            bx, by = lay.bin_xy(bin_name)
-            resting = (
-                obj[2] < L.TABLE_TOP + 0.01 + L.OBJECTS[lay.target_object]["height"] / 2 + 0.03
-            )
-            return (
-                abs(obj[0] - bx) < inner[0] - r / 2
-                and abs(obj[1] - by) < inner[1] - r / 2
-                and resting
-            )
-
         bx, by = lay.bin_xy(lay.target_bin)
         self.notes[i]["obj_at_judge_rel_bin_cm"] = np.round(
             (obj - np.array([bx, by, L.TABLE_TOP])) * 100, 1
@@ -839,11 +842,7 @@ class Expert:
         self.notes[i]["palm_at_judge_rel_bin_cm"] = np.round(
             (self._palm_pose()[0][i].cpu().numpy() - np.array([bx, by, L.TABLE_TOP])) * 100, 1
         ).tolist()
-        if inside(lay.target_bin):
-            self.label[i] = "success"
-        else:
-            other = next(b for b in lay.bins if b != lay.target_bin)
-            self.label[i] = "wrong_bin" if inside(other) else "dropped"
+        self.label[i] = placement_label(lay, obj)
 
     def _sag_correction(self, targets, palm_pos, palm_quat) -> None:
         for side in SIDES:  # one batch per hand: its palm and its arm's joints

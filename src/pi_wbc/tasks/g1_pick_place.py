@@ -196,6 +196,12 @@ class G1PickPlaceEnvCfg(G1TeacherStudentEnvCfg):
         vel.resampling_time_range = never
         vel.rel_standing_envs = 0.0
         vel.rel_turning_envs = 0.0
+        # every reset samples the zero command the high level starts from: a random one would sit
+        # in the controller's first observation and its 25-step history, so no two runs of the
+        # same layout (a recording and its replay) would start alike
+        vel.ranges.lin_vel_x = (0.0, 0.0)
+        vel.ranges.lin_vel_y = (0.0, 0.0)
+        vel.ranges.ang_vel_z = (0.0, 0.0)
         self.commands.body_pose.resampling_time_range = never
         self.commands.upper_body.resampling_time_range = never
         self.commands.upper_body.rel_still_envs = 1.0

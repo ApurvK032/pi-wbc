@@ -235,7 +235,8 @@ def main() -> None:
                     print(f"         {expert.notes[i]}")
                 if rec is not None:
                     rec.save(i, {"label": label, "failed_in": expert.failed_in[i],
-                                 "time_s": round(expert.age[i] * dt, 2)})  # fmt: skip
+                                 "time_s": round(expert.age[i] * dt, 2),
+                                 "hand": expert.side[i]})  # fmt: skip
         wall = time.perf_counter() - t0
         counts = collections.Counter(r["label"] for r in results)
         ok = counts.get("success", 0)
