@@ -30,6 +30,9 @@ parser.add_argument("--limit", type=int, default=None, help="replay only the fir
 parser.add_argument("--run", type=Path, default=Path(DEFAULT_RUN), help="controller run folder")
 parser.add_argument("--other-knock-dist", type=float, default=0.02)
 parser.add_argument("--max-early-drift-mm", type=float, default=10.0)
+parser.add_argument("--low-level", choices=["ours", "nvidia"], default="ours",
+                    help="the controller the episodes were recorded with (D-046)")  # fmt: skip
+parser.add_argument("--nvidia-policy-dir", type=Path, default=Path("third_party/gr00t_wbc/policy"))
 parser.add_argument("--out", type=Path, required=True)
 add_launcher_args(parser)
 args, overrides = parser.parse_known_args()
@@ -93,6 +96,11 @@ def main() -> None:
         policy = runner.get_inference_policy(device=venv.unwrapped.device)
         base = venv.unwrapped
         hl = HighLevel(env)
+        nv = None
+        if args.low_level == "nvidia":
+            from pi_wbc.stage3.nvidia_wbc import NvidiaLowLevel
+
+            nv = NvidiaLowLevel(env, args.nvidia_policy_dir)
         robot = base.scene["robot"]
         objects = [base.scene[f"obj_{name}"] for name in L.OBJECT_NAMES]
         results = []
@@ -103,6 +111,8 @@ def main() -> None:
             base.pick_place_layouts = [ep["layout"] for ep in eps]
             base.reset()
             hl.reset(list(range(n)))
+            if nv is not None:
+                nv.reset()
             obs = venv.get_observations()
             steps = np.array([len(ep["phase"]) for ep in eps])
             drift_root = np.zeros(n)
@@ -160,7 +170,7 @@ def main() -> None:
                         hl.body_goal[i] = torch.as_tensor(ep["cmd_body"][k], device=base.device)
                         hl.arm_hand[i] = torch.as_tensor(ep["cmd_arm_hand"][k], device=base.device)
                     hl.apply()
-                    obs, _, _, _ = venv.step(policy(obs))
+                    obs, _, _, _ = venv.step(policy(obs) if nv is None else nv.act())
             for i, ep in enumerate(batch):
                 meta, lay = ep["meta"], ep["layout"]
                 label = placement_label(lay, final[i])
@@ -200,6 +210,7 @@ def main() -> None:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         provenance.save_json(args.out, {
             "episodes_dir": str(args.episodes), "controller_run": str(args.run),
+            "low_level": args.low_level,
             "replayed": len(results), "passed": passed,
             "max_early_drift_mm": args.max_early_drift_mm, "recorded_successes": len(ok),
             "successes_kept": kept, "kept_ci95": [lo, hi], "results": results,

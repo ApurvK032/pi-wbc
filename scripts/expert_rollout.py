@@ -54,6 +54,14 @@ parser.add_argument(
     metavar="DIR",
     help="record every episode (commands and simulator state per step) as DIR/<seed>.npz",
 )
+parser.add_argument(
+    "--low-level",
+    choices=["ours", "nvidia"],
+    default="ours",
+    help="the controller under the expert's commands: stage 1's (--run) or NVIDIA's Decoupled "
+    "WBC (pi_wbc.stage3.nvidia_wbc, D-046)",
+)
+parser.add_argument("--nvidia-policy-dir", type=Path, default=Path("third_party/gr00t_wbc/policy"))
 parser.add_argument("--out", type=Path, required=True)
 add_launcher_args(parser)
 args, overrides = parser.parse_known_args()
@@ -165,12 +173,20 @@ def main() -> None:
                 params[name] = float(value)
         expert_params = dataclasses.replace(ExpertParams(), **params)
         expert = Expert(env, hl, args.run / "exported", expert_params)
+        nv = None
+        if args.low_level == "nvidia":
+            from pi_wbc.stage3.nvidia_wbc import NvidiaLowLevel
+
+            nv = NvidiaLowLevel(env, args.nvidia_policy_dir)
         rec = None
         if args.record is not None:
             from pi_wbc.stage3.recorder import EpisodeRecorder
 
             run_info = {"controller_run": str(args.run),
                         "expert_params": dataclasses.asdict(expert_params)}  # fmt: skip
+            if nv is not None:
+                run_info["low_level"] = {"name": "nvidia", "policy_commit": nv.policy_commit,
+                                         "height_offset": nv.height_offset}  # fmt: skip
             rec = EpisodeRecorder(env, hl, expert, args.record, run_info)
         dt = base.step_dt
         results, frames = [], []
@@ -188,6 +204,8 @@ def main() -> None:
             base.pick_place_layouts = [L.sample(s) for s in seeds]
             base.reset()
             expert.reset(list(range(n)))
+            if nv is not None:
+                nv.reset()
             if rec is not None:
                 rec.reset()
             in_batch = torch.arange(n).numpy() < m
@@ -203,7 +221,7 @@ def main() -> None:
                     hl.apply()
                     if rec is not None:  # this step's state and the commands applied to it
                         rec.record(in_batch & ~expert.finished())
-                    obs, _, _, _ = venv.step(policy(obs))
+                    obs, _, _, _ = venv.step(policy(obs) if nv is None else nv.act())
                     sim_steps += 1
                     if args.fail_gifs is not None and k % 3 == 0:
                         rgb = tt(base.scene["debug_cam"].data.output["rgb"])[..., :3]
@@ -246,7 +264,9 @@ def main() -> None:
               f"{sim_steps * n * dt / wall:.1f}x real time summed over robots")  # fmt: skip
         args.out.parent.mkdir(parents=True, exist_ok=True)
         provenance.save_json(args.out, {
-            "controller_run": str(args.run), "first_seed": args.first_seed,
+            "controller_run": str(args.run), "low_level": args.low_level,
+            "nvidia_policy_commit": None if nv is None else nv.policy_commit,
+            "first_seed": args.first_seed,
             "episodes": len(results), "success": ok, "success_ci95": [lo, hi],
             "labels": dict(counts), "results": results,
             "expert_params": {k: (vars(v) if hasattr(v, "__dataclass_fields__") else v)
