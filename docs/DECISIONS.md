@@ -48,6 +48,7 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 | [D-038](#d-038-the-g1s-heel-contact-spheres-at-unitrees-urdf-position-from-stage-3-on-2026-11-03) | The G1's heel contact spheres at Unitree's URDF position from stage 3 on | 2026-11-03 |
 | [D-039](#d-039-erratum-on-menageries-model-the-mujoco-benchs-feet-stood-on-friction-06-2026-11-03) | Erratum: on Menagerie's model the MuJoCo bench's feet stood on friction 0.6 (amended by D-040) | 2026-11-03 |
 | [D-040](#d-040-seven-more-mujoco-bench-fixes-and-stage-1s-bench-numbers-rerun-on-the-fixed-bench-2026-11-04) | Seven more MuJoCo-bench fixes, and stage 1's bench numbers rerun on the fixed bench | 2026-11-04 |
+| [D-041](#d-041-the-experts-hand-choice-retract-and-success-rule-and-its-official-test-range-2026-11-04) | The expert's hand choice, retract and success rule, and its official test range | 2026-11-04 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -960,6 +961,36 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   the second, about half an hour of the workstation's GPU and an hour of its CPUs. The
   development record of steps 1-4 stays on the old bench, so its numbers and the final result's
   are not directly comparable.
+
+## D-041: The expert's hand choice, retract and success rule, and its official test range (2026-11-04)
+
+- **What:**
+  - **Which hand:** the left hand when the target's right side has under 12 cm of free space
+    (to another object's edge or the bin's inner wall) and its left side has more; the grasp,
+    stances, approach and release mirror. The right hand alone succeeded on 50-64% of layouts
+    with under 10 cm and 95-99% with more (1015 episodes): its hand met the right-hand bin's
+    wall or the neighbour. On 32 training layouts next to that bin: right hand 20, left 31.
+  - **Retract:** after the release the raised hand is pulled back toward the table's front edge
+    (x = -0.15) before the arm is lowered; lowering from over the table swung the hand through
+    other objects.
+  - **Success is judged when the episode ends,** not when the hand opens: the old retract
+    knocked 26 of 176 placed objects back out of the bin on development layouts, so the expert's
+    earlier success rates were about 13 points too high.
+  - **A new failure label, `knocked_other`:** an episode fails when another object moves more
+    than 2 cm. A demonstration must not push the scene around.
+  - **Test layouts:** 60000-60383 were run twice (judged at release, then at the end after a
+    fix found on training and development layouts) and are retired. The official number comes
+    from 60384-60767, run once at f1dd315: 364 of 384 succeed (94.8%, 95% interval
+    92.1-96.6%; [results](../results/stage3/expert/test-60384-60767.json)). Fresh training
+    layouts 1000-1383: 361 of 384 (94.0%). Tuning now uses training layouts; 960 of the 1000
+    development seeds are spent.
+- **Why:** the second audit (2026-11-03) found that most failures were the right hand meeting
+  the bin wall, not the pelvis tipping back (that came with it), and that pushed neighbours went
+  unnoticed.
+- **Cost:** the left hand needs the left arm's IK and mirrored commands, no new training. The
+  stricter rule lowers success relative to the old counting. The interval's lower end clears the
+  design's 90%; the 95% goal is met only to rounding. Of the 20 test failures 16 are pushed
+  neighbours: 7 while the hand comes down, 6 in the retract, 3 while carrying.
 
 ## Open items
 
