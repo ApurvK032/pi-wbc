@@ -8,7 +8,10 @@ Runs in LeRobot's environment, not this project's:
         --out logs/export/lerobot_check.json
 
 `--add-quantiles` computes LeRobot's quantile statistics (q01 ... q99, which its `pi05` policy
-normalizes with) with LeRobot's own function and writes them locally; nothing is uploaded.
+normalizes with) and writes them locally; nothing is uploaded. It uses LeRobot's own functions
+(`get_feature_stats`, `sample_indices`, `aggregate_stats`) on the same rows and sampled frames as
+its `augment_dataset_quantile_stats.py`, but decodes each episode's sampled frames in one pass;
+`--lerobot-sampler` runs LeRobot's per-episode function itself (random access, far slower).
 Then, for a sample of episodes, items at the first, middle and last frame are compared with
 the GR00T-format export they were converted from (`--reference`, LeRobot v2.1 layout):
 state and action rows must be equal, the action chunk (π0.5's 50 steps) must follow the
@@ -29,22 +32,72 @@ FPS = 25
 CHUNK = 50  # π0.5's action horizon in LeRobot
 REPO_ID = "local/pi_wbc"
 _worker_dataset = None
+_worker_reference = None
 
 
-def _init_worker(root: str) -> None:
-    global _worker_dataset
+def _init_worker(root: str, reference: str) -> None:
+    global _worker_dataset, _worker_reference
     from lerobot.datasets import LeRobotDataset
 
     _worker_dataset = LeRobotDataset(REPO_ID, root=root)
+    _worker_reference = Path(reference)
 
 
-def _episode_stats(episode_index: int) -> dict:
+def _episode_stats_lerobot(episode_index: int) -> dict:
+    """LeRobot's own per-episode function (random access into the concatenated videos)."""
     from lerobot.scripts.augment_dataset_quantile_stats import process_single_episode
 
     return process_single_episode(_worker_dataset, episode_index, use_sampling=True)
 
 
+def _episode_stats(episode_index: int) -> dict:
+    """What LeRobot's `process_single_episode` computes, with the sampled frames decoded in one
+    sequential pass over the episode's own video (the same encoded frames as the converted
+    dataset's, checked below) instead of one random seek each into the concatenated files."""
+    from lerobot.datasets import DEFAULT_QUANTILES, get_feature_stats
+    from lerobot.datasets.compute_stats import sample_indices
+
+    ds = _worker_dataset
+    ep = ds.meta.episodes[episode_index]
+    start, end = ep["dataset_from_index"], ep["dataset_to_index"]
+    numeric = [k for k, f in ds.features.items() if f["dtype"] not in ("image", "video", "string")]
+    cols = ds.hf_dataset.select_columns(numeric)[start:end]
+    stats = {}
+    for key in numeric:
+        data = np.stack([np.asarray(v) for v in cols[key]])
+        stats[key] = get_feature_stats(data, axis=0, keepdims=data.ndim == 1,
+                                       quantile_list=DEFAULT_QUANTILES)  # fmt: skip
+    info = json.loads((_worker_reference / "meta/info.json").read_text())
+    for key in ds.meta.video_keys:
+        video = _worker_reference / info["video_path"].format(
+            episode_chunk=episode_index // info["chunks_size"], video_key=key,
+            episode_index=episode_index)  # fmt: skip
+        offsets = sample_indices(end - start)
+        frames = ffmpeg_frames(video, offsets).astype(np.float32) / 255.0
+        data = frames.transpose(0, 3, 1, 2)  # (n, c, h, w), as LeRobot's items
+        st = get_feature_stats(data, axis=(0, 2, 3), keepdims=True,
+                               quantile_list=DEFAULT_QUANTILES)  # fmt: skip
+        stats[key] = {k: v if k == "count" else np.squeeze(v, axis=0) for k, v in st.items()}
+    return stats
+
+
+def ffmpeg_frames(path: Path, indices) -> np.ndarray:
+    """Frames at `indices` (sorted), decoded in one pass."""
+    indices = sorted(int(i) for i in indices)
+    sel = "+".join(f"eq(n\\,{i})" for i in indices)
+    raw = subprocess.run(
+        ["ffmpeg", "-loglevel", "error", "-threads", "1", "-i", str(path), "-vf",
+         f"select='{sel}'", "-vsync", "0", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+        capture_output=True, check=True,
+    ).stdout  # fmt: skip
+    out = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 480, 640, 3)
+    if len(out) != len(indices):
+        raise RuntimeError(f"{path}: {len(out)} frames decoded, {len(indices)} asked for")
+    return out
+
+
 def ffmpeg_frame(path: Path, index: int) -> np.ndarray:
+    """One frame."""
     raw = subprocess.run(
         ["ffmpeg", "-loglevel", "error", "-i", str(path), "-vf", f"select=eq(n\\,{index})",
          "-vsync", "0", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
@@ -59,7 +112,10 @@ def main() -> None:
     parser.add_argument("--reference", type=Path, required=True, help="the v2.1 export")
     parser.add_argument("--episodes", type=int, default=12)
     parser.add_argument("--add-quantiles", action="store_true")
-    parser.add_argument("--workers", type=int, default=14)
+    parser.add_argument("--workers", type=int, default=12)
+    parser.add_argument(
+        "--lerobot-sampler", action="store_true", help="LeRobot's own random-access sampler"
+    )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
@@ -72,11 +128,11 @@ def main() -> None:
 
         ds = LeRobotDataset(REPO_ID, root=args.dataset)
         if not has_quantile_stats(ds.meta.stats):
-            # LeRobot's own per-episode function, one process per worker (its video decoders
-            # aren't thread-safe, so its script runs episodes one at a time: about 1.6 hours here)
-            with ProcessPoolExecutor(args.workers, initializer=_init_worker,
-                                     initargs=(str(args.dataset),)) as pool:  # fmt: skip
-                episode_stats = list(pool.map(_episode_stats, range(ds.num_episodes), chunksize=8))
+            fn = _episode_stats_lerobot if args.lerobot_sampler else _episode_stats
+            init = {"initializer": _init_worker,
+                    "initargs": (str(args.dataset), str(args.reference))}  # fmt: skip
+            with ProcessPoolExecutor(args.workers, **init) as pool:
+                episode_stats = list(pool.map(fn, range(ds.num_episodes), chunksize=8))
             write_stats(aggregate_stats(episode_stats), ds.meta.root)
             print("[lerobot] quantile statistics written", flush=True)
 
