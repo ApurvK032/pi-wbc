@@ -17,7 +17,8 @@ keeps the robot balanced. Stage 4 is done when:
 
 | | |
 |---|---|
-| Training data | v1: 1,000 episodes (790,046 frames); v2: 2,000 (contains v1); validation: 241, from layouts never trained on (D-047) |
+| Training data | v1: 1,000 episodes (790,046 frames at 25 fps); v2: 2,000 (contains v1); validation: 241, from layouts never trained on (D-047); v1 and validation also at 50 fps (D-048) |
+| Evaluation loop | [scripts/vla_eval.py](../scripts/vla_eval.py): live head camera, GR00T policy server client; replaying the expert's own commands open loop succeeds on 71% of validation episodes at 50 Hz, 50% at the 25 fps dataset's rate (D-048) |
 | Formats | GR00T-flavoured LeRobot v2.1 with GR00T's `unitree_g1` names; LeRobot v3.0 with quantile statistics (D-045) |
 | Loader checks | GR00T's loader on all 1,000 v1 episodes; LeRobot's `LeRobotDataset` (D-045) |
 | GR00T on this PC | N1.6 environment (`third_party/Isaac-GR00T-n1d6`, branch n1d6); NVIDIA's G1 checkpoint runs on our observations: 6,830 MiB of GPU memory at batch 1 (7,154 at batch 8), 79 ms per call at batch 1, 377 ms at batch 8 (GPU shared with other jobs while measured) |
@@ -37,10 +38,11 @@ keeps the robot balanced. Stage 4 is done when:
 
 ## 4. Fine-tuning (MSI, one L40S)
 
-- **Embodiment tag.** First run: `UNITREE_G1` as GR00T defines it (arms as changes from the
-  current angles, everything else absolute; a 30-step action chunk, which is 1.2 s at our 25
-  frames per second against 0.6 s in NVIDIA's 50 fps data). Second run: `NEW_EMBODIMENT` with
-  our own config and a 16-step chunk (0.64 s). Compared on the validation set's action error and
+- **Frame rate and embodiment tag.** First run: the 50 fps export (D-048) under `UNITREE_G1` as
+  GR00T defines it (arms as changes from the current angles, everything else absolute; 30-step
+  chunks, 0.6 s, exactly as in NVIDIA's 50 fps G1 data). Second run: the 25 fps export under
+  `NEW_EMBODIMENT` with a 16-step chunk (0.64 s), which the replay test predicts is worse (the
+  25 Hz command stream alone costs about 21 points open loop). Compared on the validation set's action error and
   a short closed-loop pilot; the better one goes to the test layouts. The second run's config:
   [configs/groot/pi_wbc_g1_h16.py](../configs/groot/pi_wbc_g1_h16.py). GR00T stores the
   relative-arm statistics per chunk step (shape (30, 7) for `unitree_g1`) and keeps keys
