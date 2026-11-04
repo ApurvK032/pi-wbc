@@ -50,7 +50,8 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 | [D-040](#d-040-seven-more-mujoco-bench-fixes-and-stage-1s-bench-numbers-rerun-on-the-fixed-bench-2026-11-04) | Seven more MuJoCo-bench fixes, and stage 1's bench numbers rerun on the fixed bench | 2026-11-04 |
 | [D-041](#d-041-the-experts-hand-choice-retract-and-success-rule-and-its-official-test-range-2026-11-04) | The expert's hand choice, retract and success rule, and its official test range | 2026-11-04 |
 | [D-042](#d-042-the-replay-check-tests-each-episodes-first-second-and-the-training-sets-seeds-2026-11-04) | The replay check tests each episode's first second, and the training set's seeds | 2026-11-04 |
-| [D-043](#d-043-how-the-head-camera-video-is-rendered-and-randomized-2026-11-04) | How the head-camera video is rendered and randomized | 2026-11-04 |
+| [D-043](#d-043-how-the-head-camera-video-is-rendered-and-randomized-2026-11-04) | How the head-camera video is rendered and randomized (lens amended by D-044) | 2026-11-04 |
+| [D-044](#d-044-the-head-cameras-lens-is-87-degrees-wide-2026-11-04) | The head camera's lens is 87 degrees wide | 2026-11-04 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -1039,7 +1040,7 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
   (D-031), in a copy of the pick-place scene that runs no physics: every second control step,
   the recorded pelvis pose, joint positions and object poses are written in, giving 25 frames
   per second (frame k shows the state control step 2k's command was applied to). The head
-  camera is design section 3's, 640 x 480. Each episode's look comes from its layout seed
+  camera is design section 3's, 640 x 480 (its lens: D-044). Each episode's look comes from its layout seed
   (`pi_wbc/stage3/appearance.py`, render seed 0), so any episode re-renders the same:
   - floor, table and walls: muted colours (saturation at most 0.2; the table's brightness
     0.3-0.8, so the white bottle and the black bin stand out on it) and patterns (plain a
@@ -1062,6 +1063,33 @@ D-039 and D-040 correcting stage 1's MuJoCo bench; open items at the [end](#open
 - **Cost:** the lighting is plainer than RTX: one light, no coloured shadows, no reflections.
   Patterns are generated greys, not photographs. The renderer's speed on the RTX 4070 is about
   660 frames per second for 32 episodes at once.
+
+## D-044: The head camera's lens is 87 degrees wide (2026-11-04)
+
+- **What:** the head camera sees 87 degrees across (11.04 mm focal length on Isaac Lab's
+  20.955 mm aperture), 71 degrees up and down at 640 x 480, instead of Isaac Lab's default
+  60.4 degrees (18 mm). The 1,000 training videos are rendered again with it; the rest of D-043
+  is unchanged.
+- **Why:** [scripts/camera_view_check.py](../scripts/camera_view_check.py) projects the target
+  object's centre and the working palm into the camera for every frame of the 1,000 training
+  episodes, from the recorded states and each episode's mount error. The expert holds the
+  object beside the body, so a narrow lens loses it. Share of frames with the object's centre
+  at least 2 degrees inside the picture:
+
+  | Lens (across) | Reach and grasp | Carry | Place | Palm, while carrying |
+  |---|---:|---:|---:|---:|
+  | 60.4 (Isaac Lab's default) | 88.0% | 12.9% | 51.1% | 0.0% |
+  | 69.4 (the D435's colour camera) | 97.5% | 57.6% | 84.5% | 0.6% |
+  | 80 | 100.0% | 98.0% | 98.5% | 23.3% |
+  | 87 (the D435's depth cameras) | 100.0% | 99.9% | 99.8% | 67.5% |
+  | 90 | 100.0% | 100.0% | 99.9% | 84.7% |
+
+  From 80 degrees on the object stays in view; wider lenses make it smaller (a can at the
+  grasp is about 49 pixels wide at 87 degrees, 46 at 90, 80 at 60.4). 87 is a real width of
+  the camera the G1 carries.
+- **Cost:** objects look smaller than with the default lens. The colour image is wider than
+  the real D435's colour camera (69 degrees); that would matter on the real robot, which this
+  project doesn't claim. The first render, at 60.4 degrees, is superseded.
 
 ## Open items
 

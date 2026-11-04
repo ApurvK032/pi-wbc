@@ -35,8 +35,11 @@ from pi_wbc.stage3 import layout as L
 HEAD_CAM_POS = (0.0976, 0.0175, 0.4299)
 HEAD_CAM_ROT = (0.0, 0.4035, 0.0, 0.9150)
 HEAD_CAM_SIZE = (640, 480)
-HEAD_CAM_FOCAL = 18.0  # mm, with a 20.955 mm horizontal aperture: 60 x 47 degrees
-HEAD_CAM_APERTURE = 20.955
+# lens: 87 degrees across (the D435 depth cameras' width; its colour camera is 69), 71 degrees up
+# and down at 4:3; narrower lenses lose the held object while it is carried (D-044)
+HEAD_CAM_HFOV_DEG = 87.0
+HEAD_CAM_APERTURE = 20.955  # mm, Isaac Lab's default; the vertical one follows the image shape
+HEAD_CAM_FOCAL = HEAD_CAM_APERTURE / (2 * math.tan(math.radians(HEAD_CAM_HFOV_DEG) / 2))  # mm
 
 SUN_ELEVATIONS_DEG = (30.0, 40.0, 50.0, 60.0, 70.0, 80.0)
 CAM_SHIFT_M = 0.01  # largest mount error per axis

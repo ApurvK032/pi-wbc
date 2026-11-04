@@ -130,3 +130,14 @@ def test_camera_without_mount_error_matches_the_attached_camera() -> None:
 
     fwd = quat_apply(quat, torch.tensor([[1.0, 0.0, 0.0]]))[0]
     assert math.degrees(math.asin(-fwd[2] / fwd.norm())) == pytest.approx(47.6, abs=0.1)
+
+
+def test_lens() -> None:
+    """87 degrees across (D-044), square pixels, so 71 degrees up and down at 640 x 480."""
+    w, h = A.HEAD_CAM_SIZE
+    across = 2 * math.degrees(math.atan(A.HEAD_CAM_APERTURE / (2 * A.HEAD_CAM_FOCAL)))
+    assert across == pytest.approx(87.0, abs=1e-6)
+    vertical = A.HEAD_CAM_APERTURE * h / w
+    assert 2 * math.degrees(math.atan(vertical / (2 * A.HEAD_CAM_FOCAL))) == pytest.approx(
+        70.9, abs=0.1
+    )
