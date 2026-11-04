@@ -586,8 +586,9 @@ class Expert:
                     if t_ < t1:
                         target = start + _smooth(t_ / t1) * (up - start)
                     else:
-                        back = up - p.retract_back * pl["rot"][:, 0]
-                        target = up + _smooth((t_ - t1) / p.retract_back_s) * (back - up)
+                        # (not `back`: that name holds every robot's tilt for this step)
+                        drawn = up - p.retract_back * pl["rot"][:, 0]
+                        target = up + _smooth((t_ - t1) / p.retract_back_s) * (drawn - up)
                     arm = self._ik_follow(i, target, pl["rot"], pl["q_rel"])
                     targets[i] = (target, pl["rot"])
                     pl["q_from"] = self.q_ik[i].copy()
