@@ -114,3 +114,13 @@ def test_provenance_records_the_code_hash_and_isaac_sim() -> None:
     record = provenance.collect(packages=provenance.DEFAULT_PACKAGES)
     assert record["source"] == provenance.source_digest()  # this package, outside git too
     assert "isaacsim" in record["packages"]
+
+
+def test_results_record_the_code_the_process_started_with(monkeypatch) -> None:
+    """A commit or edit during a long run must not change what its results record (D-049)."""
+    started = {"git": {"commit": "start", "dirty": False, "changes": []},
+               "source": {"sha256": "abc", "files": 1}}  # fmt: skip
+    monkeypatch.setattr(provenance, "_START", started)
+    record = provenance.collect(packages=())
+    assert record["git"]["commit"] == "start" and record["source"]["sha256"] == "abc"
+    assert record["code_recorded_at"] == "process start"

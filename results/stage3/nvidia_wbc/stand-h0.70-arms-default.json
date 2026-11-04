@@ -1,0 +1,134 @@
+{
+  "controller": "NVIDIA Decoupled WBC (GR00T-WholeBodyControl, Balance + Walk)",
+  "policy_commit": "1e1ec4f5f27e6c3e03048f693bd7c60cce04afda",
+  "physics": {
+    "config": "NewtonCfg",
+    "solver": "MJWarpSolverCfg",
+    "num_substeps": 2,
+    "solver_substeps": 2,
+    "solver_dt": 0.0025,
+    "integrator": "implicitfast",
+    "use_mujoco_contacts": false,
+    "cone": "pyramidal",
+    "impratio": 1.0,
+    "njmax": 1000,
+    "nconmax": 300,
+    "ke": 160000.0,
+    "kd": 1100.0,
+    "margin": 0.0
+  },
+  "substeps": 2,
+  "seeds_per_scenario": 10,
+  "seed": 0,
+  "duration_s": 20.0,
+  "settle_s": 2.0,
+  "nominal_height_command": 0.7,
+  "arms": "default",
+  "heel_x": null,
+  "summary": [
+    {
+      "scenario": "stand",
+      "episodes": 10,
+      "falls": 0,
+      "fall_rate_ci95": [
+        0.0,
+        0.2775328030260577
+      ],
+      "lin_err_mean": 0.00436303490393766,
+      "ang_err_mean": 0.00032694406098582676,
+      "velocity_mean": [
+        0.0016842028658963794,
+        5.744414849889129e-07,
+        9.755425429304725e-05
+      ],
+      "pelvis_z_mean": 0.701156892756621,
+      "command": {
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "height": 0.699999988079071,
+        "rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "arm_motion": false
+      }
+    },
+    {
+      "scenario": "arms_stand",
+      "episodes": 10,
+      "falls": 1,
+      "fall_rate_ci95": [
+        0.017876212896073995,
+        0.4041500295247722
+      ],
+      "lin_err_mean": 0.010250268685329635,
+      "ang_err_mean": 0.011786500652260994,
+      "velocity_mean": [
+        -9.533562651574389e-05,
+        0.00021180758324957713,
+        0.0006706722776098217
+      ],
+      "pelvis_z_mean": 0.7065116723304913,
+      "command": {
+        "velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "height": 0.699999988079071,
+        "rpy": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "arm_motion": true
+      }
+    }
+  ],
+  "provenance": {
+    "time_utc": "2026-11-04T21:52:02+00:00",
+    "git": {
+      "commit": "9b5bd6588b5e995f7a5ac3f611b427c3a0682500",
+      "dirty": true,
+      "changes": [
+        "README.md",
+        "docs/DECISIONS.md",
+        "docs/STAGE3_DESIGN.md",
+        "docs/STAGE4_DESIGN.md",
+        "msi/jobs/groot_finetune.sbatch"
+      ]
+    },
+    "code_recorded_at": "process start",
+    "source": {
+      "sha256": "51c8ecca95b4989ac07e659a61732f21d3ae79bc657d0f9297d2b4818808dfe9",
+      "files": 34
+    },
+    "python": "3.12.3",
+    "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.39",
+    "host": "godzilla",
+    "packages": {
+      "pi-wbc": "0.0.1",
+      "isaaclab": "3.0.0",
+      "isaacsim": null,
+      "newton": "1.6.1",
+      "warp-lang": "1.17.0",
+      "torch": "2.11.0+cu130",
+      "rsl-rl-lib": "5.5.1",
+      "mujoco": "3.12.0",
+      "onnxruntime": "1.31.1",
+      "numpy": "2.5.4"
+    },
+    "torch_cuda": "13.0",
+    "gpus": [
+      {
+        "name": "NVIDIA GeForce RTX 4070",
+        "driver": "595.99.02",
+        "memory_mib": "12282"
+      }
+    ]
+  }
+}

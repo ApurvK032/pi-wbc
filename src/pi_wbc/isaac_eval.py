@@ -91,6 +91,16 @@ def main(argv: list[str] | None = None) -> None:
         help="kicks as in the MuJoCo bench: this speed (m/s) added to the pelvis in a random "
         "horizontal direction at 3, 7, 11, 15 and 19 s",
     )
+    parser.add_argument(
+        "--heel-x",
+        type=float,
+        default=None,
+        help="move the feet's heel contact spheres here (m; Isaac Lab asset -0.02, Unitree's URDF "
+        "-0.05), see pi_wbc.stage3.feet",
+    )
+    parser.add_argument(
+        "--substeps", type=int, default=None, help="Newton substeps per physics step (training: 2)"
+    )
     parser.add_argument("--label", default=None)
     parser.add_argument("--out", type=Path, required=True)
     add_launcher_args(parser)
@@ -171,7 +181,12 @@ def main(argv: list[str] | None = None) -> None:
         env_cfg.commands.body_pose.resampling_time_range = (1.0e6, 1.0e6)
         env_cfg.curriculum.upper_body_level = None
 
-    with launch_simulation(env_cfg, args):
+    with launch_simulation(env_cfg, args) as physics_cfg:
+        if args.substeps is not None:
+            physics_cfg.num_substeps = args.substeps
+            env_cfg.sim.physics = physics_cfg
+        substeps = getattr(env_cfg.sim.physics, "num_substeps", None)
+        print(f"[isaac-eval] physics substeps: {substeps}")
         env = gym.make(args.task, cfg=env_cfg)
         venv = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
         runner = create_rsl_rl_runner(venv, agent_cfg)
@@ -179,6 +194,15 @@ def main(argv: list[str] | None = None) -> None:
         policy = runner.get_inference_policy(device=venv.unwrapped.device)
         base = venv.unwrapped
         device = base.device
+        if args.substeps is not None:  # the solver's own count, not only the config's
+            from isaaclab_newton.physics.newton_manager import NewtonManager
+
+            substeps = NewtonManager._num_substeps
+            print(f"[isaac-eval] Newton runs {substeps} substeps of {NewtonManager._solver_dt} s")
+        if args.heel_x is not None:
+            from pi_wbc.stage3.feet import set_heel_x
+
+            print(f"[isaac-eval] moved {set_heel_x(args.heel_x)} heel spheres to x={args.heel_x}")
         robot = base.scene["robot"]
 
         scenario_of = torch.arange(n, device=device) // args.seeds
@@ -281,6 +305,8 @@ def main(argv: list[str] | None = None) -> None:
                 "randomized": args.randomized,
                 "push_speed": args.push_speed,
                 "arm_level": args.arm_level,
+                "heel_x": args.heel_x,
+                "substeps": substeps,
                 "overrides": overrides,
                 "scenarios": {s: asdict(scenarios[s]) for s in names},
                 "summary": rows,

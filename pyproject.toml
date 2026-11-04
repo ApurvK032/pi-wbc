@@ -29,6 +29,10 @@ pi-wbc-isaac-eval = "pi_wbc.isaac_eval:main"
 pi_wbc = "pi_wbc.tasks"
 
 [dependency-groups]
+# Writing the stage 3 dataset (Parquet tables for GR00T and LeRobot).
+data = [
+    "pyarrow>=26",
+]
 dev = [
     "pre-commit>=4.0",
     "pytest>=8.3",
@@ -47,7 +51,7 @@ requires = ["uv_build>=0.13.6,<0.14"]
 build-backend = "uv_build"
 
 [tool.uv]
-default-groups = ["dev", "sim"]
+default-groups = ["dev", "sim", "data"]
 # The workstation and the cluster are both Linux x86_64.
 environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
 
