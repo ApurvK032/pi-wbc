@@ -11,9 +11,9 @@ frame; the loader itself asserts one frame per row), and checks:
 
 - every state and action group has the size modality.json gives, and equals the parquet's slice;
 - the language is the episode's instruction (tasks.jsonl and meta/pi_wbc.json agree);
-- the frames GR00T decodes (torchcodec) match ffmpeg's frames at the same indices (first, middle
-  and last), and the middle one differs from a frame 0.2, 0.4 or 0.8 s later, so rows and frames
-  line up (the robot may stand still for a moment);
+- the frames GR00T decodes (torchcodec) equal ffmpeg's at the same indices (first, middle and
+  last), and where the video changes most between two frames GR00T's frame equals ffmpeg's same
+  frame and not the next one, so rows and frames line up (not off by one);
 - `extract_step_data`, which builds GR00T's training samples, returns the 30-step action chunks
   of the unitree_g1 config at the first and last full step;
 - the dataset statistics GR00T computed load.
@@ -90,12 +90,15 @@ def main() -> None:
         theirs = np.stack([np.asarray(df["video.ego_view"].iloc[k]) for k in idx]).astype(int)
         ref = ffmpeg_frames(video, idx).astype(int)
         same = [float(np.abs(theirs[j] - ref[j]).mean()) for j in range(3)]
-        # mid-task the robot moves: a frame 0.2, 0.4 or 0.8 s later must differ
-        fps = info["fps"]
-        later = [min(n // 2 + round(t * fps), n - 1) for t in (0.2, 0.4, 0.8)]
-        shifted = ffmpeg_frames(video, later).astype(int)
-        off = [float(np.abs(theirs[1] - f).mean()) for f in shifted]
-        assert max(same) < 1.0 and max(off) > 3 * max(same) + 0.5, (same, off)
+        # off-by-one test: where the video changes most from one frame to the next, GR00T's frame
+        # must equal ffmpeg's same frame and differ from ffmpeg's next one
+        small = np.stack([np.asarray(f)[::8, ::8] for f in df["video.ego_view"]]).astype(np.int16)
+        k = int(np.argmax(np.abs(np.diff(small, axis=0)).mean(axis=(1, 2, 3))))
+        pair = ffmpeg_frames(video, [k, k + 1]).astype(int)
+        mine = np.asarray(df["video.ego_view"].iloc[k]).astype(int)
+        at_k = float(np.abs(mine - pair[0]).mean())
+        off = [float(np.abs(mine - pair[1]).mean())]
+        assert max(same) < 1.0 and at_k < 1.0 and off[0] > 3 * at_k + 0.5, (same, at_k, off)
         # training samples: action chunks of the config's horizon at the first and last full step
         for step in (0, n - horizon):
             vla = extract_step_data(df, step, configs, EmbodimentTag.UNITREE_G1)
@@ -106,11 +109,11 @@ def main() -> None:
         report["checked"].append({
             "episode_index": i, "seed": ours[i]["seed"], "rows": n,
             "frame_diff_vs_ffmpeg": [round(x, 3) for x in same],
-            "frame_diff_vs_0.2_0.4_0.8_s_later": [round(x, 2) for x in off],
+            "frame_diff_at_largest_change_vs_next": [round(at_k, 3), round(off[0], 2)],
         })  # fmt: skip
         seed = ours[i]["seed"]
         print(f"[groot] episode {i} (seed {seed}): {n} rows ok; frames differ from ffmpeg's "
-              f"by {max(same):.2f} (later: {max(off):.1f})", flush=True)  # fmt: skip
+              f"by {max(same):.2f} (next frame: {off[0]:.1f})", flush=True)  # fmt: skip
     stats = loader.get_dataset_statistics()
     report["statistics_keys"] = sorted(stats)
     report["action_horizon"] = horizon
