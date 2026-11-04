@@ -18,7 +18,7 @@ keeps the robot balanced. Stage 4 is done when:
 | | |
 |---|---|
 | Training data | v1: 1,000 episodes (790,046 frames at 25 fps); v2: 2,000 (contains v1); validation: 241, from layouts never trained on (D-047); v1, v2 and validation also at 50 fps (D-048) |
-| Evaluation loop | [scripts/vla_eval.py](../scripts/vla_eval.py): live head camera, a GR00T policy server client (written to the server's message format, not yet run against a server); replaying the expert's own commands open loop succeeds on 71% of validation episodes at 50 Hz, 50% at the 25 fps dataset's rate (D-048) |
+| Evaluation loop | [scripts/vla_eval.py](../scripts/vla_eval.py): live head camera, a GR00T policy server client (written to the server's message format, not yet run against a server); replaying the expert's own commands open loop succeeds on 69% of validation episodes at 50 Hz, 49% at the 25 fps dataset's rate (each command held), 62% averaged, under the shared judge (D-048, D-052) |
 | Formats | GR00T-flavoured LeRobot v2.1 with GR00T's `unitree_g1` names; LeRobot v3.0 with quantile statistics (D-045) |
 | Loader checks | GR00T's loader on every episode of each export (v2 at 50 fps: a 12-episode sample); LeRobot's `LeRobotDataset` on 12-episode samples (D-045, D-050) |
 | GR00T on this PC | N1.6 environment (`third_party/Isaac-GR00T-n1d6`, branch n1d6); NVIDIA's G1 checkpoint runs on our observations: 6,830 MiB of GPU memory at batch 1 (7,154 at batch 8), 79 ms per call at batch 1, 377 ms at batch 8 (GPU shared with other jobs while measured) |
@@ -86,11 +86,13 @@ keeps the robot balanced. Stage 4 is done when:
 - Lighting: the render-only trick of turning the whole scene for the sun's direction
   (D-043) can't be used with live physics; each batch gets a random global sun direction
   instead.
-- Success and failure labels: one judge shared by the expert, the replay check and this loop
-  (object resting in the named bin, no other object moved more than 2 cm until the arm has
-  withdrawn, the robot's falls; 60 s limit), and timeouts labelled as timeouts. Not yet so: the
-  loop stops 1 s after the object comes to rest, so it misses pushes during the retract, and it
-  labels a timeout "dropped" (D-051). Fixed before any VLA is scored.
+- Success and failure labels: one judge for the expert, the replay check and this loop
+  ([src/pi_wbc/stage3/judge.py](../src/pi_wbc/stage3/judge.py), D-052), every control step. A
+  fall (pelvis below 0.45 m or tilted past 60 degrees) or another object moved more than 2 cm
+  ends the episode at once; otherwise it ends 4.5 s after the target is first in a bin and out
+  of the hand (the expert's arm withdraws within 3.5-4.3 s, so pushes while withdrawing count),
+  or at 60 s, labelled by its state then: success, wrong bin, dropped, knocked (pushed before a
+  hand reached it), missed grasp, or timed out (never reached, or still held).
 - Layouts: checkpoint choice on validation layouts (40000-40255, never trained on); the reported
   number on test layouts 60384-60767, the expert's official set, so every layout has the
   expert's outcome beside the VLA's. The expert's 94.8% there predates D-042's zero-velocity

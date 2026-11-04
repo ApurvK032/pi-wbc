@@ -75,7 +75,7 @@ Training seed 2, recording seed 0, the first take, on the fixed bench (D-040).</
 - **Evaluated like a study, not a demo.** Three training seeds per configuration, development
   seeds for choices and frozen test seeds reported in full for every candidate recipe (one
   problem first seen there led to D-024), 95% Wilson intervals, and result files stamped with
-  their commit, code hash, package versions and GPU. 51 decisions are logged with what each one
+  their commit, code hash, package versions and GPU. 52 decisions are logged with what each one
   cost.
 - **Debugged in the open.** Four problems were found and fixed on the way (slow walking, falls at
   full arm ranges, too short a history, lost turning), each traced to its cause with an

@@ -3,8 +3,9 @@
 Each entry says what was decided, why, and what it costs. Entries are numbered D-NNN and never
 deleted; a later entry that replaces one says so, and the old one is marked superseded.
 
-**Index** (stage 0: D-001 to D-011; stage 1: D-012 to D-029; stage 3: D-030 onwards, with
-D-039 and D-040 correcting stage 1's MuJoCo bench and D-051 stage 3's benches and statements; open
+**Index** (stage 0: D-001 to D-011; stage 1: D-012 to D-029; stage 3: D-030 to D-051, with
+D-039 and D-040 correcting stage 1's MuJoCo bench and D-051 stage 3's benches and statements;
+stage 4: D-052 onwards; open
 items at the [end](#open-items)):
 
 | Decision | What | Date |
@@ -56,10 +57,11 @@ items at the [end](#open-items)):
 | [D-045](#d-045-the-datasets-export-format-gr00t-flavoured-lerobot-v21-and-lerobot-v30-2026-11-04) | The dataset's export format: GR00T-flavoured LeRobot v2.1, and LeRobot v3.0 | 2026-11-04 |
 | [D-046](#d-046-nvidias-controller-as-the-tasks-low-level-2026-11-04) | NVIDIA's controller as the task's low level, and its matched set (amended by D-051) | 2026-11-04 |
 | [D-047](#d-047-training-set-v2-and-a-validation-set-2026-11-04) | Training set v2 and a validation set (amended by D-051) | 2026-11-04 |
-| [D-048](#d-048-50-frames-per-second-versions-of-the-datasets-2026-11-04) | 50 frames-per-second versions of the datasets (amended by D-051) | 2026-11-04 |
+| [D-048](#d-048-50-frames-per-second-versions-of-the-datasets-2026-11-04) | 50 frames-per-second versions of the datasets (amended by D-051 and D-052) | 2026-11-04 |
 | [D-049](#d-049-results-record-the-code-their-run-started-with-2026-11-04) | Results record the code their run started with (amended by D-051) | 2026-11-04 |
 | [D-050](#d-050-stage-3-closes-2026-11-04) | Stage 3 closes (amended by D-051) | 2026-11-04 |
 | [D-051](#d-051-stage-3-reviewed-before-its-merge-the-bench-scenes-physics-and-corrections-2026-11-04) | Stage 3 reviewed before its merge: the bench scenes' physics, and corrections | 2026-11-04 |
+| [D-052](#d-052-one-judge-for-the-expert-the-replay-check-and-the-evaluation-loop-2026-11-04) | One judge for the expert, the replay check and the evaluation loop | 2026-11-04 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -1301,6 +1303,10 @@ items at the [end](#open-items)):
   episodes they disagree on 75 (42 succeed only in the loop, 33 only in the check), so 71%
   against 67% does not show that the loop adds no loss. The comparisons between command rates,
   all under the loop's own rule, stand.
+- **Amended by D-052 (2026-11-04):** under the shared judge the same replays give 166, 119 and
+  150 of 241; holding still costs about 20 points (p = 2.5e-6), but averaging against 50 Hz is
+  no longer a shown difference (48 against 32 episodes, p = 0.09), and the loop and the replay
+  check agree within noise (33 against 35, p = 0.90). Details: results/stage4/README.md.
 
 ## D-049: Results record the code their run started with (2026-11-04)
 
@@ -1386,6 +1392,44 @@ items at the [end](#open-items)):
   before the fix was committed and again from its commit (9b5bd65), whose files are the ones kept.
   Not changed: the expert's 94.8%, the datasets and their checks, the matched set and the
   command-rate test. Stage 4 starts with the judge.
+
+## D-052: One judge for the expert, the replay check and the evaluation loop (2026-11-04)
+
+- **What:** every episode is judged by one module,
+  [src/pi_wbc/stage3/judge.py](../src/pi_wbc/stage3/judge.py), from simulator state at every
+  control step: in the closed-loop evaluation (`scripts/vla_eval.py`), in the replay check
+  (`scripts/replay_check.py`, which now holds a recording's last command until the judge has
+  ended the episode) and beside the expert's own labels in `scripts/expert_rollout.py` (both
+  reported; the expert, its labels and its recordings are unchanged). A fall (pelvis below
+  0.45 m or tilted more than 60 degrees) or another object moved more than 2 cm ends an episode
+  at once; otherwise it ends 4.5 s after the target is first in a bin and out of the hand (its
+  centre more than 12 cm from both palms, the expert's own test), or at 60 s, labelled by its
+  state then: success, wrong_bin, dropped, knocked (pushed more than 3 cm before a hand reached
+  it), missed_grasp or timed_out (never reached, or still held). Results:
+  [results/stage4](../results/stage4/README.md).
+- **Why:** D-051 found that the evaluation loop stopped 1 s after the object came to rest (so
+  it never saw objects pushed while the arm withdraws, our controller's main failure), that the
+  replay check had no fall test, and that both labelled every timeout "dropped", which stage 5
+  would have counted against the controller. A VLA must be judged as the expert is. The 4.5 s:
+  the expert takes 3.5-4.3 s from letting go to the end of its retract (median 4.24 s). The
+  hand test: the expert carries the object low over the bin, and it passes the resting-in-bin
+  test up to 3.3 s before the hand opens.
+- **Checked:** judging the 1,088 training and 256 validation recordings again
+  (`scripts/judge_recordings.py`, palms from the recorded joint angles on the controller's
+  MuJoCo model), every one of the expert's 1,251 successes is a success. The 49 failures judged
+  successes are all the expert's `knocked_other`: the push happened in the control step at
+  which the expert stopped, which the recorder does not store (the largest push left in those
+  recordings is 2.0 cm); live runs see it. The other label differences (9) are other names for
+  the same grasp failures. D-048's replays under the judge, on the 241 validation episodes:
+  50 Hz 166 (68.9%), 25 Hz held 119 (49.4%), averaged 150 (62.2%), the replay check 168
+  (69.7%). Holding costs about 20 points (73 against 26 episodes, p = 2.5e-6) as before;
+  averaging against 50 Hz is no longer a shown difference (48 against 32, p = 0.09; it was
+  p = 0.0015). The loop and the replay check now agree within noise (33 against 35, p = 0.90).
+- **Cost:** 51 minutes of GPU for the four replays; the replay check runs each episode up to
+  4.5 s longer, and the evaluation loop reads the scene at every control step instead of every
+  frame. The expert's success rates (D-041, D-046) stay as they were measured, under its own
+  rule; on every episode the recordings can show, the two rules agree. Three of the replays
+  record one uncommitted file (docs/STAGE4_DESIGN.md, text). Not rerun: D-048's NVIDIA replays.
 
 ## Open items
 
