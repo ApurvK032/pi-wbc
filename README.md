@@ -54,7 +54,8 @@ Training seed 2, recording seed 0, the first take, on the fixed bench (D-040).</
 > that controller on 94.8% of unused test layouts (the target was 95%), and 2,000 of its
 > episodes, rendered from the head camera, load in GR00T's own data loader (and LeRobot's, checked
 > on samples). All transfer here is sim-to-sim;
-> nothing has run on hardware. Next: fine-tuning GR00T on the demonstrations ([roadmap](#roadmap)).
+> nothing has run on hardware. Under way: fine-tuning GR00T N1.6 on the demonstrations
+> ([roadmap](#roadmap)).
 
 **Contents:** [Highlights](#highlights) · [The project](#the-project) ·
 [How it works](#how-it-works) · [Results](#results) ·
@@ -91,7 +92,7 @@ Training seed 2, recording seed 0, the first take, on the fixed bench (D-040).</
 - **Evaluated like a study, not a demo.** Three training seeds per configuration, development
   seeds for choices and frozen test seeds reported in full for every candidate recipe (one
   problem first seen there led to D-024), 95% Wilson intervals, and result files stamped with
-  their commit, code hash, package versions and GPU. 52 decisions are logged with what each one
+  their commit, code hash, package versions and GPU. 53 decisions are logged with what each one
   cost.
 - **Debugged in the open.** Four problems were found and fixed on the way (slow walking, falls at
   full arm ranges, too short a history, lost turning), each traced to its cause with an
@@ -432,7 +433,7 @@ docstring; times on the RTX 4070):
 | 1 | Whole-body controller: PPO, rewards, curriculum, domain randomization, teacher-student ([results](results/stage1/README.md)) | done |
 | 2 | Human motion imitation from retargeted motion capture | planned |
 | 3 | Pick-and-place task, scripted expert, rendered demonstrations ([results](results/stage3/README.md)) | done |
-| 4 | VLA fine-tuning (GR00T N1.6, π0.5) and closed-loop evaluation | planned |
+| 4 | VLA fine-tuning (GR00T N1.6, π0.5) and closed-loop evaluation ([results so far](results/stage4/README.md)) | in progress |
 | 5 | Failure attribution study and controller swap against NVIDIA's controller | planned |
 
 The full plan: [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
