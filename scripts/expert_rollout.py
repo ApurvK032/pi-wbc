@@ -39,10 +39,24 @@ parser.add_argument(
 )
 parser.add_argument(
     "--cam",
-    choices=["side", "front"],
+    choices=["side", "front", "hero", "herd"],
     default="side",
-    help="side: the robot's right, approach and table; front: across the table, at the hand",
+    help="side: the robot's right, approach and table; front: across the table, at the hand; "
+    "hero: across the table, robot, hand and both bins (640 x 400, for the front page)",
 )
+parser.add_argument(
+    "--herd",
+    action="store_true",
+    help="with --gif: one high camera in the first robot's world that sees every robot "
+    "(pi_wbc.stage3.herd), robots --herd-spacing apart; for front-page pictures",
+)
+parser.add_argument("--herd-spacing", type=float, default=5.0, help="metres between robots")
+parser.add_argument(
+    "--herd-eye",
+    default="6,-22,8",
+    help="camera position relative to the robots' centre (x toward the tables, z up)",
+)
+parser.add_argument("--herd-target", default="4,-2,0", help="where it looks, same frame")
 parser.add_argument(
     "--param",
     action="append",
@@ -115,6 +129,8 @@ def look_at(eye, target):
 CAMERAS = {  # (eye, target) in the environment's frame; the table's front edge is at x = 0
     "side": ((-1.6, -2.4, 1.6), (-0.6, 0.0, 0.8)),  # robot's right side, approach and table front
     "front": ((0.75, -0.15, 1.15), (0.12, -0.10, 0.82)),  # across the table, at the hand
+    "hero": ((0.75, -1.15, 1.35), (-0.45, 0.05, 0.9)),  # across the table, front right
+    "herd": ((0.75, -1.15, 1.35), (-0.45, 0.05, 0.9)),  # moved over all robots by --herd
 }
 
 
@@ -127,13 +143,30 @@ def side_camera(small: bool = False, cam: str = "side"):
     return CameraCfg(
         prim_path="{ENV_REGEX_NS}/debug_cam",
         update_period=0.0,
-        width=320 if small else 480,
-        height=214 if small else 320,
+        width=320 if small else {"hero": 640, "herd": 960}.get(cam, 480),
+        height=214 if small else {"hero": 400, "herd": 540}.get(cam, 320),
         data_types=["rgb"],
-        spawn=sim_utils.PinholeCameraCfg(focal_length=18.0, clipping_range=(0.05, 30.0)),
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=18.0, clipping_range=(0.05, 150.0 if cam == "herd" else 30.0)
+        ),
         offset=CameraCfg.OffsetCfg(pos=eye, rot=look_at(eye, target), convention="world"),
         renderer_cfg=NewtonWarpRendererCfg(),
     )
+
+
+def aim_herd_camera(base, eye_offset, target_offset) -> None:
+    """Point the first robot's camera over every robot, and let it see them all."""
+    from pi_wbc.stage3.herd import see_all_worlds
+
+    cam = base.scene["debug_cam"]
+    see_all_worlds(cam._renderer.newton_sensor.model)
+    origins = base.scene.env_origins
+    centre = origins.mean(dim=0) + torch.tensor((-0.8, 0.0, 0.0), device=origins.device)
+    eye = (centre + torch.tensor(eye_offset, device=origins.device)).tolist()
+    target = (centre + torch.tensor(target_offset, device=origins.device)).tolist()
+    pos = torch.tensor([eye], device=origins.device)
+    rot = torch.tensor([look_at(eye, target)], device=origins.device)
+    cam.set_world_poses(pos, rot, env_ids=[0], convention="world")
 
 
 def save_gif(frames, path: Path) -> None:
@@ -147,6 +180,10 @@ def save_gif(frames, path: Path) -> None:
 
 
 def main() -> None:
+    if args.herd:  # unused objects stand 6 m from their table: in the next robot's patch here
+        import pi_wbc.tasks.g1_pick_place as task_module
+
+        task_module.PARK = (-400.0, 400.0)
     env_cfg, agent_cfg = resolve_task_config(
         TASK, "rsl_rl_cfg_entry_point", overrides=[*overrides, "physics=newton_mjwarp"]
     )
@@ -157,7 +194,10 @@ def main() -> None:
     n = min(args.num_envs, args.episodes)
     env_cfg.scene.num_envs = n
     if args.gif is not None or args.fail_gifs is not None:
-        env_cfg.scene.debug_cam = side_camera(small=args.fail_gifs is not None, cam=args.cam)
+        cam = "herd" if args.herd else args.cam
+        env_cfg.scene.debug_cam = side_camera(small=args.fail_gifs is not None, cam=cam)
+    if args.herd:
+        env_cfg.scene.env_spacing = args.herd_spacing
     with launch_simulation(env_cfg, args):
         env = gym.make(TASK, cfg=env_cfg)
         venv = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
@@ -220,6 +260,9 @@ def main() -> None:
             seed += n
             base.pick_place_layouts = [L.sample(s) for s in seeds]
             base.reset()
+            if args.herd and not results:
+                aim_herd_camera(base, [float(v) for v in args.herd_eye.split(",")],
+                                [float(v) for v in args.herd_target.split(",")])  # fmt: skip
             expert.reset(list(range(n)))
             if nv is not None:
                 nv.reset()

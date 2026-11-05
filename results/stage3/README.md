@@ -196,9 +196,14 @@ layouts ([src/pi_wbc/stage3/layout.py](../../src/pi_wbc/stage3/layout.py)). The 
 sends only the controller's commands: base velocity, body height and lean, and arm and hand
 joint targets ([scripts/expert_rollout.py](../../scripts/expert_rollout.py)).
 
-![The expert picks the red can and puts it in the purple bin](expert/expert_dev_50000.gif)
+![The expert picks the red can and puts it in the purple bin, beside the head camera's view](media/pick_and_place.gif)
 
-(An earlier version of the expert, on development layout 50,000.)
+(The final expert on validation layout 40,003, beside the head camera's view of the same
+episode, 2x speed; [run](media/pick_and_place-run.json),
+[render](media/pick_and_place-render.json). An earlier version on development layout 50,000:
+[expert/expert_dev_50000.gif](expert/expert_dev_50000.gif). 64 robots at once, each on its own
+training layout: [media/herd.gif](media/herd.gif), with one camera that sees every robot
+([src/pi_wbc/stage3/herd.py](../../src/pi_wbc/stage3/herd.py)); [run](media/herd-run.json).)
 
 On unused test layouts 60,384-60,767, run once (D-041):
 

@@ -1,8 +1,9 @@
 <h1 align="center">π-WBC</h1>
 
 <p align="center"><b>Whole-body control for the Unitree G1 humanoid: a PPO teacher-student controller
-trained in Isaac Lab, tested sim-to-sim on PhysX and MuJoCo without retraining, and built to sit
-under a vision-language-action model.</b></p>
+trained in Isaac Lab, tested sim-to-sim on PhysX and MuJoCo without retraining, and a
+pick-and-place task whose rendered demonstrations will teach a vision-language-action model to
+drive it.</b></p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.12-3776ab" alt="Python 3.12">
@@ -13,6 +14,13 @@ under a vision-language-action model.</b></p>
   <img src="https://img.shields.io/badge/stages%201%20and%203%20of%205-done-2ea44f" alt="Stages 1 and 3 of 5: done">
   <img src="https://img.shields.io/badge/license-all%20rights%20reserved-lightgrey" alt="License: all rights reserved">
 </p>
+
+<p align="center">
+  <img src="results/stage3/media/pick_and_place.gif" alt="Left: the G1 walks to a table, picks up the red can and puts it in the purple bin. Right: the head camera's view of the same episode" width="800">
+</p>
+<p align="center"><em>"Pick up the red can and drop it in the purple bin": the stage 3 scripted expert
+drives the G1 through the stage 1 controller (left), and the head camera records what a VLA will
+learn from (right). Validation layout 40,003, the final expert, 2x speed.</em></p>
 
 <p align="center">
   <img src="results/stage1/long_s2_walk_turn.gif" alt="The G1 walking at 0.6 m/s while turning at 0.5 rad/s, in plain MuJoCo" width="440">
@@ -27,9 +35,17 @@ MuJoCo Menagerie's G1 model, which it never trained on: walking while turning, t
 kicked at 2 m/s while walking at 1 m/s, and walking while the arms sweep their trained range.
 Training seed 2, recording seed 0, the first take, on the fixed bench (D-040).</em></p>
 
+**Stage 1, the controller**
+
 | **1** | **3** | **2.5 m/s** | **3.2 h** |
 |:---:|:---:|:---:|:---:|
 | fall in 66,000 MuJoCo test episodes without kicks, with low friction, 1 kg in each hand, extra delay and sensor noise included | simulators the same policy runs in without retraining: Isaac Lab (Newton), Isaac Sim (PhysX) and MuJoCo | the largest kick survived at least 95% of the time on every training seed (98.6%-99.4% of kicks) | of training for one seed on one L40S GPU, 4096 robots in parallel (seed 3: teacher 2.5 h, student 0.7 h) |
+
+**Stage 3, the task and the demonstrations**
+
+| **94.8%** | **17.6 h** | **96.4% vs 92.8%** | **5,482** |
+|:---:|:---:|:---:|:---:|
+| of 384 unused test layouts solved by the scripted expert through our controller (95% CI 92.1-96.6%) | of demonstrations in training set v2: 2,000 episodes, 3.2 million head-camera frames at 50 fps, plus 241 episodes for validation | the expert's success through NVIDIA's controller and ours on the same 1,088 layouts; the gap is objects pushed while our robot withdraws its arm | episodes read back through GR00T N1.6's own data loader, one video frame per row, spot-checked against an independent decode |
 
 > **Status: stages 1 and 3 of 5 are done.** Stage 1, the whole-body controller: a student policy
 > that sees only what a real G1 measures walks, turns, crouches, leans and keeps its balance
@@ -147,8 +163,10 @@ flowchart LR
 
 ## Results
 
-All numbers are for the three trained students (training seeds 1-3) of the final recipe, unless
-marked. Full tables, raw data and the path that led here: [results/stage1](results/stage1/README.md).
+Stage 1's numbers are for the three trained students (training seeds 1-3) of the final recipe,
+unless marked; full tables, raw data and the path that led here:
+[results/stage1](results/stage1/README.md). Stage 3's, for the task, the expert and the
+demonstrations, close this section ([the task and its demonstrations](#the-task-and-its-demonstrations-stage-3)).
 
 ### Following commands
 
@@ -266,6 +284,50 @@ each. Seen on every seed:
   84 / 258 / 116) and more to sensor noise, though still rarely (48 against 6 of 13,200). So
   noise randomization seems to cost some push recovery; neither cause was tested.
 
+### The task and its demonstrations (stage 3)
+
+<p align="center">
+  <img src="results/stage3/media/herd.gif" alt="64 G1 robots, each at its own table, picking up objects and putting them in bins at the same time" width="720">
+</p>
+<p align="center"><em>64 robots run the task at once, each on its own layout (training layouts
+10,000-10,063, 2x speed), as when the demonstrations are recorded; one camera sees them all.</em></p>
+
+A table, three of five round objects, two bins and a seeded layout; the robot starts 1.5-3 m
+away. The scripted expert reads the true state and sends only what a VLA will send: base
+velocity, pelvis height, torso lean and arm and hand joint targets, through the stage 1
+controller. It solves 364 of 384 unused test layouts (94.8%, 95% CI 92.1-96.6%); 16 of its 20
+failures are another object pushed more than 2 cm, none a fall. Its first 1,000 successes in
+seed order form the training set (2,000 in v2, 241 more for validation), each replayed through
+the physics to check that it belongs to its commands, then rendered from the head camera with
+its own randomized look:
+
+<p align="center">
+  <img src="results/stage3/render/head_camera_lift.jpg" alt="Twelve head-camera views, each with a different floor, table, wall, light and camera mount, half a second into the lift" width="760">
+</p>
+<p align="center"><em>The head camera half a second into the lift, in 12 training episodes: floor,
+table and wall colours and patterns, the sun's height and direction, the light and the camera's
+mount all vary with the episode's seed; object and bin colours stay fixed, since the
+instructions name them.</em></p>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="results/figures/stage3-dark.png">
+  <img src="results/figures/stage3-light.png" alt="Left: failures on the same 1,088 layouts with our controller and NVIDIA's; pushes while the arm withdraws are 4.1% against 0.4%, other failures 3.0% against 3.2%. Right: the expert's commands replayed open loop succeed 71.0% and 96.7% at 50 Hz, 49.8% and 71.8% when each is held for two steps" width="820">
+</picture>
+</p>
+
+- **Our controller against NVIDIA's.** Under the same commands, the expert succeeds more often
+  through NVIDIA's Decoupled WBC (96.4% against 92.8%, paired p = 3.5e-5). Nearly all of the
+  gap is other objects pushed while our robot withdraws its arm from the bin (left); why is a
+  stage 5 lead.
+- **The command rate matters.** Replaying the expert's commands open loop, holding each for
+  two control steps (a 25 Hz stream) costs 21-25 points with either controller (right), so the
+  datasets also come at 50 frames per second, the rate of NVIDIA's own G1 data.
+- **Checked from end to end.** GR00T N1.6's own loader reads every episode of each export (v2
+  at 50 fps: a 12-episode sample), its frames spot-checked against an independent decode;
+  LeRobot's reads samples; every row is recomputed from its recording. A review before the merge reran two benches and corrected several statements
+  (D-051). Details: [results/stage3](results/stage3/README.md).
+
 ## What went wrong on the way, and the fixes
 
 <p align="center">
@@ -327,6 +389,7 @@ docstring; times on the RTX 4070):
 | Render the head camera | `uv run python scripts/render_episodes.py --episodes logs/dataset/train-v1 --seeds manifest.json --out logs/render/train-v1 --viz none` (`--fps 50` for D-048) | about 20 min (about 65 at 50 fps) |
 | Export for GR00T | `uv run python scripts/export_dataset.py --recordings logs/dataset/train-v1 --render logs/render/train-v1 --seeds manifest.json --out logs/export/train-v1` | about 1 min |
 | Check with GR00T's and LeRobot's loaders | `scripts/check_groot_dataset.py`, `scripts/check_lerobot_dataset.py` (in their own environments) | minutes |
+| Front-page clips | `uv run python scripts/expert_rollout.py --seed-list 40003 --num-envs 1 --cam hero --gif hero.gif --record rec --out run.json --viz none`, then `render_episodes.py --episodes rec`; the herd: `--first-seed 10000 --episodes 64 --num-envs 64 --herd --gif herd.gif` | a few minutes each |
 | Check everything from disk | `uv run python scripts/verify_files.py --recordings ... --render ... --export ...` | seconds |
 
 ## Repository layout
