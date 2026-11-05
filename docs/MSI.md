@@ -31,9 +31,10 @@ apptainer build ~/containers/pi-wbc.sif ~/pi-wbc/msi/pi-wbc.def
 cd ~/pi-wbc && apptainer exec ~/containers/pi-wbc.sif uv sync --frozen
 ```
 
-The environment takes about 8 GB (`.venv` plus uv's cache in `~/.cache/uv`); the image 151 MB.
-Rebuild the image only when `msi/pi-wbc.def` changes; re-run `uv sync --frozen` when
-`uv.lock` changes.
+The environment takes about 8 GB (`.venv` plus uv's cache in `~/.cache/uv`); the image 151 MB
+before FFmpeg was added (2026-11-04: GR00T's video decoder, torchcodec, needs its libraries; the
+first GR00T job failed in its first batch without them). Rebuild the image only when
+`msi/pi-wbc.def` changes; re-run `uv sync --frozen` when `uv.lock` changes.
 
 ## Jobs
 

@@ -458,8 +458,9 @@ in the named bin, no other object has moved more than 2 cm and the robot is up, 
 60 s. That is not yet the expert's rule: the expert's episodes are judged after the arm has
 withdrawn, so pushes during the retract count, while the loop stops 1 s after the object comes
 to rest; and an episode that runs out of time is labelled "dropped". Both are fixed before any
-VLA is scored (D-051). Replaying the expert's own commands open loop through it, on the 241
-validation episodes (D-048):
+VLA is scored (D-051; done in D-052, with these replays repeated under the shared judge in
+[results/stage4](../stage4/README.md)). Replaying the expert's own commands open loop through it, on
+the 241 validation episodes (D-048):
 
 | Commands sent | Success | 95% CI |
 |---|---:|---|
@@ -484,7 +485,7 @@ comparison. These are comparisons within the loop's own rule. Files: [eval/](eva
   failed (the pinned root ignores resets, and rewriting its pose every step shakes the grip).
 - **Why our controller pushes objects during the retract** where NVIDIA's doesn't (D-046).
 - **One success rule for the expert, the replay check and the evaluation loop,** and timeouts
-  labelled as timeouts, before stage 4 scores a VLA (D-051).
+  labelled as timeouts, before stage 4 scores a VLA (D-051; done in stage 4, D-052).
 - **Hand contact flags in the recordings** (design section 8): the recorder stores poses and
   commands, not which fingers touch the object.
 - **OVRTX renders** of a few episodes for the front page (D-031); the dataset itself uses

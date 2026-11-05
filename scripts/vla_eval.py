@@ -9,10 +9,10 @@ the policy gets the image, the 43 joint positions and the instruction and return
 commands in the export's 35-value layout (pi_wbc.stage3.export); each command is held for two
 50 Hz control steps.
 
-An episode succeeds once the target object rests in the named bin (the expert's judge,
-`placement_label`), no other object has moved more than 2 cm and the robot is up, for
-`--hold-s` without a break; otherwise it fails when `--max-s` runs out (label from the final
-state) or the robot falls.
+Every control step is judged by the shared judge (pi_wbc.stage3.judge, D-052), as the expert's
+episodes and the replay check are: a fall or another object moved more than 2 cm ends the
+episode; otherwise it ends `settle_s` after the target is first in a bin and out of the hand
+(time for the arm to withdraw, pushes included), or at `--max-s`, labelled by its state then.
 
 Policies:
 - `replay`: the expert's recorded commands for the same layout, as the dataset holds them
@@ -49,8 +49,6 @@ parser.add_argument("--seeds", required=True, help="layout seeds: a-b (inclusive
 parser.add_argument("--num-envs", type=int, default=16)
 parser.add_argument("--execute", type=int, default=8, help="frames executed per policy call")
 parser.add_argument("--max-s", type=float, default=60.0)
-parser.add_argument("--hold-s", type=float, default=1.0)
-parser.add_argument("--knock-dist", type=float, default=0.02)
 parser.add_argument("--render-seed", type=int, default=0)
 parser.add_argument("--gif", type=Path, default=None, help="save each episode's head camera here")
 RUN = "logs/rsl_rl/pi_wbc_g1_student/slurm-5628865-full-range-long-r"
@@ -85,14 +83,14 @@ from pi_wbc import provenance  # noqa: E402
 from pi_wbc.stage3 import appearance as A  # noqa: E402
 from pi_wbc.stage3 import export as E  # noqa: E402
 from pi_wbc.stage3 import layout as L  # noqa: E402
-from pi_wbc.stage3.expert import placement_label  # noqa: E402
+from pi_wbc.stage3.judge import Judge, JudgeParams  # noqa: E402
 from pi_wbc.stats import wilson_interval  # noqa: E402
 from pi_wbc.tasks.g1_pick_place import HighLevel  # noqa: E402
 
 TASK = "PiWbc-G1-PickPlace"
 FPS = args.fps
 FRAME_STEP = 50 // FPS  # control steps per frame (50 Hz control)
-FALL_Z = 0.45  # pelvis height (m) below which the robot has fallen
+CONTROL_DT = 1.0 / 50
 
 
 def tt(x):
@@ -240,7 +238,17 @@ def main() -> None:
         origins = base.scene.env_origins
         unit = torch.tensor([0.0, 0.0, 0.0, 1.0], device=dev)
         max_frames = round(args.max_s * FPS)
-        hold = round(args.hold_s * FPS)
+        judge_params = JudgeParams(max_s=args.max_s)
+        palm_ids = [robot.body_names.index(f"{s}_hand_palm_link") for s in ("left", "right")]
+
+        def scene_state():
+            o = origins[:, None]
+            every = (torch.stack([tt(x.data.root_pos_w) for x in objects], dim=1) - o).cpu().numpy()
+            palms = (tt(robot.data.body_link_pos_w)[:, palm_ids] - o).cpu().numpy()
+            z = (tt(robot.data.root_pos_w)[:, 2] - origins[:, 2]).cpu().numpy()
+            up = (-tt(robot.data.projected_gravity_b)[:, 2]).cpu().numpy()
+            return z, up, every, palms
+
         t0 = time.perf_counter()
         for start in range(0, len(seeds_all), n):
             seeds = seeds_all[start : start + n]
@@ -276,22 +284,11 @@ def main() -> None:
             tilt = torch.tensor([x.cam_tilt for x in looks], device=dev)
             gain = torch.tensor([x.gain for x in looks], device=dev)
             tint = torch.tensor([x.tint for x in looks], device=dev)
-            target = [L.OBJECT_NAMES.index(lay.target_object) for lay in lays]
-            others = [
-                [k for k, name in enumerate(L.OBJECT_NAMES)
-                 if name in lay.objects and name != lay.target_object]
-                for lay in lays
-            ]  # fmt: skip
             texts = [lay.instruction for lay in lays]
             obs = venv.get_observations()
-            every = torch.stack([tt(o.data.root_pos_w) for o in objects], dim=1)
-            start_xy = (every - origins[:, None]).cpu().numpy()[..., :2].copy()
-            ok_run = np.zeros(n, dtype=int)
-            done = np.zeros(n, dtype=bool)
-            label = ["timed_out"] * n
-            end_frame = np.full(n, max_frames)
-            fell = np.zeros(n, dtype=bool)
+            judge = Judge(lays, scene_state()[2], judge_params)
             chunk = None
+            t = 0.0
             calls, call_s = 0, 0.0
             with torch.no_grad():
                 for k in range(max_frames):
@@ -310,7 +307,7 @@ def main() -> None:
                         calls += 1
                         if args.gif is not None:
                             for i in range(m):
-                                if not done[i]:
+                                if not judge.done[i]:
                                     gif_frames.setdefault(seeds[i], []).append(images[i, ::2, ::2])
                     for sub in range(FRAME_STEP):
                         i = k % args.execute
@@ -326,36 +323,16 @@ def main() -> None:
                         hl.velocity[:] = a[:, 32:35]
                         hl.apply()
                         obs, _, _, _ = venv.step(controller(obs) if nv is None else nv.act())
-                    # judge
-                    every = torch.stack([tt(o.data.root_pos_w) for o in objects], dim=1)
-                    every = (every - origins[:, None]).cpu().numpy()
-                    z = tt(robot.data.root_pos_w)[:, 2].cpu().numpy()
-                    for i in range(m):
-                        if done[i]:
-                            continue
-                        moved = (np.linalg.norm(every[i, others[i], :2] - start_xy[i, others[i]],
-                                                axis=1).max() if others[i] else 0.0)  # fmt: skip
-                        if z[i] < FALL_Z:
-                            fell[i], done[i], label[i], end_frame[i] = True, True, "fell", k
-                            continue
-                        placed = placement_label(lays[i], every[i, target[i]])
-                        if moved > args.knock_dist:
-                            done[i], label[i], end_frame[i] = True, "knocked_other", k
-                            continue
-                        ok_run[i] = ok_run[i] + 1 if placed == "success" else 0
-                        if ok_run[i] >= hold:
-                            done[i], label[i], end_frame[i] = True, "success", k
-                        elif k == max_frames - 1:
-                            label[i] = placed if placed != "success" else "timed_out"
-                    if done[:m].all():
+                        t += CONTROL_DT
+                        judge.step(t, *scene_state())  # every control step
+                    if judge.done[:m].all():
                         break
+            judge.finish(t, "time limit")
             for i in range(m):
-                results.append({
-                    "seed": seeds[i], "instruction": texts[i], "label": label[i],
-                    "time_s": round(float(end_frame[i] + 1) / FPS, 2), "fell": bool(fell[i]),
-                })  # fmt: skip
-                print(f"[vla] seed {seeds[i]}: {label[i]:13s} at {results[-1]['time_s']:5.1f} s "
-                      f"'{texts[i]}'", flush=True)  # fmt: skip
+                r = judge.result(i)
+                results.append({"seed": seeds[i], "instruction": texts[i], **r})
+                print(f"[vla] seed {seeds[i]}: {r['label']:13s} at {r['time_s']:5.1f} s "
+                      f"({r['ended_by']}) '{texts[i]}'", flush=True)  # fmt: skip
             print(f"[vla] batch: {calls} policy calls, {1000 * call_s / max(calls, 1):.0f} ms each",
                   flush=True)  # fmt: skip
         wall = time.perf_counter() - t0
@@ -371,7 +348,7 @@ def main() -> None:
             "server": None if args.policy == "replay" else f"{args.host}:{args.port}",
             "controller_run": str(args.run), "low_level": args.low_level,
             "execute_frames": args.execute,
-            "max_s": args.max_s, "hold_s": args.hold_s, "knock_dist": args.knock_dist,
+            "max_s": args.max_s, "judge": judge_params.__dict__,
             "render_seed": args.render_seed, "episodes": len(results), "success": ok,
             "success_ci95": [lo, hi], "labels": labels, "results": results,
         })  # fmt: skip
