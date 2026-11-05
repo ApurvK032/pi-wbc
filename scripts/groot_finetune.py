@@ -5,6 +5,8 @@ with our arguments recorded next to the checkpoints (`pi_wbc_launch.json`; GR00T
 config there too). Starting from a checkpoint, GR00T passes only the tune flags, state dropout
 and fp32 trainable weights to the model; the rest of the model's settings (how many of the
 language model's top layers train: 4; bf16 weights) come from the checkpoint's own config.
+Each training log line also carries the peak GPU memory so far (`gpu_mem_peak_gib`), and only
+the last `--keep` checkpoints stay (each is about 23 GB with its optimizer state).
 
     third_party/Isaac-GR00T-n1d6/.venv/bin/python scripts/groot_finetune.py \\
         --base-model nvidia/GR00T-N1.6-3B --dataset logs/export/pi_wbc_g1_pick_place_train_v1 \\
@@ -37,6 +39,7 @@ def main() -> None:
     parser.add_argument("--grad-accum", type=int, default=1)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--keep", type=int, default=2, help="checkpoints kept (the latest)")
     parser.add_argument("--no-tune-diffusion", action="store_true")
     parser.add_argument("--no-tune-projector", action="store_true")
     parser.add_argument("--color-jitter", action="store_true",
@@ -49,6 +52,18 @@ def main() -> None:
     from gr00t.configs.base_config import get_default_config
     from gr00t.data.embodiment_tags import EmbodimentTag
     from gr00t.experiment.experiment import run
+    from gr00t.experiment.trainer import Gr00tTrainer
+
+    log = Gr00tTrainer.log
+
+    def log_with_memory(self, logs, start_time=None):  # the peak GPU memory in every log line
+        import torch
+
+        if torch.cuda.is_available():
+            logs["gpu_mem_peak_gib"] = round(torch.cuda.max_memory_allocated() / 2**30, 2)
+        return log(self, logs, start_time=start_time)
+
+    Gr00tTrainer.log = log_with_memory
 
     tag = EmbodimentTag[args.tag].value
     if args.modality_config is not None:
@@ -82,7 +97,7 @@ def main() -> None:
     t.gradient_accumulation_steps = args.grad_accum
     t.output_dir = str(args.output)
     t.save_steps = args.save_steps
-    t.save_total_limit = 5
+    t.save_total_limit = args.keep
     t.num_gpus = 1
     t.use_wandb = args.wandb
     t.max_steps = args.max_steps

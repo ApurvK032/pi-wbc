@@ -62,6 +62,7 @@ items at the [end](#open-items)):
 | [D-050](#d-050-stage-3-closes-2026-11-04) | Stage 3 closes (amended by D-051) | 2026-11-04 |
 | [D-051](#d-051-stage-3-reviewed-before-its-merge-the-bench-scenes-physics-and-corrections-2026-11-04) | Stage 3 reviewed before its merge: the bench scenes' physics, and corrections | 2026-11-04 |
 | [D-052](#d-052-one-judge-for-the-expert-the-replay-check-and-the-evaluation-loop-2026-11-04) | One judge for the expert, the replay check and the evaluation loop | 2026-11-04 |
+| [D-053](#d-053-gr00t-n16s-first-fine-tune-the-smoke-run-and-the-first-full-runs-settings-2026-11-04) | GR00T N1.6's first fine-tune: the smoke run, and the first full run's settings | 2026-11-04 |
 
 ## D-001: Robot is the Unitree G1, 29 DoF (2026-10-28)
 
@@ -1430,6 +1431,33 @@ items at the [end](#open-items)):
   frame. The expert's success rates (D-041, D-046) stay as they were measured, under its own
   rule; on every episode the recordings can show, the two rules agree. Three of the replays
   record one uncommitted file (docs/STAGE4_DESIGN.md, text). Not rerun: D-048's NVIDIA replays.
+
+## D-053: GR00T N1.6's first fine-tune: the smoke run, and the first full run's settings (2026-11-04)
+
+- **What:**
+  - **Smoke run** (cluster job 5784737: an A40 with 46 GB, code 484632c, GR00T 9b37aa1): 50
+    steps at batch 32 on training set v1 at 50 fps under `UNITREE_G1` trained and saved. The
+    loss fell from 1.30 to 1.04; after about 35 s of start-up it ran at 1.03 steps per second.
+    A checkpoint is 23 GB (9.8 GB of weights and 13 GB of optimizer state), and the run writes a
+    second copy of the final weights. The first attempt (job 5765490) failed in its first batch:
+    the cluster image had no FFmpeg, so GR00T's video decoder (torchcodec) could not load and
+    GR00T fell back to a backend its frame reader lacks. The image now has FFmpeg 6.1, the
+    workstation's version (msi/pi-wbc.def), and the job checks the decoder before training.
+  - **First full run:** the same data and tag (design section 4), batch 64, 20,000 steps (1.28
+    million samples, about 0.8 passes over v1's 1.58 million frames), learning rate 1e-4,
+    colour jitter on (GR00T's default), 8 data workers, a checkpoint every 2,000 steps with the
+    last 2 kept, and the peak GPU memory in every log line (`scripts/groot_finetune.py`). If
+    batch 64 does not fit in 48 GB, batch 32 with 2 accumulation steps. Before it,
+    `scripts/groot_inference_test.py` loads the smoke checkpoint on the cluster
+    (`msi/jobs/groot_check.sbatch`), and the run starts only if that passes.
+- **Why:** NVIDIA's G1 example trains 10,000 steps at batch 1,024 on 8 GPUs (10 million
+  samples). On one GPU, 20,000 steps at batch 64 take about 11 h on an A40 (from the smoke run's
+  speed) and an estimated 6-8 h on an L40S: one 24 h job. Keeping 5 checkpoints would take about
+  120 GB.
+- **Cost:** about an eighth of NVIDIA's samples. Checkpoints are compared on the validation set
+  afterwards; if its action error is still falling at the end, a second job resumes from the
+  last checkpoint. The smoke run's GPU memory was not recorded; the full run's first log lines
+  give it.
 
 ## Open items
 
