@@ -45,13 +45,19 @@ sim = [
     "torch==2.11.0",
     "torchvision==0.26.0",
 ]
+# The closed-loop evaluation's client for GR00T's policy server: ZeroMQ and msgpack, as in
+# GR00T's own environment.
+vla = [
+    "msgpack>=1.1",
+    "pyzmq>=27",
+]
 
 [build-system]
 requires = ["uv_build>=0.13.6,<0.14"]
 build-backend = "uv_build"
 
 [tool.uv]
-default-groups = ["dev", "sim", "data"]
+default-groups = ["dev", "sim", "data", "vla"]
 # The workstation and the cluster are both Linux x86_64.
 environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
 
